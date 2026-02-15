@@ -23,6 +23,9 @@ export interface CalendarItem {
   user_id: string;
   is_completed?: boolean | null;
   is_task?: boolean;
+  is_holiday?: boolean;
+  is_finance?: boolean;
+  is_project?: boolean;
 }
 
 interface EventEditDialogProps {

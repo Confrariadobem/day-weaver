@@ -8,6 +8,7 @@ import {
   User,
   Settings,
   LogOut,
+  Sparkles,
 } from "lucide-react";
 
 export type ModuleKey = "calendar" | "finances" | "dashboard" | "profile" | "preferences";
@@ -36,7 +37,7 @@ export default function NavSidebar({ activeModule, onModuleChange }: NavSidebarP
     <div className="flex h-full w-16 flex-col items-center border-r border-border bg-[hsl(var(--nav-background))] py-3">
       {/* Logo */}
       <div className="mb-6 flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-        <CalendarDays className="h-5 w-5 text-primary-foreground" />
+        <Sparkles className="h-5 w-5 text-primary-foreground" />
       </div>
 
       {/* Nav items */}
