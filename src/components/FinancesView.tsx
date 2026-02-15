@@ -110,6 +110,7 @@ export default function FinancesView() {
   const [cashFlowFilter, setCashFlowFilter] = useState<CashFlowFilter>("all");
   const [hidePaid] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Form state
   const [title, setTitle] = useState("");
@@ -669,42 +670,81 @@ export default function FinancesView() {
         {/* ============ LANÇAMENTOS ============ */}
         {viewTab === "previsao" && (
           <>
-            {/* Search bar */}
+            {/* Search bar - clean, minimal */}
             <div className="mb-2">
               <Input
                 placeholder="Pesquisar lançamentos por título ou categoria..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 text-xs"
+                className="h-8 text-xs bg-transparent border-0 border-b border-border/30 rounded-none focus-visible:ring-0 focus-visible:border-primary/40 placeholder:text-muted-foreground/40"
               />
             </div>
 
-            {/* Quick filters below search */}
+            {/* Quick filters + bulk actions */}
             <div className="mb-3 flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 flex-wrap">
-                <Button size="sm" variant={cashFlowFilter === "all" ? "default" : "outline"} className="h-7 text-[11px] px-2.5" onClick={() => setCashFlowFilter("all")}>
-                  Todos
-                </Button>
-                <Button size="sm" variant={cashFlowFilter === "payable" ? "default" : "outline"} className="h-7 text-[11px] px-2.5 gap-1" onClick={() => setCashFlowFilter("payable")}>
-                  <ArrowDownCircle className="h-3 w-3" /> Contas a Pagar
-                </Button>
-                <Button size="sm" variant={cashFlowFilter === "receivable" ? "default" : "outline"} className="h-7 text-[11px] px-2.5 gap-1" onClick={() => setCashFlowFilter("receivable")}>
-                  <ArrowUpCircle className="h-3 w-3" /> Contas a Receber
-                </Button>
-                <Button size="sm" variant={cashFlowFilter === "overdue" ? "destructive" : "outline"} className="h-7 text-[11px] px-2.5 gap-1" onClick={() => setCashFlowFilter("overdue")}>
-                  <AlertTriangle className="h-3 w-3" /> Atrasados
-                </Button>
-                <Button size="sm" variant={cashFlowFilter === "pending" ? "default" : "outline"} className="h-7 text-[11px] px-2.5 gap-1" onClick={() => setCashFlowFilter("pending")}>
-                  <Filter className="h-3 w-3" /> Contas Pendentes
-                </Button>
-                <Button size="sm" variant={cashFlowFilter === "paid" ? "default" : "outline"} className="h-7 text-[11px] px-2.5 gap-1" onClick={() => setCashFlowFilter("paid")}>
-                  <Check className="h-3 w-3" /> Contas Pagas
-                </Button>
+                {([
+                  { key: "all" as CashFlowFilter, label: "Todos" },
+                  { key: "payable" as CashFlowFilter, label: "A Pagar" },
+                  { key: "receivable" as CashFlowFilter, label: "A Receber" },
+                  { key: "overdue" as CashFlowFilter, label: "Atrasados" },
+                  { key: "pending" as CashFlowFilter, label: "Pendentes" },
+                  { key: "paid" as CashFlowFilter, label: "Pagas" },
+                ]).map(f => (
+                  <Button
+                    key={f.key}
+                    size="sm"
+                    variant={cashFlowFilter === f.key ? "default" : "ghost"}
+                    className={cn("h-6 text-[10px] px-2 gap-1 rounded-full", cashFlowFilter !== f.key && "text-muted-foreground hover:text-foreground")}
+                    onClick={() => setCashFlowFilter(f.key)}
+                  >
+                    {f.label}
+                  </Button>
+                ))}
               </div>
-              <div className="flex items-center gap-2 ml-auto">
+              <div className="flex items-center gap-1.5 ml-auto">
+                {selectedIds.size > 0 && (
+                  <>
+                    <span className="text-[10px] text-muted-foreground">{selectedIds.size} selecionados</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-[10px] gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                      onClick={async () => {
+                        for (const id of selectedIds) {
+                          await supabase.from("financial_entries").delete().eq("id", id);
+                        }
+                        setSelectedIds(new Set());
+                        fetchData();
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" /> Excluir
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-[10px] gap-1 text-muted-foreground rounded-full"
+                      onClick={() => {
+                        const selected = filtered.filter(e => selectedIds.has(e.id));
+                        const header = "Data,Título,Tipo,Categoria,Valor,Status\n";
+                        const rows = selected.map(e => {
+                          const cat = categories.find(c => c.id === e.category_id)?.name || "";
+                          return `${e.entry_date},"${e.title}",${e.type === "revenue" ? "Receita" : "Despesa"},"${cat}",${e.amount},${e.is_paid ? "Pago" : "Pendente"}`;
+                        }).join("\n");
+                        const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url; a.download = `lancamentos_selecionados.csv`; a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                    >
+                      <Printer className="h-3 w-3" /> Relatório
+                    </Button>
+                  </>
+                )}
                 <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
                   <DialogTrigger asChild>
-                    <Button size="sm" className="h-7 text-[11px]"><Plus className="mr-1 h-3 w-3" /> Lançamento</Button>
+                    <Button size="sm" className="h-6 text-[10px] rounded-full px-3"><Plus className="mr-1 h-3 w-3" /> Lançamento</Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader><DialogTitle>{editingEntry ? "Editar Lançamento" : "Novo Lançamento"}</DialogTitle></DialogHeader>
@@ -713,17 +753,9 @@ export default function FinancesView() {
                       <div className="grid grid-cols-2 gap-2">
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="0,00"
-                            value={amount}
-                            onChange={(e) => {
-                              const v = e.target.value.replace(/[^0-9.,]/g, "");
-                              setAmount(v);
-                            }}
-                            className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
+                          <Input type="text" inputMode="decimal" placeholder="0,00" value={amount}
+                            onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
+                            className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                         </div>
                         <Select value={type} onValueChange={(v) => setType(v as "revenue" | "expense")}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
@@ -742,10 +774,8 @@ export default function FinancesView() {
                           <Input type="number" placeholder="Parcelas" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} />
                         )}
                       </div>
-
-                      {/* Recurrence */}
                       {!editingEntry && (
-                        <div className="rounded-lg border border-border p-3 space-y-2">
+                        <div className="rounded-lg border border-border/30 p-3 space-y-2">
                           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                             <Repeat className="h-3.5 w-3.5" /> Recorrência
                           </div>
@@ -767,7 +797,6 @@ export default function FinancesView() {
                           </div>
                         </div>
                       )}
-
                       <Select value={categoryId} onValueChange={setCategoryId}>
                         <SelectTrigger><SelectValue placeholder="Categoria (opcional)" /></SelectTrigger>
                         <SelectContent>
@@ -780,25 +809,21 @@ export default function FinancesView() {
                           {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
-
-                      {/* Payment info */}
-                      <div className="rounded-lg border border-border p-3 space-y-2">
-                         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                           <Wallet className="h-3.5 w-3.5" /> Pagamento {isPaid && <span className="text-destructive">*</span>}
-                         </div>
-                         <div className="grid grid-cols-2 gap-2">
-                           <Select value={accountId} onValueChange={setAccountId}>
-                             <SelectTrigger className={cn("text-xs", isPaid && !accountId && "border-destructive")}><SelectValue placeholder={isPaid ? "Conta (obrigatório)" : "Conta (opcional)"} /></SelectTrigger>
+                      <div className="rounded-lg border border-border/30 p-3 space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                          <Wallet className="h-3.5 w-3.5" /> Pagamento {isPaid && <span className="text-destructive">*</span>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Select value={accountId} onValueChange={setAccountId}>
+                            <SelectTrigger className={cn("text-xs", isPaid && !accountId && "border-destructive")}><SelectValue placeholder={isPaid ? "Conta (obrigatório)" : "Conta (opcional)"} /></SelectTrigger>
                             <SelectContent>
                               {accounts.filter(a => a.is_active).map(a => (
-                                <SelectItem key={a.id} value={a.id}>
-                                  {ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon} {a.name}
-                                </SelectItem>
+                                <SelectItem key={a.id} value={a.id}>{ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon} {a.name}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
-                           <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                             <SelectTrigger className={cn("text-xs", isPaid && !paymentMethod && "border-destructive")}><SelectValue placeholder={isPaid ? "Forma Pgto (obrigatório)" : "Forma Pgto"} /></SelectTrigger>
+                          <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                            <SelectTrigger className={cn("text-xs", isPaid && !paymentMethod && "border-destructive")}><SelectValue placeholder={isPaid ? "Forma Pgto (obrigatório)" : "Forma Pgto"} /></SelectTrigger>
                             <SelectContent>
                               {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                             </SelectContent>
@@ -809,7 +834,6 @@ export default function FinancesView() {
                           <label htmlFor="is-paid" className="text-xs cursor-pointer">Marcar como pago</label>
                         </div>
                       </div>
-
                       <Button onClick={createOrUpdateEntry} className="w-full">{editingEntry ? "Salvar Alterações" : "Salvar"}</Button>
                     </div>
                   </DialogContent>
@@ -817,89 +841,112 @@ export default function FinancesView() {
               </div>
             </div>
 
-            {/* Cash Flow Forecast Table */}
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-b border-border">
-                    <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("entry_date")}>Data <SortIcon field="entry_date" /></TableHead>
-                    <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("title")}>Título <SortIcon field="title" /></TableHead>
-                    <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("category")}>Categoria <SortIcon field="category" /></TableHead>
-                    <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("type")}>Tipo <SortIcon field="type" /></TableHead>
-                    <TableHead className="cursor-pointer text-right text-xs" onClick={() => toggleSort("amount")}>Valor <SortIcon field="amount" /></TableHead>
-                    <TableHead className="text-xs w-[110px] text-right font-bold">Saldo</TableHead>
-                    <TableHead className="text-xs text-center">Status</TableHead>
-                    <TableHead className="w-16 text-xs text-center">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            {/* Clean borderless table */}
+            <div className="rounded-lg overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-[10px] text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
+                    <th className="text-left py-2 px-2 w-8">
+                      <Checkbox
+                        checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                        onCheckedChange={(c) => {
+                          if (c) setSelectedIds(new Set(filtered.map(e => e.id)));
+                          else setSelectedIds(new Set());
+                        }}
+                        className="h-3.5 w-3.5"
+                      />
+                    </th>
+                    <th className="text-left py-2 px-2 cursor-pointer" onClick={() => toggleSort("entry_date")}>Data <SortIcon field="entry_date" /></th>
+                    <th className="text-left py-2 px-2 cursor-pointer" onClick={() => toggleSort("title")}>Título <SortIcon field="title" /></th>
+                    <th className="text-left py-2 px-2 cursor-pointer" onClick={() => toggleSort("category")}>Categoria <SortIcon field="category" /></th>
+                    <th className="text-left py-2 px-2 cursor-pointer" onClick={() => toggleSort("type")}>Tipo <SortIcon field="type" /></th>
+                    <th className="text-right py-2 px-2 cursor-pointer" onClick={() => toggleSort("amount")}>Valor <SortIcon field="amount" /></th>
+                    <th className="text-right py-2 px-2 w-[100px]">Saldo</th>
+                    <th className="text-center py-2 px-2">Status</th>
+                    <th className="text-center py-2 px-2 w-14">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {filtered.length === 0 && (
-                    <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">Sem lançamentos neste período</TableCell></TableRow>
+                    <tr><td colSpan={9} className="text-center text-muted-foreground/40 py-12">Sem lançamentos neste período</td></tr>
                   )}
-                  {filtered.map((e) => {
+                  {filtered.map((e, idx) => {
                     const cat = categories.find(c => c.id === e.category_id);
                     const runningBal = runningBalances.balanceMap.get(e.id) ?? 0;
                     const isBreakEven = runningBalances.breakEvenId === e.id;
                     const isOverdue = !e.is_paid && new Date(e.entry_date) < new Date();
+                    const isSelected = selectedIds.has(e.id);
                     return (
-                      <TableRow
+                      <tr
                         key={e.id}
                         className={cn(
-                          "group cursor-pointer transition-colors",
-                          isBreakEven && "bg-primary/10 dark:bg-primary/15",
-                          e.is_paid && "opacity-60",
-                          isOverdue && !isBreakEven && "bg-destructive/5"
+                          "group cursor-pointer transition-colors hover:bg-muted/20",
+                          idx > 0 && "border-t border-border/10",
+                          isBreakEven && "bg-primary/5",
+                          e.is_paid && "opacity-50",
+                          isOverdue && !isBreakEven && "bg-destructive/3",
+                          isSelected && "bg-primary/5"
                         )}
                         onClick={() => handleRowClick(e)}
                       >
-                        <TableCell className="text-xs">{format(new Date(e.entry_date), "dd/MM/yyyy")}</TableCell>
-                        <TableCell className={cn("text-xs", e.is_paid && "line-through text-muted-foreground")}>{e.title}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{cat?.name || "—"}</TableCell>
-                        <TableCell>
-                          <span className={cn("rounded px-2 py-0.5 text-[10px] font-medium",
-                            e.type === "revenue" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
-                          )}>
+                        <td className="py-2.5 px-2">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(c) => {
+                              const next = new Set(selectedIds);
+                              if (c) next.add(e.id); else next.delete(e.id);
+                              setSelectedIds(next);
+                            }}
+                            onClick={(ev) => ev.stopPropagation()}
+                            className="h-3.5 w-3.5"
+                          />
+                        </td>
+                        <td className="py-2.5 px-2 text-muted-foreground">{format(new Date(e.entry_date), "dd/MM/yy")}</td>
+                        <td className={cn("py-2.5 px-2", e.is_paid && "line-through text-muted-foreground")}>{e.title}</td>
+                        <td className="py-2.5 px-2 text-muted-foreground/60">{cat?.name || "—"}</td>
+                        <td className="py-2.5 px-2">
+                          <span className={cn("text-[10px] font-medium", e.type === "revenue" ? "text-success" : "text-destructive")}>
                             {e.type === "revenue" ? "Receita" : "Despesa"}
                           </span>
-                        </TableCell>
-                        <TableCell className={cn("text-right text-xs font-medium tabular-nums",
-                          e.type === "revenue" ? "text-success" : "text-destructive"
-                        )}>{brl(Number(e.amount))}</TableCell>
-                        <TableCell className={cn("text-right text-xs font-bold tabular-nums", runningBal >= 0 ? "text-primary" : "text-destructive")}>
+                        </td>
+                        <td className={cn("py-2.5 px-2 text-right font-medium tabular-nums", e.type === "revenue" ? "text-success" : "text-destructive")}>
+                          {brl(Number(e.amount))}
+                        </td>
+                        <td className={cn("py-2.5 px-2 text-right font-semibold tabular-nums", runningBal >= 0 ? "text-primary" : "text-destructive")}>
                           {brl(runningBal)}
-                        </TableCell>
-                        <TableCell className="text-center">
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
                           {e.is_paid ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success">
+                            <span className="inline-flex items-center gap-1 text-[10px] text-success/60">
                               <Check className="h-2.5 w-2.5" /> Pago
                             </span>
                           ) : isOverdue ? (
                             <button
                               onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); setIsPaid(true); }}
-                              className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive hover:bg-destructive/20 transition-colors"
+                              className="inline-flex items-center gap-1 text-[10px] text-destructive hover:text-destructive/80 transition-colors"
                             >
                               <AlertTriangle className="h-2.5 w-2.5" /> Atrasado
                             </button>
                           ) : (
                             <button
                               onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); setIsPaid(true); }}
-                              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-success/10 hover:text-success hover:border-success/30 transition-colors"
+                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-success transition-colors"
                             >
-                              <CircleDollarSign className="h-2.5 w-2.5" /> Dar baixa
+                              <CircleDollarSign className="h-2.5 w-2.5" /> Baixa
                             </button>
                           )}
-                        </TableCell>
-                        <TableCell className="text-center">
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
                           <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }} className="rounded p-1 hover:bg-muted"><Pencil className="h-3 w-3 text-muted-foreground" /></button>
-                            <button onClick={(ev) => { ev.stopPropagation(); deleteEntry(e.id); }} className="rounded p-1 hover:bg-destructive/10"><Trash2 className="h-3 w-3 text-destructive" /></button>
+                            <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }} className="rounded p-1 hover:bg-muted/40"><Pencil className="h-3 w-3 text-muted-foreground/50" /></button>
+                            <button onClick={(ev) => { ev.stopPropagation(); deleteEntry(e.id); }} className="rounded p-1 hover:bg-destructive/10"><Trash2 className="h-3 w-3 text-destructive/50" /></button>
                           </div>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     );
                   })}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
           </>
         )}
