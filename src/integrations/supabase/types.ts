@@ -100,8 +100,57 @@ export type Database = {
         }
         Relationships: []
       }
+      financial_accounts: {
+        Row: {
+          closing_day: number | null
+          color: string | null
+          created_at: string
+          credit_limit: number | null
+          current_balance: number
+          due_day: number | null
+          id: string
+          initial_balance: number
+          is_active: boolean | null
+          name: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          closing_day?: number | null
+          color?: string | null
+          created_at?: string
+          credit_limit?: number | null
+          current_balance?: number
+          due_day?: number | null
+          id?: string
+          initial_balance?: number
+          is_active?: boolean | null
+          name: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          closing_day?: number | null
+          color?: string | null
+          created_at?: string
+          credit_limit?: number | null
+          current_balance?: number
+          due_day?: number | null
+          id?: string
+          initial_balance?: number
+          is_active?: boolean | null
+          name?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       financial_entries: {
         Row: {
+          account_id: string | null
           amount: number
           category_id: string | null
           created_at: string
@@ -109,6 +158,9 @@ export type Database = {
           id: string
           installment_group: string | null
           installment_number: number | null
+          is_paid: boolean | null
+          payment_date: string | null
+          payment_method: string | null
           project_id: string | null
           title: string
           total_installments: number | null
@@ -116,6 +168,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           amount: number
           category_id?: string | null
           created_at?: string
@@ -123,6 +176,9 @@ export type Database = {
           id?: string
           installment_group?: string | null
           installment_number?: number | null
+          is_paid?: boolean | null
+          payment_date?: string | null
+          payment_method?: string | null
           project_id?: string | null
           title: string
           total_installments?: number | null
@@ -130,6 +186,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string | null
           amount?: number
           category_id?: string | null
           created_at?: string
@@ -137,6 +194,9 @@ export type Database = {
           id?: string
           installment_group?: string | null
           installment_number?: number | null
+          is_paid?: boolean | null
+          payment_date?: string | null
+          payment_method?: string | null
           project_id?: string | null
           title?: string
           total_installments?: number | null
@@ -144,6 +204,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "financial_entries_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "financial_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "financial_entries_category_id_fkey"
             columns: ["category_id"]
