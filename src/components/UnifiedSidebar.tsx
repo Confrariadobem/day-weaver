@@ -26,7 +26,7 @@ interface UnifiedSidebarProps {
   onToggle: () => void;
 }
 
-type SidebarTab = "projects" | "tasks" | "categories";
+type SidebarTab = "projects";
 type SortField = "title" | "status" | "priority" | "date" | "assignee";
 type SortDir = "asc" | "desc";
 
@@ -52,7 +52,7 @@ function getPriorityBadge(p: string) {
 
 export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarProps) {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<SidebarTab>("projects");
+  // removed tab state - single view now
   const [sortField, setSortField] = useState<SortField>("title");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -376,19 +376,7 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
       <div className="flex h-full w-80 flex-col border-l border-border/30 bg-sidebar-background">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border/30 px-3 py-2">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as SidebarTab)} className="flex-1">
-            <TabsList className="h-8 w-full bg-muted/50">
-              <TabsTrigger value="projects" className="flex-1 text-xs h-7 data-[state=active]:bg-background">
-                📁 Projetos
-              </TabsTrigger>
-              <TabsTrigger value="tasks" className="flex-1 text-xs h-7 data-[state=active]:bg-background">
-                ☑️ Tarefas
-              </TabsTrigger>
-              <TabsTrigger value="categories" className="flex-1 text-xs h-7 data-[state=active]:bg-background">
-                🏷️ Categorias
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <span className="text-xs font-semibold text-foreground">📁 Projetos e Tarefas</span>
           <Button variant="ghost" size="icon" className="h-7 w-7 ml-1 shrink-0" onClick={onToggle}>
             <PanelLeftClose className="h-4 w-4" />
           </Button>
@@ -404,218 +392,209 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
 
         <SortBar />
 
-        {/* ─── PROJECTS TAB ─── */}
-        {activeTab === "projects" && (
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-              {activeProjects.map((p) => {
-                const pTasks = [...tasks, ...completedTasks].filter(t => t.project_id === p.id);
-                const pDone = pTasks.filter(t => t.is_completed).length;
-                const costs = getProjectCosts(p.id);
-                const isSelected = selectedProject === p.id;
-                return (
-                  <div key={p.id}>
-                    <div
-                      onClick={() => handleProjectClick(p)}
-                      className={cn(
-                        "group flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer transition-colors",
-                        isSelected ? "bg-primary/10 text-primary" : "hover:bg-accent/50"
-                      )}
-                    >
-                      <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate">{p.name}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {pDone}/{pTasks.length} tarefas
-                          {costs.totalCost > 0 && ` • ${brl(costs.totalCost)}`}
-                        </p>
-                      </div>
-                      <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform", !isSelected && "-rotate-90")} />
-                    </div>
-
-                    {isSelected && (
-                      <div className="ml-4 mt-1 mb-2 space-y-0.5 border-l-2 border-primary/20 pl-2">
-                        <div className="mb-2">
-                          <Progress value={pTasks.length > 0 ? (pDone / pTasks.length) * 100 : 0} className="h-1.5" />
-                          <p className="text-[10px] text-muted-foreground mt-0.5">{pTasks.length > 0 ? Math.round((pDone / pTasks.length) * 100) : 0}% concluído</p>
-                        </div>
-                         {sortTasks(pTasks.filter(t => !t.is_completed)).map((task) => (
-                          <TaskRow key={task.id} task={task} />
-                        ))}
-                        {/* Add task to project */}
-                        <div className="flex gap-1 mt-1">
-                          <Input
-                            placeholder="Nova tarefa..."
-                            value={newTask}
-                            onChange={(e) => setNewTask(e.target.value)}
-                            onKeyDown={async (e) => {
-                              if (e.key === "Enter" && newTask.trim() && user) {
-                                await supabase.from("tasks").insert({
-                                  title: newTask.trim(), user_id: user.id, project_id: p.id,
-                                });
-                                setNewTask(""); fetchData();
-                              }
-                            }}
-                            className="h-6 text-[10px]"
-                          />
-                          <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={async () => {
-                            if (newTask.trim() && user) {
-                              await supabase.from("tasks").insert({
-                                title: newTask.trim(), user_id: user.id, project_id: p.id,
-                              });
-                              setNewTask(""); fetchData();
-                            }
-                          }}>
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        {pTasks.filter(t => t.is_completed).length > 0 && (
-                          <p className="text-[10px] text-muted-foreground/50 px-2 pt-1">
-                            +{pTasks.filter(t => t.is_completed).length} concluída(s)
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {activeProjects.length === 0 && completedProjectsList.length === 0 && (
-                <p className="py-6 text-center text-xs text-muted-foreground">Nenhum projeto</p>
-              )}
-
-              {completedProjectsList.length > 0 && (
-                <Collapsible open={showCompletedProjects} onOpenChange={setShowCompletedProjects} className="mt-3">
-                  <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground w-full px-2 py-1.5">
-                    <ChevronDown className={cn("h-3 w-3 transition-transform", !showCompletedProjects && "-rotate-90")} />
-                    <Check className="h-3 w-3" />
-                    Concluídos ({completedProjectsList.length})
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-0.5 mt-1">
-                    {completedProjectsList.map((p) => (
-                      <div key={p.id} onClick={() => openEditProject(p)}
-                        className="flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-accent/50 opacity-50">
-                        <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <p className="text-xs truncate line-through">{p.name}</p>
-                      </div>
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </div>
-
-            <div className="border-t border-border/30 p-2">
-              <Button variant="ghost" size="sm" className="w-full h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                onClick={() => { resetProjectForm(); setProjectDialogOpen(true); }}>
-                <Plus className="h-3.5 w-3.5" /> Novo Projeto
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ─── TASKS TAB ─── */}
-        {activeTab === "tasks" && (
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto px-2 pt-1">
-              {allActiveTasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
-              ))}
-              {allActiveTasks.length === 0 && (
-                <p className="py-6 text-center text-xs text-muted-foreground">Nenhuma tarefa</p>
-              )}
-
-              {completedTasks.length > 0 && (
-                <Collapsible open={showCompleted} onOpenChange={setShowCompleted} className="mt-3 mb-2">
+        {/* ─── PROJECTS GROUPED BY CATEGORY ─── */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {/* Group projects by category */}
+            {sortedCategories.filter(c => c.is_project).map((cat) => {
+              const catProjects = activeProjects.filter(p => p.category_id === cat.id);
+              const catOrphanTasks = allActiveTasks.filter(t => t.category_id === cat.id && !t.project_id);
+              if (catProjects.length === 0 && catOrphanTasks.length === 0) return null;
+              return (
+                <Collapsible key={cat.id} defaultOpen className="mb-1">
                   <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent">
-                    <ChevronDown className={cn("h-3 w-3 transition-transform", !showCompleted && "-rotate-90")} />
-                    <CheckCircle2 className="h-3 w-3" />
-                    <span>Concluídas</span>
-                    <span className="ml-auto text-[10px]">{completedTasks.length}</span>
+                    <ChevronDown className="h-3 w-3" />
+                    {cat.color && <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />}
+                    <span className="truncate">{cat.icon} {cat.name}</span>
+                    <span className="ml-auto text-[10px]">{catProjects.length}P / {catOrphanTasks.length}T</span>
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-0.5 pl-2 pt-1">
-                    {completedTasks.map((task) => (
-                      <div key={task.id} className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground/60 line-through">
-                        <CheckCircle2 className="h-3 w-3 text-muted-foreground/40 shrink-0" />
-                        <span className="flex-1 truncate">{task.title}</span>
-                      </div>
-                    ))}
+                  <CollapsibleContent className="pl-3 pt-0.5 space-y-0.5">
+                    {catProjects.map((p) => {
+                      const pTasks = [...tasks, ...completedTasks].filter(t => t.project_id === p.id);
+                      const pDone = pTasks.filter(t => t.is_completed).length;
+                      const costs = getProjectCosts(p.id);
+                      const isSelected = selectedProject === p.id;
+                      return (
+                        <div key={p.id}>
+                          <div onClick={() => handleProjectClick(p)}
+                            className={cn("group flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer transition-colors",
+                              isSelected ? "bg-primary/10 text-primary" : "hover:bg-accent/50"
+                            )}>
+                            <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium truncate">{p.name}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {pDone}/{pTasks.length} tarefas
+                                {costs.totalCost > 0 && ` • ${brl(costs.totalCost)}`}
+                              </p>
+                            </div>
+                            <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform", !isSelected && "-rotate-90")} />
+                          </div>
+                          {isSelected && (
+                            <div className="ml-4 mt-1 mb-2 space-y-0.5 border-l-2 border-primary/20 pl-2">
+                              <div className="mb-2">
+                                <Progress value={pTasks.length > 0 ? (pDone / pTasks.length) * 100 : 0} className="h-1.5" />
+                                <p className="text-[10px] text-muted-foreground mt-0.5">{pTasks.length > 0 ? Math.round((pDone / pTasks.length) * 100) : 0}% concluído</p>
+                              </div>
+                              {sortTasks(pTasks.filter(t => !t.is_completed)).map((task) => (
+                                <TaskRow key={task.id} task={task} />
+                              ))}
+                              <div className="flex gap-1 mt-1">
+                                <Input placeholder="Nova tarefa..." value={newTask} onChange={(e) => setNewTask(e.target.value)}
+                                  onKeyDown={async (e) => {
+                                    if (e.key === "Enter" && newTask.trim() && user) {
+                                      await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
+                                      setNewTask(""); fetchData();
+                                    }
+                                  }} className="h-6 text-[10px]" />
+                                <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={async () => {
+                                  if (newTask.trim() && user) {
+                                    await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
+                                    setNewTask(""); fetchData();
+                                  }
+                                }}><Plus className="h-3 w-3" /></Button>
+                              </div>
+                              {pTasks.filter(t => t.is_completed).length > 0 && (
+                                <p className="text-[10px] text-muted-foreground/50 px-2 pt-1">+{pTasks.filter(t => t.is_completed).length} concluída(s)</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {/* Orphan tasks in this category */}
+                    {catOrphanTasks.map(task => <TaskRow key={task.id} task={task} />)}
                   </CollapsibleContent>
                 </Collapsible>
-              )}
-            </div>
+              );
+            })}
 
-            <div className="border-t border-border/30 p-2">
-              <div className="flex gap-1">
-                <Input placeholder="Nova tarefa... (Enter)" value={newTask} onChange={(e) => setNewTask(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addTask()} className="h-7 text-xs" />
-                <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={addTask}>
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ─── CATEGORIES TAB ─── */}
-        {activeTab === "categories" && (
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto px-2 pt-1">
-              {sortedCategories.map((cat) => {
-                const catTasks = tasksByCategory[cat.id] || [];
-                const catProjects = projects.filter(p => p.category_id === cat.id && p.status !== "completed");
-                if (catTasks.length === 0 && catProjects.length === 0) return null;
-                return (
-                  <Collapsible key={cat.id} defaultOpen className="mb-1.5">
-                    <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent">
-                      <ChevronDown className="h-3 w-3" />
-                      {cat.color && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color }} />}
-                      <span>{cat.icon} {cat.name}</span>
-                      <span className="ml-auto text-[10px]">{catProjects.length}P / {catTasks.length}T</span>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pl-4 pt-0.5 space-y-0.5">
-                      {catProjects.map(p => (
-                        <div key={p.id} onClick={() => openEditProject(p)}
-                          className="flex items-center gap-1.5 rounded px-2 py-1 text-xs hover:bg-accent/50 cursor-pointer">
-                          <FolderOpen className="h-3 w-3 text-muted-foreground shrink-0" />
-                          <span className="truncate font-medium">{p.name}</span>
-                        </div>
-                      ))}
-                      {catTasks.map(task => (
-                        <TaskRow key={task.id} task={task} />
-                      ))}
-                    </CollapsibleContent>
-                  </Collapsible>
-                );
-              })}
-
-              {/* Uncategorized */}
-              {(tasksByCategory["uncategorized"] || []).length > 0 && (
-                <Collapsible defaultOpen className="mb-1.5">
+            {/* Uncategorized projects & tasks */}
+            {(() => {
+              const uncatProjects = activeProjects.filter(p => !p.category_id);
+              const uncatTasks = allActiveTasks.filter(t => !t.category_id && !t.project_id);
+              if (uncatProjects.length === 0 && uncatTasks.length === 0) return null;
+              return (
+                <Collapsible defaultOpen className="mb-1">
                   <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent">
                     <ChevronDown className="h-3 w-3" />
                     <span>Sem Categoria</span>
-                    <span className="ml-auto text-[10px]">{(tasksByCategory["uncategorized"] || []).length}</span>
+                    <span className="ml-auto text-[10px]">{uncatProjects.length}P / {uncatTasks.length}T</span>
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="pl-4 pt-0.5 space-y-0.5">
-                    {(tasksByCategory["uncategorized"] || []).map(task => (
-                      <TaskRow key={task.id} task={task} />
-                    ))}
+                  <CollapsibleContent className="pl-3 pt-0.5 space-y-0.5">
+                    {uncatProjects.map((p) => {
+                      const pTasks = [...tasks, ...completedTasks].filter(t => t.project_id === p.id);
+                      const pDone = pTasks.filter(t => t.is_completed).length;
+                      const costs = getProjectCosts(p.id);
+                      const isSelected = selectedProject === p.id;
+                      return (
+                        <div key={p.id}>
+                          <div onClick={() => handleProjectClick(p)}
+                            className={cn("group flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer transition-colors",
+                              isSelected ? "bg-primary/10 text-primary" : "hover:bg-accent/50"
+                            )}>
+                            <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium truncate">{p.name}</p>
+                              <p className="text-[10px] text-muted-foreground">{pDone}/{pTasks.length} tarefas{costs.totalCost > 0 && ` • ${brl(costs.totalCost)}`}</p>
+                            </div>
+                            <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform", !isSelected && "-rotate-90")} />
+                          </div>
+                          {isSelected && (
+                            <div className="ml-4 mt-1 mb-2 space-y-0.5 border-l-2 border-primary/20 pl-2">
+                              <div className="mb-2">
+                                <Progress value={pTasks.length > 0 ? (pDone / pTasks.length) * 100 : 0} className="h-1.5" />
+                                <p className="text-[10px] text-muted-foreground mt-0.5">{pTasks.length > 0 ? Math.round((pDone / pTasks.length) * 100) : 0}% concluído</p>
+                              </div>
+                              {sortTasks(pTasks.filter(t => !t.is_completed)).map((task) => <TaskRow key={task.id} task={task} />)}
+                              <div className="flex gap-1 mt-1">
+                                <Input placeholder="Nova tarefa..." value={newTask} onChange={(e) => setNewTask(e.target.value)}
+                                  onKeyDown={async (e) => {
+                                    if (e.key === "Enter" && newTask.trim() && user) {
+                                      await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
+                                      setNewTask(""); fetchData();
+                                    }
+                                  }} className="h-6 text-[10px]" />
+                                <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={async () => {
+                                  if (newTask.trim() && user) {
+                                    await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
+                                    setNewTask(""); fetchData();
+                                  }
+                                }}><Plus className="h-3 w-3" /></Button>
+                              </div>
+                              {pTasks.filter(t => t.is_completed).length > 0 && (
+                                <p className="text-[10px] text-muted-foreground/50 px-2 pt-1">+{pTasks.filter(t => t.is_completed).length} concluída(s)</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {uncatTasks.map(task => <TaskRow key={task.id} task={task} />)}
                   </CollapsibleContent>
                 </Collapsible>
-              )}
-            </div>
+              );
+            })()}
 
-            <div className="border-t border-border/30 p-2">
-              <div className="flex gap-1">
-                <Input placeholder="Nova tarefa... (Enter)" value={newTask} onChange={(e) => setNewTask(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addTask()} className="h-7 text-xs" />
-                <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={addTask}>
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+            {activeProjects.length === 0 && allActiveTasks.filter(t => !t.project_id).length === 0 && (
+              <p className="py-6 text-center text-xs text-muted-foreground">Nenhum projeto ou tarefa</p>
+            )}
+
+            {/* Completed projects */}
+            {completedProjectsList.length > 0 && (
+              <Collapsible open={showCompletedProjects} onOpenChange={setShowCompletedProjects} className="mt-3">
+                <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground w-full px-2 py-1.5">
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", !showCompletedProjects && "-rotate-90")} />
+                  <Check className="h-3 w-3" />
+                  Concluídos ({completedProjectsList.length})
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-0.5 mt-1">
+                  {completedProjectsList.map((p) => (
+                    <div key={p.id} onClick={() => openEditProject(p)}
+                      className="flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-accent/50 opacity-50">
+                      <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <p className="text-xs truncate line-through">{p.name}</p>
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {/* Completed tasks (hidden section) */}
+            {completedTasks.length > 0 && (
+              <Collapsible open={showCompleted} onOpenChange={setShowCompleted} className="mt-2">
+                <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent">
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", !showCompleted && "-rotate-90")} />
+                  <CheckCircle2 className="h-3 w-3" />
+                  <span>Tarefas Concluídas</span>
+                  <span className="ml-auto text-[10px]">{completedTasks.length}</span>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-0.5 pl-2 pt-1">
+                  {completedTasks.map((task) => (
+                    <div key={task.id} className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground/60 line-through">
+                      <CheckCircle2 className="h-3 w-3 text-muted-foreground/40 shrink-0" />
+                      <span className="flex-1 truncate">{task.title}</span>
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+          </div>
+
+          <div className="border-t border-border/30 p-2 space-y-1">
+            <Button variant="ghost" size="sm" className="w-full h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+              onClick={() => { resetProjectForm(); setProjectDialogOpen(true); }}>
+              <Plus className="h-3.5 w-3.5" /> Novo Projeto
+            </Button>
+            <div className="flex gap-1">
+              <Input placeholder="Nova tarefa... (Enter)" value={newTask} onChange={(e) => setNewTask(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addTask()} className="h-7 text-xs" />
+              <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={addTask}>
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* ─── Project Dialog ─── */}
