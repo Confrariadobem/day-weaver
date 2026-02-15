@@ -16,11 +16,12 @@ import {
   startOfYear, endOfYear, differenceInDays,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, MoreVertical, Search, CalendarDays, Calculator } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, MoreVertical, Search, CalendarDays, Calculator, Flag } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
 
 type ViewMode = "today" | "3days" | "weekly" | "monthly" | "yearly";
+type CalendarFilter = "all" | "holidays" | "finances" | "projects" | "tasks";
 
 // Brazilian official holidays (fixed + calculated)
 function getBrazilianHolidays(year: number): { date: Date; name: string }[] {
@@ -81,6 +82,7 @@ export default function CalendarView() {
   const [calcDateOpen, setCalcDateOpen] = useState(false);
   const [calcFrom, setCalcFrom] = useState(format(new Date(), "yyyy-MM-dd"));
   const [calcTo, setCalcTo] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [activeFilters, setActiveFilters] = useState<CalendarFilter[]>(["all"]);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -106,9 +108,14 @@ export default function CalendarView() {
   }, [user, fetchData]);
 
   const calendarItems = useMemo(() => {
-    const items: CalendarItem[] = events.map((e) => ({
-      ...e, is_task: !!e.task_id, is_completed: false,
-    }));
+    const items: CalendarItem[] = events.map((e) => {
+      const desc = e.description || "";
+      const isProject = desc.includes("[tipo:project]");
+      const isFinance = desc.includes("[tipo:bill]") || desc.includes("[tipo:receivable]");
+      return {
+        ...e, is_task: !!e.task_id, is_completed: false, is_project: isProject, is_finance: isFinance,
+      };
+    });
     const linkedTaskIds = new Set(events.filter((e) => e.task_id).map((e) => e.task_id));
     tasks.forEach((t) => {
       if (t.scheduled_date && !linkedTaskIds.has(t.id)) {
@@ -130,13 +137,51 @@ export default function CalendarView() {
         items.push({
           id: `holiday-${h.name}-${yr}`, title: `🇧🇷 ${h.name}`,
           start_time: h.date.toISOString(),
-          all_day: true, color: "#22c55e", description: "Feriado oficial do Brasil",
-          user_id: user?.id || "", is_task: false,
+          all_day: true, color: "#eab308", description: "Feriado oficial do Brasil",
+          user_id: user?.id || "", is_task: false, is_holiday: true,
         });
       });
     });
+    // Sort: holidays first within each day
+    items.sort((a, b) => {
+      const dayA = a.start_time.slice(0, 10);
+      const dayB = b.start_time.slice(0, 10);
+      if (dayA !== dayB) return dayA.localeCompare(dayB);
+      if (a.is_holiday && !b.is_holiday) return -1;
+      if (!a.is_holiday && b.is_holiday) return 1;
+      return 0;
+    });
     return items;
   }, [events, tasks, currentDate, user]);
+
+  const toggleFilter = (f: CalendarFilter) => {
+    if (f === "all") {
+      setActiveFilters(["all"]);
+    } else {
+      setActiveFilters(prev => {
+        const without = prev.filter(x => x !== "all");
+        const has = without.includes(f);
+        const next = has ? without.filter(x => x !== f) : [...without, f];
+        return next.length === 0 ? ["all"] : next;
+      });
+    }
+  };
+
+  const filteredItems = useMemo(() => {
+    if (activeFilters.includes("all")) return calendarItems;
+    return calendarItems.filter(it => {
+      if (activeFilters.includes("holidays") && it.is_holiday) return true;
+      if (activeFilters.includes("finances") && it.is_finance) return true;
+      if (activeFilters.includes("projects") && it.is_project) return true;
+      if (activeFilters.includes("tasks") && it.is_task) return true;
+      // Events that don't match any specific category show when no specific filter excludes them
+      if (!it.is_holiday && !it.is_finance && !it.is_project && !it.is_task) {
+        // Regular events show if no specific filter is active (only "all" would show them)
+        return false;
+      }
+      return false;
+    });
+  }, [calendarItems, activeFilters]);
 
   const getFinancialSummary = useCallback((startDate: Date, endDate: Date) => {
     const rev = entries.filter((e) => {
@@ -236,7 +281,21 @@ export default function CalendarView() {
     return getFinancialSummary(start, end);
   }, [currentDate, viewMode, getFinancialSummary]);
 
-  const brlFmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const brlFmt = (v: number) => {
+    const abs = Math.abs(v);
+    const formatted = abs.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (v < 0) return `- R$ ${formatted}`;
+    if (v > 0) return `+ R$ ${formatted}`;
+    return `R$ ${formatted}`;
+  };
+
+  const FILTER_OPTIONS: { key: CalendarFilter; label: string; color: string }[] = [
+    { key: "all", label: "Todos", color: "hsl(var(--primary))" },
+    { key: "holidays", label: "Feriados", color: "#eab308" },
+    { key: "finances", label: "Finanças", color: "hsl(var(--destructive))" },
+    { key: "projects", label: "Projetos", color: "#f97316" },
+    { key: "tasks", label: "Tarefas", color: "#8b5cf6" },
+  ];
 
   // Search filtering
   const searchResults = useMemo(() => {
@@ -322,13 +381,28 @@ export default function CalendarView() {
         </div>
       </div>
 
+      {/* Filter bar */}
+      <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border/20">
+        {FILTER_OPTIONS.map((f) => (
+          <label key={f.key} className="flex items-center gap-1.5 cursor-pointer text-sm">
+            <Checkbox
+              checked={activeFilters.includes(f.key)}
+              onCheckedChange={() => toggleFilter(f.key)}
+              className="h-3.5 w-3.5"
+              style={{ borderColor: f.color, ...(activeFilters.includes(f.key) ? { backgroundColor: f.color } : {}) }}
+            />
+            <span className="text-muted-foreground">{f.label}</span>
+          </label>
+        ))}
+      </div>
+
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {viewMode === "today" && <HourlyDayView days={[currentDate]} items={calendarItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
-        {viewMode === "3days" && <HourlyDayView days={[currentDate, addDays(currentDate, 1), addDays(currentDate, 2)]} items={calendarItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
-        {viewMode === "weekly" && <HourlyWeekView date={currentDate} items={calendarItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
-        {viewMode === "monthly" && <MonthlyGrid date={currentDate} items={calendarItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
-        {viewMode === "yearly" && <YearlyView date={currentDate} items={calendarItems} entries={entries} tasks={tasks} getFinSummary={getFinancialSummary} onMonthClick={(d) => { setCurrentDate(d); setViewMode("monthly"); }} />}
+        {viewMode === "today" && <HourlyDayView days={[currentDate]} items={filteredItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
+        {viewMode === "3days" && <HourlyDayView days={[currentDate, addDays(currentDate, 1), addDays(currentDate, 2)]} items={filteredItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
+        {viewMode === "weekly" && <HourlyWeekView date={currentDate} items={filteredItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
+        {viewMode === "monthly" && <MonthlyGrid date={currentDate} items={filteredItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
+        {viewMode === "yearly" && <YearlyView date={currentDate} items={filteredItems} entries={entries} tasks={tasks} getFinSummary={getFinancialSummary} onMonthClick={(d) => { setCurrentDate(d); setViewMode("monthly"); }} onEditItem={openEdit} />}
       </div>
 
       <EventEditDialog open={editDialogOpen} onOpenChange={setEditDialogOpen} item={editingItem} defaultDate={editDefaultDate} userId={user?.id || ""} onSaved={fetchData} />
@@ -646,11 +720,13 @@ function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent }: Hou
 
 /* ─── Yearly View ───────────────────────────────────── */
 
-function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick }: {
+function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick, onEditItem }: {
   date: Date; items: CalendarItem[]; entries: any[]; tasks: Tables<"tasks">[];
   getFinSummary: (s: Date, e: Date) => { rev: number; exp: number; balance: number };
   onMonthClick: (d: Date) => void;
+  onEditItem: (item: CalendarItem) => void;
 }) {
+  const [listDialog, setListDialog] = useState<{ open: boolean; title: string; items: CalendarItem[] }>({ open: false, title: "", items: [] });
   const months = Array.from({ length: 12 }, (_, i) => new Date(date.getFullYear(), i, 1));
   const yearStart = startOfYear(date);
   const yearEnd = endOfYear(date);
@@ -660,7 +736,13 @@ function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick }
     return new Date(t.scheduled_date).getFullYear() === date.getFullYear();
   });
   const completedTasks = totalTasks.filter(t => t.is_completed);
-  const brlFmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const brlFmt = (v: number) => {
+    const abs = Math.abs(v);
+    const formatted = abs.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (v < 0) return `- R$ ${formatted}`;
+    if (v > 0) return `+ R$ ${formatted}`;
+    return `R$ ${formatted}`;
+  };
 
   return (
     <div className="h-full overflow-auto p-4">
@@ -696,8 +778,9 @@ function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick }
             const d = new Date(it.start_time);
             return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
           });
+          const holidayCount = monthItems.filter(it => it.is_holiday).length;
           const taskCount = monthItems.filter(it => it.is_task).length;
-          const eventCount = monthItems.length - taskCount;
+          const eventCount = monthItems.filter(it => !it.is_task && !it.is_holiday).length;
           const fin = getFinSummary(mStart, mEnd);
           const mDays = eachDayOfInterval({ start: startOfWeek(mStart, { locale: ptBR }), end: endOfWeek(mEnd, { locale: ptBR }) });
 
@@ -710,8 +793,24 @@ function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick }
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm font-semibold capitalize">{format(month, "MMMM", { locale: ptBR })}</span>
                 <div className="flex gap-1.5 text-xs">
-                  {eventCount > 0 && <span className="text-primary">{eventCount}📅</span>}
-                  {taskCount > 0 && <span className="text-[hsl(var(--success))]">{taskCount}✅</span>}
+                  {holidayCount > 0 && (
+                    <span
+                      className="text-yellow-500 cursor-pointer hover:underline"
+                      onClick={(e) => { e.stopPropagation(); setListDialog({ open: true, title: `Feriados - ${format(month, "MMMM", { locale: ptBR })}`, items: monthItems.filter(it => it.is_holiday) }); }}
+                    >{holidayCount}🏳️</span>
+                  )}
+                  {eventCount > 0 && (
+                    <span
+                      className="text-primary cursor-pointer hover:underline"
+                      onClick={(e) => { e.stopPropagation(); setListDialog({ open: true, title: `Eventos - ${format(month, "MMMM", { locale: ptBR })}`, items: monthItems.filter(it => !it.is_task && !it.is_holiday) }); }}
+                    >{eventCount}📅</span>
+                  )}
+                  {taskCount > 0 && (
+                    <span
+                      className="text-[hsl(var(--success))] cursor-pointer hover:underline"
+                      onClick={(e) => { e.stopPropagation(); setListDialog({ open: true, title: `Tarefas - ${format(month, "MMMM", { locale: ptBR })}`, items: monthItems.filter(it => it.is_task) }); }}
+                    >{taskCount}✅</span>
+                  )}
                 </div>
               </div>
 
@@ -740,7 +839,7 @@ function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick }
               {(fin.rev > 0 || fin.exp > 0) && (
                 <div className="mt-2 text-xs">
                   <span className={cn(fin.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
-                    {fin.balance >= 0 ? "+" : ""}{brlFmt(fin.balance)}
+                    {brlFmt(fin.balance)}
                   </span>
                 </div>
               )}
@@ -748,6 +847,31 @@ function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick }
           );
         })}
       </div>
+
+      {/* Items list dialog */}
+      <Dialog open={listDialog.open} onOpenChange={(o) => setListDialog(prev => ({ ...prev, open: o }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="capitalize">{listDialog.title}</DialogTitle></DialogHeader>
+          <div className="max-h-60 overflow-auto space-y-1">
+            {listDialog.items.map((it) => (
+              <div
+                key={it.id}
+                className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted/30 cursor-pointer"
+                onClick={() => {
+                  if (!it.is_holiday) {
+                    onEditItem(it);
+                    setListDialog(prev => ({ ...prev, open: false }));
+                  }
+                }}
+              >
+                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: it.color || "#3b82f6" }} />
+                <span className="text-sm flex-1 truncate">{it.title}</span>
+                <span className="text-xs text-muted-foreground">{format(new Date(it.start_time), "dd/MM")}</span>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
