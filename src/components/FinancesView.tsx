@@ -15,7 +15,8 @@ import {
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Save,
   Printer, FileDown, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
-  CircleDollarSign, AlertTriangle, Search,
+  CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
+  Filter,
 } from "lucide-react";
 import {
   format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
@@ -25,7 +26,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
-  ResponsiveContainer, ComposedChart, Line, Legend, Cell, PieChart, Pie,
+  ResponsiveContainer, ComposedChart, Line, Legend, Cell, PieChart, Pie, Area, AreaChart,
 } from "recharts";
 import type { Tables as DBTables } from "@/integrations/supabase/types";
 
@@ -34,10 +35,9 @@ type SortField = "title" | "amount" | "entry_date" | "type" | "category" | "is_p
 type SortDir = "asc" | "desc";
 type RecurrenceType = "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
 type RecurrenceDateMode = "same_date" | "first_business_day";
-type ViewTab = "previsao" | "doar" | "relatorios" | "contas";
+type ViewTab = "indicadores" | "previsao" | "doar" | "contas";
 type AccountType = "bank_account" | "credit_card" | "investment" | "wallet" | "cash" | "crypto";
-type CashFlowFilter = "all" | "payable" | "receivable" | "overdue" | "paid" | "pending";
-type DoarViewMode = "categories" | "expenses_revenues" | "entries";
+type CashFlowFilter = "all" | "payable" | "receivable" | "overdue" | "pending";
 
 interface FinancialAccount {
   id: string; user_id: string; name: string; type: string;
@@ -60,19 +60,9 @@ const ACCOUNT_TYPE_LABELS: Record<AccountType, { label: string; icon: React.Reac
 
 const PAYMENT_METHODS = ["Débito", "Crédito", "PIX", "Boleto", "Transferência", "Dinheiro", "Crypto"];
 
-const PERIOD_OPTIONS: { key: PeriodFilter; label: string }[] = [
-  { key: "daily", label: "Dia" },
-  { key: "3days", label: "3 Dias" },
-  { key: "weekly", label: "Semana" },
-  { key: "monthly", label: "Mês" },
-  { key: "yearly", label: "Ano" },
-  { key: "custom", label: "Personalizado" },
-];
-
 const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
 const CHART_COLORS = ["#3b82f6", "#22c55e", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
-// Helper: is business day (Mon-Fri)
 const isBusinessDay = (d: Date) => { const day = d.getDay(); return day !== 0 && day !== 6; };
 const getNextBusinessDay = (d: Date) => {
   const result = new Date(d);
@@ -86,13 +76,12 @@ export default function FinancesView() {
   const [projects, setProjects] = useState<DBTables<"projects">[]>([]);
   const [categories, setCategories] = useState<DBTables<"categories">[]>([]);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
-  const [period] = useState<PeriodFilter>("custom");
-  const [doarPeriod] = useState<PeriodFilter>("yearly");
   const [sortField, setSortField] = useState<SortField>("entry_date");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<any | null>(null);
   const [viewTab, setViewTab] = useState<ViewTab>("previsao");
+  const [customPeriodEnabled, setCustomPeriodEnabled] = useState(false);
   const [customStart, setCustomStart] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEnd, setCustomEnd] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [doarCustomStart, setDoarCustomStart] = useState(format(startOfYear(new Date()), "yyyy-MM-dd"));
@@ -106,13 +95,12 @@ export default function FinancesView() {
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const [cashFlowFilter, setCashFlowFilter] = useState<CashFlowFilter>("all");
-  const [hidePaid] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [doarSearchQuery, setDoarSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [doarViewMode, setDoarViewMode] = useState<DoarViewMode>("categories");
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   const [deleteEntryConfirm, setDeleteEntryConfirm] = useState<string | null>(null);
+  const [showPaidItems, setShowPaidItems] = useState(false);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -354,34 +342,27 @@ export default function FinancesView() {
 
   const now = new Date();
 
-  const getPeriodRange = (p: PeriodFilter, cs: string, ce: string) => {
-    switch (p) {
-      case "daily": return { start: startOfDay(now), end: endOfDay(now) };
-      case "3days": return { start: startOfDay(now), end: endOfDay(addDays(now, 2)) };
-      case "weekly": return { start: startOfWeek(now, { locale: ptBR }), end: endOfWeek(now, { locale: ptBR }) };
-      case "monthly": return { start: startOfMonth(now), end: endOfMonth(now) };
-      case "yearly": return { start: startOfYear(now), end: endOfYear(now) };
-      case "custom": return { start: new Date(cs), end: new Date(ce) };
-    }
-  };
-
-  const periodRange = useMemo(() => getPeriodRange(period, customStart, customEnd), [period, customStart, customEnd]);
-  const doarPeriodRange = useMemo(() => getPeriodRange(doarPeriod, doarCustomStart, doarCustomEnd), [doarPeriod, doarCustomStart, doarCustomEnd]);
-
+  // Fluxo de caixa: all entries by default, or filtered by custom period
   const filtered = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const query = searchQuery.toLowerCase().trim();
+    
     return entries
       .filter((e) => {
-        const d = new Date(e.entry_date);
-        if (d < periodRange.start || d > periodRange.end) return false;
+        // Apply custom period filter only if enabled
+        if (customPeriodEnabled) {
+          const d = new Date(e.entry_date);
+          const start = new Date(customStart);
+          const end = new Date(customEnd);
+          if (d < start || d > end) return false;
+        }
+        // Filter by cash flow type (excluding "paid" — paid items go to hidden section)
         if (cashFlowFilter === "payable") return e.type === "expense" && !e.is_paid;
         if (cashFlowFilter === "receivable") return e.type === "revenue" && !e.is_paid;
         if (cashFlowFilter === "overdue") { const ed = new Date(e.entry_date); ed.setHours(0, 0, 0, 0); return !e.is_paid && ed < today; }
-        if (cashFlowFilter === "paid") return e.is_paid;
         if (cashFlowFilter === "pending") return !e.is_paid;
-        if (hidePaid && e.is_paid) return false;
-        return true;
+        // "all" filter: show unpaid only (paid go to hidden section)
+        return !e.is_paid;
       })
       .filter((e) => {
         if (!query) return true;
@@ -389,6 +370,14 @@ export default function FinancesView() {
         return e.title.toLowerCase().includes(query) || cat.toLowerCase().includes(query);
       })
       .sort((a, b) => {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const aOverdue = !a.is_paid && new Date(a.entry_date) < today;
+        const bOverdue = !b.is_paid && new Date(b.entry_date) < today;
+        // Overdue items always at top
+        if (aOverdue && !bOverdue) return -1;
+        if (!aOverdue && bOverdue) return 1;
+        
+        // Then sort by selected field
         let aVal: any, bVal: any;
         if (sortField === "category") {
           aVal = categories.find(c => c.id === a.category_id)?.name || "";
@@ -396,7 +385,7 @@ export default function FinancesView() {
         } else if (sortField === "is_paid") {
           aVal = a.is_paid ? 1 : 0; bVal = b.is_paid ? 1 : 0;
         } else if (sortField === "balance") {
-          return 0; // balance is computed after sort
+          return 0;
         } else {
           aVal = a[sortField]; bVal = b[sortField];
         }
@@ -404,7 +393,26 @@ export default function FinancesView() {
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, periodRange, sortField, sortDir, categories, cashFlowFilter, hidePaid, searchQuery]);
+  }, [entries, sortField, sortDir, categories, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd]);
+
+  // Paid items (hidden section)
+  const paidItems = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    return entries
+      .filter((e) => {
+        if (!e.is_paid) return false;
+        if (customPeriodEnabled) {
+          const d = new Date(e.entry_date);
+          const start = new Date(customStart);
+          const end = new Date(customEnd);
+          if (d < start || d > end) return false;
+        }
+        if (!query) return true;
+        const cat = categories.find(c => c.id === e.category_id)?.name || "";
+        return e.title.toLowerCase().includes(query) || cat.toLowerCase().includes(query);
+      })
+      .sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+  }, [entries, searchQuery, customPeriodEnabled, customStart, customEnd, categories]);
 
   const totalRevenue = filtered.filter((e) => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
   const totalExpense = filtered.filter((e) => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
@@ -443,7 +451,6 @@ export default function FinancesView() {
     </span>
   );
 
-  // Sort categories alphabetically, "Outros" last
   const sortedFinCategories = useMemo(() => {
     const fin = categories.filter((c) => c.is_revenue || c.is_expense);
     return [...fin].sort((a, b) => {
@@ -549,8 +556,10 @@ export default function FinancesView() {
   }, [entries, doarYear]);
 
   const categoryPieData = useMemo(() => {
+    const yr = doarYear;
+    const yearEntries = entries.filter(e => new Date(e.entry_date).getFullYear() === yr);
     const map = new Map<string, { name: string; value: number; color: string }>();
-    filtered.filter(e => e.type === "expense").forEach(e => {
+    yearEntries.filter(e => e.type === "expense").forEach(e => {
       const cat = categories.find(c => c.id === e.category_id);
       const name = cat?.name || "Sem Categoria";
       const color = cat?.color || "#6b7280";
@@ -559,11 +568,13 @@ export default function FinancesView() {
       map.set(name, prev);
     });
     return Array.from(map.values()).sort((a, b) => b.value - a.value);
-  }, [filtered, categories]);
+  }, [entries, categories, doarYear]);
 
   const revenuePieData = useMemo(() => {
+    const yr = doarYear;
+    const yearEntries = entries.filter(e => new Date(e.entry_date).getFullYear() === yr);
     const map = new Map<string, { name: string; value: number; color: string }>();
-    filtered.filter(e => e.type === "revenue").forEach(e => {
+    yearEntries.filter(e => e.type === "revenue").forEach(e => {
       const cat = categories.find(c => c.id === e.category_id);
       const name = cat?.name || "Sem Categoria";
       const color = cat?.color || "#6b7280";
@@ -572,13 +583,29 @@ export default function FinancesView() {
       map.set(name, prev);
     });
     return Array.from(map.values()).sort((a, b) => b.value - a.value);
-  }, [filtered, categories]);
+  }, [entries, categories, doarYear]);
+
+  // Monthly trend data for area chart
+  const monthlyTrendData = useMemo(() => {
+    const yr = doarYear;
+    const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
+    return months.map(month => {
+      const mEntries = entries.filter(e => {
+        const d = new Date(e.entry_date);
+        return d.getMonth() === month.getMonth() && d.getFullYear() === yr;
+      });
+      const paid = mEntries.filter(e => e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
+      const pending = mEntries.filter(e => !e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
+      return { month: format(month, "MMM", { locale: ptBR }).toUpperCase(), pago: paid, pendente: pending };
+    });
+  }, [entries, doarYear]);
 
   const handlePrint = () => window.print();
 
   const handleExportCSV = () => {
+    const allItems = [...filtered, ...paidItems];
     const header = "Data,Título,Tipo,Categoria,Projeto,Conta,Pago,Forma Pgto,Valor\n";
-    const rows = filtered.map(e => {
+    const rows = allItems.map(e => {
       const cat = categories.find(c => c.id === e.category_id)?.name || "";
       const proj = projects.find(p => p.id === e.project_id)?.name || "";
       const acc = accounts.find(a => a.id === e.account_id)?.name || "";
@@ -606,10 +633,20 @@ export default function FinancesView() {
         th, td { border: 1px solid #ccc; padding: 3px 5px; text-align: right; }
         th { background: #f3f4f6; font-weight: bold; }
         td:first-child, th:first-child { text-align: left; }
-        .section-header { background: #e5e7eb; font-weight: bold; text-align: left; }
-        .total-row { background: #f9fafb; font-weight: bold; }
+        .section-header { font-weight: bold; text-align: left; }
+        .section-header-rev { background: #dcfce7 !important; color: #16a34a; }
+        .section-header-exp { background: #fee2e2 !important; color: #dc2626; }
+        .total-row { font-weight: bold; }
+        .total-row-rev { background: #f0fdf4 !important; }
+        .total-row-exp { background: #fef2f2 !important; }
+        .result-row { background: #eff6ff !important; }
+        .accum-row { background: #f3f4f6 !important; }
+        .carry-row { background: #faf5ff !important; }
         .text-green { color: #16a34a; } .text-red { color: #dc2626; } .text-blue { color: #2563eb; }
-      </style></head><body>
+        .cat-row { background: #fafafa !important; }
+        .entry-row { background: #f9fafb !important; color: #6b7280; }
+        .no-expand .expand-icon { display: none !important; }
+      </style></head><body class="no-expand">
       ${printContent.innerHTML}
       </body></html>
     `);
@@ -625,27 +662,25 @@ export default function FinancesView() {
     });
   };
 
-  // Period selector component shared between tabs
-  const PeriodSelector = ({ value, onChange, customS, customE, onCustomS, onCustomE }: {
-    value: PeriodFilter; onChange: (v: PeriodFilter) => void;
-    customS: string; customE: string; onCustomS: (v: string) => void; onCustomE: (v: string) => void;
-  }) => (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      {PERIOD_OPTIONS.map(p => (
-        <Button key={p.key} size="sm" variant={value === p.key ? "default" : "ghost"}
-          className={cn("h-7 text-xs px-2.5 rounded-full", value !== p.key && "text-muted-foreground hover:text-foreground")}
-          onClick={() => onChange(p.key)}
-        >{p.label}</Button>
-      ))}
-      {value === "custom" && (
-        <div className="flex items-center gap-1.5">
-          <Input type="date" value={customS} onChange={(e) => onCustomS(e.target.value)} className="h-7 text-xs w-32" />
-          <span className="text-xs text-muted-foreground">a</span>
-          <Input type="date" value={customE} onChange={(e) => onCustomE(e.target.value)} className="h-7 text-xs w-32" />
-        </div>
-      )}
-    </div>
-  );
+  const toggleExpandAll = () => {
+    const allIds = [...dreData.revRows, ...dreData.expRows].map(r => r.id);
+    if (expandedCats.size === allIds.length) {
+      setExpandedCats(new Set());
+    } else {
+      setExpandedCats(new Set(allIds));
+    }
+  };
+
+  const toggleCollapseAll = () => {
+    if (revenueCollapsed && expenseCollapsed) {
+      setRevenueCollapsed(false);
+      setExpenseCollapsed(false);
+    } else {
+      setRevenueCollapsed(true);
+      setExpenseCollapsed(true);
+      setExpandedCats(new Set());
+    }
+  };
 
   // Entry dialog content (shared)
   const renderEntryDialog = () => (
@@ -807,13 +842,13 @@ export default function FinancesView() {
         </Card>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - Indicadores repositioned to left of Fluxo de Caixa */}
       <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
         <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as ViewTab)}>
           <TabsList className="h-9">
+            <TabsTrigger value="indicadores" className="text-sm">Indicadores</TabsTrigger>
             <TabsTrigger value="previsao" className="text-sm">Fluxo de Caixa</TabsTrigger>
             <TabsTrigger value="doar" className="text-sm">DOAR</TabsTrigger>
-            <TabsTrigger value="relatorios" className="text-sm">Relatórios</TabsTrigger>
             <TabsTrigger value="contas" className="text-sm">Carteira</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -825,13 +860,6 @@ export default function FinancesView() {
         {/* ============ FLUXO DE CAIXA ============ */}
         {viewTab === "previsao" && (
           <>
-            {/* Custom date filter only */}
-            <div className="mb-2 flex items-center gap-1.5">
-              <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="h-7 text-xs w-32" />
-              <span className="text-xs text-muted-foreground">a</span>
-              <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="h-7 text-xs w-32" />
-            </div>
-
             {/* Search bar */}
             <div className="mb-2">
               <Input
@@ -842,7 +870,7 @@ export default function FinancesView() {
               />
             </div>
 
-            {/* Quick filters + bulk actions */}
+            {/* Quick filters + custom period toggle + bulk actions */}
             <div className="mb-3 flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 flex-wrap">
                 {([
@@ -851,7 +879,6 @@ export default function FinancesView() {
                   { key: "receivable" as CashFlowFilter, label: "A Receber" },
                   { key: "overdue" as CashFlowFilter, label: "Atrasados" },
                   { key: "pending" as CashFlowFilter, label: "Pendentes" },
-                  { key: "paid" as CashFlowFilter, label: "Pagas" },
                 ]).map(f => (
                   <Button key={f.key} size="sm"
                     variant={cashFlowFilter === f.key ? "default" : "ghost"}
@@ -859,7 +886,25 @@ export default function FinancesView() {
                     onClick={() => setCashFlowFilter(f.key)}
                   >{f.label}</Button>
                 ))}
+
+                {/* Custom period toggle */}
+                <Button size="sm"
+                  variant={customPeriodEnabled ? "default" : "ghost"}
+                  className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", !customPeriodEnabled && "text-muted-foreground hover:text-foreground")}
+                  onClick={() => setCustomPeriodEnabled(!customPeriodEnabled)}
+                >
+                  <Filter className="h-3 w-3" /> Período
+                </Button>
               </div>
+
+              {customPeriodEnabled && (
+                <div className="flex items-center gap-1.5">
+                  <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="h-7 text-xs w-32" />
+                  <span className="text-xs text-muted-foreground">a</span>
+                  <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="h-7 text-xs w-32" />
+                </div>
+              )}
+
               <div className="flex items-center gap-1.5 ml-auto">
                 {selectedIds.size > 0 && (
                   <>
@@ -900,7 +945,7 @@ export default function FinancesView() {
               </div>
             </div>
 
-            {/* Table - no Action column */}
+            {/* Table */}
             <div className="rounded-lg overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
@@ -926,7 +971,7 @@ export default function FinancesView() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">Sem lançamentos neste período</td></tr>
+                    <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">Sem lançamentos pendentes</td></tr>
                   )}
                   {filtered.map((e, idx) => {
                     const cat = categories.find(c => c.id === e.category_id);
@@ -940,8 +985,7 @@ export default function FinancesView() {
                           "group cursor-pointer transition-colors hover:bg-muted/20",
                           idx > 0 && "border-t border-border/10",
                           isBreakEven && "bg-primary/5",
-                          e.is_paid && "opacity-50",
-                          isOverdue && !isBreakEven && "bg-destructive/3",
+                          isOverdue && !isBreakEven && (e.type === "expense" ? "bg-destructive/8" : "bg-success/8"),
                           isSelected && "bg-primary/5"
                         )}
                         onClick={() => handleRowClick(e)}
@@ -956,7 +1000,7 @@ export default function FinancesView() {
                             onClick={(ev) => ev.stopPropagation()} className="h-3.5 w-3.5" />
                         </td>
                         <td className="py-2.5 px-2 text-muted-foreground">{format(new Date(e.entry_date), "dd/MM/yy")}</td>
-                        <td className={cn("py-2.5 px-2", e.is_paid && "line-through text-muted-foreground")}>{e.title}</td>
+                        <td className="py-2.5 px-2">{e.title}</td>
                         <td className="py-2.5 px-2 text-muted-foreground/60">{cat?.name || "—"}</td>
                         <td className="py-2.5 px-2">
                           <span className={cn("text-xs font-medium", e.type === "revenue" ? "text-success" : "text-destructive")}>
@@ -970,11 +1014,7 @@ export default function FinancesView() {
                           {brl(runningBal)}
                         </td>
                         <td className="py-2.5 px-2 text-center">
-                          {e.is_paid ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-success/60">
-                              <Check className="h-2.5 w-2.5" /> Pago
-                            </span>
-                          ) : isOverdue ? (
+                          {isOverdue ? (
                             <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); setIsPaid(true); }}
                               className="inline-flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors">
                               <AlertTriangle className="h-2.5 w-2.5" /> Atrasado
@@ -992,6 +1032,58 @@ export default function FinancesView() {
                 </tbody>
               </table>
             </div>
+
+            {/* Paid items - hidden at bottom */}
+            {paidItems.length > 0 && (
+              <div className="mt-4 border-t border-border/20 pt-2">
+                <button
+                  onClick={() => setShowPaidItems(!showPaidItems)}
+                  className="flex items-center gap-2 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors w-full py-1"
+                >
+                  {showPaidItems ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                  {paidItems.length} lançamento{paidItems.length !== 1 ? "s" : ""} pago{paidItems.length !== 1 ? "s" : ""}
+                </button>
+                {showPaidItems && (
+                  <div className="mt-1 rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {paidItems.map((e, idx) => {
+                          const cat = categories.find(c => c.id === e.category_id);
+                          return (
+                            <tr key={e.id}
+                              className={cn(
+                                "group cursor-pointer transition-colors hover:bg-muted/20 opacity-50",
+                                idx > 0 && "border-t border-border/10",
+                              )}
+                              onClick={() => handleRowClick(e)}
+                            >
+                              <td className="py-2 px-2 w-8" />
+                              <td className="py-2 px-2 text-muted-foreground">{format(new Date(e.entry_date), "dd/MM/yy")}</td>
+                              <td className="py-2 px-2 line-through text-muted-foreground">{e.title}</td>
+                              <td className="py-2 px-2 text-muted-foreground/60">{cat?.name || "—"}</td>
+                              <td className="py-2 px-2">
+                                <span className={cn("text-xs font-medium", e.type === "revenue" ? "text-success" : "text-destructive")}>
+                                  {e.type === "revenue" ? "Receita" : "Despesa"}
+                                </span>
+                              </td>
+                              <td className={cn("py-2 px-2 text-right font-medium tabular-nums", e.type === "revenue" ? "text-success" : "text-destructive")}>
+                                {brl(Number(e.amount))}
+                              </td>
+                              <td className="py-2 px-2 text-right" />
+                              <td className="py-2 px-2 text-center">
+                                <span className="inline-flex items-center gap-1 text-xs text-success/60">
+                                  <Check className="h-2.5 w-2.5" /> Pago
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -1003,21 +1095,18 @@ export default function FinancesView() {
           if (!availableYears.includes(doarYear)) availableYears.push(doarYear);
           availableYears.sort((a, b) => b - a);
 
-          // Filter DOAR entries by search
           const dQuery = doarSearchQuery.toLowerCase().trim();
           const filterDoarRow = (row: { name: string }) => !dQuery || row.name.toLowerCase().includes(dQuery);
-
           const filteredRevRows = dreData.revRows.filter(filterDoarRow);
           const filteredExpRows = dreData.expRows.filter(filterDoarRow);
 
           const renderCategoryEntries = (row: typeof dreData.revRows[0]) => {
             if (!expandedCats.has(row.id)) return null;
-            // Group entries by title - show one row per unique title with values in month columns
             const allEntries = row.entries.flat();
             if (allEntries.length === 0) return null;
             const grouped = new Map<string, { title: string; monthAmounts: number[] }>();
             allEntries.forEach(e => {
-              const key = e.title.replace(/\s*\(\d+\/\d+\)$/, ""); // strip installment suffix
+              const key = e.title.replace(/\s*\(\d+\/\d+\)$/, "");
               if (!grouped.has(key)) {
                 grouped.set(key, { title: key, monthAmounts: new Array(12).fill(0) });
               }
@@ -1025,7 +1114,7 @@ export default function FinancesView() {
               grouped.get(key)!.monthAmounts[mi] += Number(e.amount);
             });
             return Array.from(grouped.values()).map(g => (
-              <tr key={g.title} className="bg-muted/10 text-xs">
+              <tr key={g.title} className="entry-row bg-muted/10 text-xs">
                 <td className="p-1.5 border-b border-border/50 pl-10 text-muted-foreground" colSpan={2}>{g.title}</td>
                 {g.monthAmounts.map((v, mi) => (
                   <td key={mi} className="text-right p-1.5 border-b border-border/50 text-muted-foreground">
@@ -1054,6 +1143,9 @@ export default function FinancesView() {
                 <Input placeholder="Pesquisar categorias..."
                   value={doarSearchQuery} onChange={(e) => setDoarSearchQuery(e.target.value)}
                   className="h-8 w-48 text-xs bg-transparent border-0 border-b border-border/30 rounded-none focus-visible:ring-0 focus-visible:border-primary/40 placeholder:text-muted-foreground/40" />
+                <Button size="icon" variant="outline" className="h-8 w-8" onClick={toggleCollapseAll} title="Contrair/Expandir tudo">
+                  <ChevronsUpDown className="h-4 w-4" />
+                </Button>
                 <Button size="icon" variant="outline" className="h-8 w-8" onClick={handlePrintDOAR} title="Imprimir">
                   <Printer className="h-4 w-4" />
                 </Button>
@@ -1080,7 +1172,7 @@ export default function FinancesView() {
                 <tbody>
                   {/* Carry-over */}
                   {dreData.carryOver !== 0 && (
-                    <tr className="bg-primary/5">
+                    <tr className="carry-row bg-primary/5">
                       <td className="p-2 border-b border-border font-bold text-primary">📦 Saldo Anterior</td>
                       <td className="text-right p-2 border-b border-border text-muted-foreground">—</td>
                       {dreData.months.map((m, i) => (
@@ -1095,10 +1187,12 @@ export default function FinancesView() {
                   )}
 
                   {/* Revenue header */}
-                  <tr className="bg-success/10 cursor-pointer select-none" onClick={() => setRevenueCollapsed(!revenueCollapsed)}>
+                  <tr className="section-header section-header-rev bg-success/10 cursor-pointer select-none" onClick={() => setRevenueCollapsed(!revenueCollapsed)}>
                     <td colSpan={2} className="p-2 border-b border-border font-bold text-success">
                       <span className="inline-flex items-center gap-1">
-                        {revenueCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                        <span className="expand-icon">
+                          {revenueCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                        </span>
                         RECEITAS
                       </span>
                     </td>
@@ -1114,10 +1208,12 @@ export default function FinancesView() {
                     const isExpanded = expandedCats.has(row.id);
                     return (
                       <React.Fragment key={row.id}>
-                        <tr className="hover:bg-muted/30 cursor-pointer" onClick={() => toggleCatExpand(row.id)}>
+                        <tr className="cat-row hover:bg-muted/30 cursor-pointer" onClick={() => toggleCatExpand(row.id)}>
                           <td className="p-2 border-b border-border pl-6">
                             <span className="inline-flex items-center gap-1">
-                              {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                              <span className="expand-icon">
+                                {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                              </span>
                               {row.name}
                             </span>
                           </td>
@@ -1134,7 +1230,7 @@ export default function FinancesView() {
                     );
                   })}
                   {!revenueCollapsed && (
-                    <tr className="bg-success/5 font-bold">
+                    <tr className="total-row total-row-rev bg-success/5 font-bold">
                       <td className="p-2 border-b-2 border-border text-success">TOTAL RECEITAS</td>
                       <td className="text-right p-2 border-b-2 border-border text-success">100%</td>
                       {dreData.monthTotalsRev.map((v, i) => (
@@ -1145,10 +1241,12 @@ export default function FinancesView() {
                   )}
 
                   {/* Expense header */}
-                  <tr className="bg-destructive/10 cursor-pointer select-none" onClick={() => setExpenseCollapsed(!expenseCollapsed)}>
+                  <tr className="section-header section-header-exp bg-destructive/10 cursor-pointer select-none" onClick={() => setExpenseCollapsed(!expenseCollapsed)}>
                     <td colSpan={2} className="p-2 border-b border-border font-bold text-destructive">
                       <span className="inline-flex items-center gap-1">
-                        {expenseCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                        <span className="expand-icon">
+                          {expenseCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                        </span>
                         DESPESAS
                       </span>
                     </td>
@@ -1164,10 +1262,12 @@ export default function FinancesView() {
                     const isExpanded = expandedCats.has(row.id);
                     return (
                       <React.Fragment key={row.id}>
-                        <tr className="hover:bg-muted/30 cursor-pointer" onClick={() => toggleCatExpand(row.id)}>
+                        <tr className="cat-row hover:bg-muted/30 cursor-pointer" onClick={() => toggleCatExpand(row.id)}>
                           <td className="p-2 border-b border-border pl-6">
                             <span className="inline-flex items-center gap-1">
-                              {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                              <span className="expand-icon">
+                                {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                              </span>
                               {row.name}
                             </span>
                           </td>
@@ -1184,7 +1284,7 @@ export default function FinancesView() {
                     );
                   })}
                   {!expenseCollapsed && (
-                    <tr className="bg-destructive/5 font-bold">
+                    <tr className="total-row total-row-exp bg-destructive/5 font-bold">
                       <td className="p-2 border-b-2 border-border text-destructive">TOTAL DESPESAS</td>
                       <td className="text-right p-2 border-b-2 border-border text-destructive">100%</td>
                       {dreData.monthTotalsExp.map((v, i) => (
@@ -1195,7 +1295,7 @@ export default function FinancesView() {
                   )}
 
                   {/* Balance per month */}
-                  <tr className="bg-primary/5 font-bold">
+                  <tr className="result-row bg-primary/5 font-bold">
                     <td className="p-2 border-b border-border text-primary">RESULTADO DO MÊS</td>
                     <td className="p-2 border-b border-border">—</td>
                     {dreData.monthBalance.map((v, i) => (
@@ -1209,7 +1309,7 @@ export default function FinancesView() {
                   </tr>
 
                   {/* Accumulated */}
-                  <tr className="bg-muted font-bold">
+                  <tr className="accum-row bg-muted font-bold">
                     <td className="p-2 border-b border-border">SALDO ACUMULADO</td>
                     <td className="p-2 border-b border-border">—</td>
                     {dreData.accumulated.map((v, i) => (
@@ -1228,8 +1328,8 @@ export default function FinancesView() {
           );
         })()}
 
-        {/* ============ RELATÓRIOS ============ */}
-        {viewTab === "relatorios" && (
+        {/* ============ INDICADORES ============ */}
+        {viewTab === "indicadores" && (
           <div className="space-y-4" ref={reportRef}>
             <div className="flex items-center gap-2 flex-wrap">
               <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handlePrint}>
@@ -1250,6 +1350,34 @@ export default function FinancesView() {
               </div>
             </div>
 
+            {/* Summary cards */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Resumo Anual — {doarYear}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="rounded-lg bg-success/10 p-3 text-center">
+                    <p className="text-[10px] text-muted-foreground">Total Receitas</p>
+                    <p className="text-lg font-bold text-success">{brl(dreData.monthTotalsRev.reduce((s, v) => s + v, 0))}</p>
+                    <p className="text-[10px] text-muted-foreground">{entries.filter(e => e.type === "revenue" && new Date(e.entry_date).getFullYear() === doarYear).length} lançamentos</p>
+                  </div>
+                  <div className="rounded-lg bg-destructive/10 p-3 text-center">
+                    <p className="text-[10px] text-muted-foreground">Total Despesas</p>
+                    <p className="text-lg font-bold text-destructive">{brl(dreData.monthTotalsExp.reduce((s, v) => s + v, 0))}</p>
+                    <p className="text-[10px] text-muted-foreground">{entries.filter(e => e.type === "expense" && new Date(e.entry_date).getFullYear() === doarYear).length} lançamentos</p>
+                  </div>
+                  <div className="rounded-lg bg-primary/10 p-3 text-center">
+                    <p className="text-[10px] text-muted-foreground">Resultado do Ano</p>
+                    <p className={cn("text-lg font-bold", (dreData.accumulated[11] || 0) >= 0 ? "text-success" : "text-destructive")}>
+                      {brl(dreData.accumulated[11] || 0)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Revenue vs Expense chart */}
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm">Receita × Despesa Mensal — {doarYear}</CardTitle></CardHeader>
               <CardContent>
@@ -1270,30 +1398,45 @@ export default function FinancesView() {
               </CardContent>
             </Card>
 
+            {/* Monthly balance trend (area chart) */}
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Resumo do Período ({format(periodRange.start, "dd/MM/yyyy")} — {format(periodRange.end, "dd/MM/yyyy")})</CardTitle>
-              </CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Saldo Mensal — {doarYear}</CardTitle></CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div className="rounded-lg bg-success/10 p-3 text-center">
-                    <p className="text-[10px] text-muted-foreground">Total Receitas</p>
-                    <p className="text-lg font-bold text-success">{brl(totalRevenue)}</p>
-                    <p className="text-[10px] text-muted-foreground">{filtered.filter(e => e.type === "revenue").length} lançamentos</p>
-                  </div>
-                  <div className="rounded-lg bg-destructive/10 p-3 text-center">
-                    <p className="text-[10px] text-muted-foreground">Total Despesas</p>
-                    <p className="text-lg font-bold text-destructive">{brl(totalExpense)}</p>
-                    <p className="text-[10px] text-muted-foreground">{filtered.filter(e => e.type === "expense").length} lançamentos</p>
-                  </div>
-                  <div className="rounded-lg bg-primary/10 p-3 text-center">
-                    <p className="text-[10px] text-muted-foreground">Saldo Período</p>
-                    <p className={cn("text-lg font-bold", balance >= 0 ? "text-success" : "text-destructive")}>{brl(balance)}</p>
-                  </div>
+                <div className="h-[220px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={reportChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                      <Area type="monotone" dataKey="saldo" name="Saldo Mensal" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Paid vs Pending trend */}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Pago × Pendente — {doarYear}</CardTitle></CardHeader>
+              <CardContent>
+                <div className="h-[220px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyTrendData} barGap={0}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="pago" name="Pago" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="pendente" name="Pendente" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Pie charts */}
             <div className="grid grid-cols-2 gap-4">
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Categorias — Despesas</CardTitle></CardHeader>
