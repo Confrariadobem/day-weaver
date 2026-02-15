@@ -3,29 +3,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
-  format,
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
-  addMonths,
-  subMonths,
-  addWeeks,
-  subWeeks,
-  isToday,
-  isSameMonth,
-  isSameDay,
-  addDays,
-  subDays,
-  getISOWeek,
-  startOfYear,
-  endOfYear,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
+  eachDayOfInterval, addMonths, subMonths, addWeeks, subWeeks,
+  isToday, isSameMonth, isSameDay, addDays, subDays, getISOWeek,
+  startOfYear, endOfYear, differenceInDays,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, MoreVertical, Search, CalendarDays, Calculator } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
 
@@ -43,6 +34,13 @@ export default function CalendarView() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CalendarItem | null>(null);
   const [editDefaultDate, setEditDefaultDate] = useState<Date>(new Date());
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [gotoDateOpen, setGotoDateOpen] = useState(false);
+  const [gotoDate, setGotoDate] = useState("");
+  const [calcDateOpen, setCalcDateOpen] = useState(false);
+  const [calcFrom, setCalcFrom] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [calcTo, setCalcTo] = useState(format(new Date(), "yyyy-MM-dd"));
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -69,24 +67,16 @@ export default function CalendarView() {
 
   const calendarItems = useMemo(() => {
     const items: CalendarItem[] = events.map((e) => ({
-      ...e,
-      is_task: !!e.task_id,
-      is_completed: false,
+      ...e, is_task: !!e.task_id, is_completed: false,
     }));
     const linkedTaskIds = new Set(events.filter((e) => e.task_id).map((e) => e.task_id));
     tasks.forEach((t) => {
       if (t.scheduled_date && !linkedTaskIds.has(t.id)) {
         items.push({
-          id: `task-${t.id}`,
-          title: t.title,
+          id: `task-${t.id}`, title: t.title,
           start_time: new Date(`${t.scheduled_date}T00:00:00`).toISOString(),
-          all_day: true,
-          color: "#8b5cf6",
-          description: t.description,
-          task_id: t.id,
-          user_id: t.user_id,
-          is_task: true,
-          is_completed: t.is_completed,
+          all_day: true, color: "#8b5cf6", description: t.description,
+          task_id: t.id, user_id: t.user_id, is_task: true, is_completed: t.is_completed,
         });
       }
     });
@@ -178,10 +168,9 @@ export default function CalendarView() {
   const headerLabel = viewMode === "yearly"
     ? format(currentDate, "yyyy")
     : viewMode === "weekly"
-    ? `Semana ${getISOWeek(currentDate)} • ${format(currentDate, "MMMM yyyy", { locale: ptBR })}`
+    ? `S${getISOWeek(currentDate)} • ${format(currentDate, "MMMM yyyy", { locale: ptBR })}`
     : format(currentDate, "MMMM yyyy", { locale: ptBR });
 
-  // Financial summary for the current view period
   const viewFinSummary = useMemo(() => {
     let start: Date, end: Date;
     if (viewMode === "today") { start = currentDate; end = currentDate; }
@@ -194,13 +183,31 @@ export default function CalendarView() {
 
   const brlFmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  // Search filtering
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return calendarItems.filter(it => it.title.toLowerCase().includes(q)).slice(0, 10);
+  }, [searchQuery, calendarItems]);
+
+  const calcDays = useMemo(() => {
+    if (!calcFrom || !calcTo) return null;
+    return differenceInDays(new Date(calcTo), new Date(calcFrom));
+  }, [calcFrom, calcTo]);
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-        {/* Financial summary - top left */}
+        {/* Financial summary */}
         <div className="text-sm text-muted-foreground mr-2">
-          Recurso previsto: <span className={cn("font-medium", viewFinSummary.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brlFmt(viewFinSummary.balance)}</span>
+          Recurso previsto: <span className="text-[hsl(var(--success))]">{brlFmt(viewFinSummary.rev)}</span>
+          {" – "}
+          <span className="text-destructive">{brlFmt(viewFinSummary.exp)}</span>
+          {" = "}
+          <span className={cn("font-semibold", viewFinSummary.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+            {brlFmt(viewFinSummary.balance)}
+          </span>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
@@ -214,12 +221,9 @@ export default function CalendarView() {
             </Button>
           </div>
 
-          <Button variant="outline" size="sm" className="h-8 text-sm" onClick={handleToday}>
-            Hoje
-          </Button>
-
+          <Button variant="outline" size="sm" className="h-8 text-sm" onClick={handleToday}>Hoje</Button>
           <Button variant="outline" size="sm" className="h-8 text-sm" onClick={() => openNew(currentDate)}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> Evento
+            <Plus className="mr-1 h-3.5 w-3.5" /> Novo
           </Button>
 
           <div className="flex rounded-lg bg-muted p-0.5">
@@ -229,85 +233,105 @@ export default function CalendarView() {
                 onClick={() => setViewMode(v.key)}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  viewMode === v.key
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                  viewMode === v.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {v.label}
               </button>
             ))}
           </div>
+
+          {/* 3-dot menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setSearchOpen(true)}>
+                <Search className="mr-2 h-4 w-4" /> Pesquisar eventos
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setGotoDateOpen(true)}>
+                <CalendarDays className="mr-2 h-4 w-4" /> Ir para data
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCalcDateOpen(true)}>
+                <Calculator className="mr-2 h-4 w-4" /> Calcular data
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {viewMode === "today" && (
-          <HourlyDayView
-            days={[currentDate]}
-            items={calendarItems}
-            onDrop={handleDrop}
-            onToggle={toggleComplete}
-            onClick={openEdit}
-            onNewEvent={openNew}
-          />
-        )}
-        {viewMode === "3days" && (
-          <HourlyDayView
-            days={[currentDate, addDays(currentDate, 1), addDays(currentDate, 2)]}
-            items={calendarItems}
-            onDrop={handleDrop}
-            onToggle={toggleComplete}
-            onClick={openEdit}
-            onNewEvent={openNew}
-          />
-        )}
-        {viewMode === "weekly" && (
-          <HourlyWeekView
-            date={currentDate}
-            items={calendarItems}
-            onDrop={handleDrop}
-            onToggle={toggleComplete}
-            onClick={openEdit}
-            onNewEvent={openNew}
-          />
-        )}
-        {viewMode === "monthly" && (
-          <MonthlyGrid
-            date={currentDate}
-            items={calendarItems}
-            onDrop={handleDrop}
-            onToggle={toggleComplete}
-            onClick={openEdit}
-            onNewEvent={openNew}
-          />
-        )}
-        {viewMode === "yearly" && (
-          <YearlyView
-            date={currentDate}
-            items={calendarItems}
-            entries={entries}
-            tasks={tasks}
-            getFinSummary={getFinancialSummary}
-            onMonthClick={(d) => { setCurrentDate(d); setViewMode("monthly"); }}
-          />
-        )}
+        {viewMode === "today" && <HourlyDayView days={[currentDate]} items={calendarItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
+        {viewMode === "3days" && <HourlyDayView days={[currentDate, addDays(currentDate, 1), addDays(currentDate, 2)]} items={calendarItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
+        {viewMode === "weekly" && <HourlyWeekView date={currentDate} items={calendarItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
+        {viewMode === "monthly" && <MonthlyGrid date={currentDate} items={calendarItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
+        {viewMode === "yearly" && <YearlyView date={currentDate} items={calendarItems} entries={entries} tasks={tasks} getFinSummary={getFinancialSummary} onMonthClick={(d) => { setCurrentDate(d); setViewMode("monthly"); }} />}
       </div>
 
-      <EventEditDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        item={editingItem}
-        defaultDate={editDefaultDate}
-        userId={user?.id || ""}
-        onSaved={fetchData}
-      />
+      <EventEditDialog open={editDialogOpen} onOpenChange={setEditDialogOpen} item={editingItem} defaultDate={editDefaultDate} userId={user?.id || ""} onSaved={fetchData} />
+
+      {/* Search dialog */}
+      <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Pesquisar Eventos</DialogTitle></DialogHeader>
+          <Input placeholder="Digite para buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} autoFocus />
+          <div className="max-h-60 overflow-auto space-y-1">
+            {searchResults.map((it) => (
+              <div key={it.id} className="flex items-center gap-2 rounded-lg p-2 hover:bg-muted/30 cursor-pointer" onClick={() => {
+                setCurrentDate(new Date(it.start_time));
+                setSearchOpen(false);
+                setSearchQuery("");
+              }}>
+                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: it.color || "#3b82f6" }} />
+                <span className="text-sm flex-1 truncate">{it.title}</span>
+                <span className="text-xs text-muted-foreground">{format(new Date(it.start_time), "dd/MM/yy")}</span>
+              </div>
+            ))}
+            {searchQuery && searchResults.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhum resultado</p>}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Go to date dialog */}
+      <Dialog open={gotoDateOpen} onOpenChange={setGotoDateOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader><DialogTitle>Ir para Data</DialogTitle></DialogHeader>
+          <Input type="date" value={gotoDate} onChange={(e) => setGotoDate(e.target.value)} />
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setGotoDateOpen(false)}>Cancelar</Button>
+            <Button size="sm" onClick={() => { if (gotoDate) { setCurrentDate(new Date(gotoDate)); setGotoDateOpen(false); } }}>Ir</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Date calculator dialog */}
+      <Dialog open={calcDateOpen} onOpenChange={setCalcDateOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader><DialogTitle>Calcular Dias</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm text-muted-foreground">De</label>
+              <Input type="date" value={calcFrom} onChange={(e) => setCalcFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Até</label>
+              <Input type="date" value={calcTo} onChange={(e) => setCalcTo(e.target.value)} />
+            </div>
+            {calcDays !== null && (
+              <p className="text-center text-lg font-bold">{Math.abs(calcDays)} dias</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-/* ─── Shared ──────────────────────────────────────── */
+/* ─── Event Chip ──────────────────────────────────── */
 
 interface HourlyViewProps {
   items: CalendarItem[];
@@ -317,22 +341,16 @@ interface HourlyViewProps {
   onNewEvent: (d: Date) => void;
 }
 
-/* ─── Event Chip ──────────────────────────────────── */
-
 function EventChip({ item, onToggle, onClick, compact }: { item: CalendarItem; onToggle: (i: CalendarItem) => void; onClick: (i: CalendarItem) => void; compact?: boolean }) {
   const completed = item.is_completed;
   return (
     <div
       draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("event-id", item.id);
-        e.dataTransfer.setData("task-title", item.title);
-      }}
+      onDragStart={(e) => { e.dataTransfer.setData("event-id", item.id); e.dataTransfer.setData("task-title", item.title); }}
       onClick={(e) => { e.stopPropagation(); onClick(item); }}
       className={cn(
         "group flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-sm leading-snug transition-colors hover:brightness-110",
-        completed && "opacity-50 line-through",
-        compact ? "truncate" : ""
+        completed && "opacity-50 line-through", compact ? "truncate" : ""
       )}
       style={{ backgroundColor: `${item.color || "#3b82f6"}20`, color: item.color || "#3b82f6" }}
     >
@@ -341,85 +359,83 @@ function EventChip({ item, onToggle, onClick, compact }: { item: CalendarItem; o
           <Checkbox checked={!!completed} className="h-3.5 w-3.5 border-current" />
         </span>
       )}
-      {!item.is_task && (
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color || "#3b82f6" }} />
-      )}
+      {!item.is_task && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color || "#3b82f6" }} />}
       <span className="truncate">{item.title}</span>
-      {!item.all_day && (
-        <span className="ml-auto shrink-0 opacity-70 text-xs">{format(new Date(item.start_time), "HH:mm")}</span>
-      )}
+      {!item.all_day && <span className="ml-auto shrink-0 opacity-70 text-xs">{format(new Date(item.start_time), "HH:mm")}</span>}
     </div>
   );
 }
 
-/* ─── Hourly Day View (Today & 3 Days) ─────────────── */
+/* ─── Hourly Day View (Today & 3 Days) — uses same scroll model as weekly ─── */
 
 function HourlyDayView({ days, items, onDrop, onToggle, onClick, onNewEvent }: HourlyViewProps & { days: Date[] }) {
   return (
-    <div className={cn("flex h-full", days.length === 1 ? "" : "")}>
-      {/* Time gutter */}
-      <div className="flex flex-col border-r border-border/20 pt-10">
-        {HOURS.map((h) => (
-          <div key={h} className="flex h-14 w-16 items-start justify-end pr-2">
-            <span className="text-xs text-muted-foreground">{String(h).padStart(2, "0")}:00</span>
+    <div className="flex h-full flex-col">
+      {/* Day headers */}
+      <div className={cn("grid border-b border-border/20", days.length === 1 ? "grid-cols-[50px_1fr]" : `grid-cols-[50px_repeat(${days.length},1fr)]`)}>
+        <div />
+        {days.map((day) => (
+          <div key={day.toISOString()} className={cn("flex items-center gap-2 px-3 py-2", isToday(day) && "bg-primary/5")}>
+            <span className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold",
+              isToday(day) ? "bg-primary text-primary-foreground" : "text-foreground"
+            )}>
+              {format(day, "d")}
+            </span>
+            <div>
+              <p className="text-sm font-medium capitalize">{format(day, "EEEE", { locale: ptBR })}</p>
+              <p className="text-xs text-muted-foreground">{format(day, "d MMM yyyy", { locale: ptBR })}</p>
+            </div>
+            <button onClick={() => onNewEvent(day)} className="ml-auto rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
+              <Plus className="h-4 w-4" />
+            </button>
           </div>
         ))}
       </div>
-      {/* Day columns */}
-      <div className={cn("flex flex-1", days.length > 1 ? "divide-x divide-border/20" : "")}>
-        {days.map((day) => {
-          const allDayItems = items.filter((it) => isSameDay(new Date(it.start_time), day) && it.all_day);
-          const timedItems = items.filter((it) => isSameDay(new Date(it.start_time), day) && !it.all_day);
-          return (
-            <div key={day.toISOString()} className="flex flex-1 flex-col">
-              {/* Day header */}
-              <div className={cn("flex items-center gap-2 px-3 py-2 border-b border-border/20", isToday(day) && "bg-primary/5")}>
-                <span className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold",
-                  isToday(day) ? "bg-primary text-primary-foreground" : "text-foreground"
-                )}>
-                  {format(day, "d")}
-                </span>
-                <div>
-                  <p className="text-sm font-medium capitalize">{format(day, "EEEE", { locale: ptBR })}</p>
-                  <p className="text-xs text-muted-foreground">{format(day, "d MMM yyyy", { locale: ptBR })}</p>
-                </div>
-                <button onClick={() => onNewEvent(day)} className="ml-auto rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
-                  <Plus className="h-4 w-4" />
-                </button>
+
+      {/* All-day section */}
+      {days.some(day => items.some(it => isSameDay(new Date(it.start_time), day) && it.all_day)) && (
+        <div className={cn("grid border-b border-border/20", days.length === 1 ? "grid-cols-[50px_1fr]" : `grid-cols-[50px_repeat(${days.length},1fr)]`)}>
+          <div className="flex items-center justify-end pr-2 text-xs text-muted-foreground">Dia</div>
+          {days.map((day) => {
+            const allDayItems = items.filter((it) => isSameDay(new Date(it.start_time), day) && it.all_day);
+            return (
+              <div key={day.toISOString()} className="px-1 py-1 space-y-0.5">
+                {allDayItems.map((it) => <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />)}
               </div>
-              {/* All day events */}
-              {allDayItems.length > 0 && (
-                <div className="border-b border-border/20 px-2 py-1 space-y-0.5">
-                  {allDayItems.map((it) => (
-                    <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />
-                  ))}
-                </div>
-              )}
-              {/* Hourly grid */}
-              <div className="flex-1 overflow-auto">
-                {HOURS.map((h) => {
-                  const hourItems = timedItems.filter((it) => new Date(it.start_time).getHours() === h);
-                  const slotDate = new Date(day);
-                  slotDate.setHours(h, 0, 0, 0);
-                  return (
-                    <div
-                      key={h}
-                      className="relative h-14 border-b border-border/10 px-2 hover:bg-accent/10 transition-colors"
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => onDrop(e, slotDate)}
-                      onClick={() => onNewEvent(slotDate)}
-                    >
-                      {hourItems.map((it) => (
-                        <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Scrollable hourly grid */}
+      <div className="flex-1 overflow-auto">
+        {HOURS.map((h) => (
+          <div key={h} className={cn("grid border-b border-border/10", days.length === 1 ? "grid-cols-[50px_1fr]" : `grid-cols-[50px_repeat(${days.length},1fr)]`)}>
+            <div className="flex h-14 items-start justify-end pr-2 pt-0.5 sticky left-0 bg-background z-10">
+              <span className="text-xs text-muted-foreground">{String(h).padStart(2, "0")}:00</span>
             </div>
-          );
-        })}
+            {days.map((day) => {
+              const hourItems = items.filter((it) => {
+                const d = new Date(it.start_time);
+                return isSameDay(d, day) && !it.all_day && d.getHours() === h;
+              });
+              const slotDate = new Date(day);
+              slotDate.setHours(h, 0, 0, 0);
+              return (
+                <div
+                  key={day.toISOString()}
+                  className="h-14 border-l border-border/10 px-0.5 hover:bg-accent/10 transition-colors"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => onDrop(e, slotDate)}
+                  onClick={() => onNewEvent(slotDate)}
+                >
+                  {hourItems.map((it) => <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />)}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -434,13 +450,14 @@ function HourlyWeekView({ date, items, onDrop, onToggle, onClick, onNewEvent }: 
 
   return (
     <div className="flex h-full flex-col">
-      {/* Week header with day names */}
+      {/* Week header */}
       <div className="grid grid-cols-[50px_repeat(7,1fr)] border-b border-border/20">
         <div className="flex items-center justify-center text-xs text-muted-foreground/50">S{weekNum}</div>
         {days.map((day) => {
           const dayItems = items.filter((it) => isSameDay(new Date(it.start_time), day));
           return (
-            <div key={day.toISOString()} className={cn("flex flex-col items-center py-2", isToday(day) && "bg-primary/5")}>
+            <div key={day.toISOString()} className={cn("flex flex-col items-center py-2 cursor-pointer hover:bg-accent/10", isToday(day) && "bg-primary/5")}
+              onClick={() => onNewEvent(day)}>
               <span className="text-xs uppercase text-muted-foreground">{format(day, "EEE", { locale: ptBR })}</span>
               <span className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold",
@@ -459,11 +476,12 @@ function HourlyWeekView({ date, items, onDrop, onToggle, onClick, onNewEvent }: 
           );
         })}
       </div>
-      {/* Hourly grid */}
+
+      {/* Scrollable hourly grid */}
       <div className="flex-1 overflow-auto">
         {HOURS.map((h) => (
           <div key={h} className="grid grid-cols-[50px_repeat(7,1fr)] border-b border-border/10">
-            <div className="flex h-14 items-start justify-end pr-2 pt-0.5">
+            <div className="flex h-14 items-start justify-end pr-2 pt-0.5 sticky left-0 bg-background z-10">
               <span className="text-xs text-muted-foreground">{String(h).padStart(2, "0")}:00</span>
             </div>
             {days.map((day) => {
@@ -481,9 +499,7 @@ function HourlyWeekView({ date, items, onDrop, onToggle, onClick, onNewEvent }: 
                   onDrop={(e) => onDrop(e, slotDate)}
                   onClick={() => onNewEvent(slotDate)}
                 >
-                  {hourItems.map((it) => (
-                    <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />
-                  ))}
+                  {hourItems.map((it) => <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />)}
                 </div>
               );
             })}
@@ -508,26 +524,22 @@ function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent }: Hou
 
   return (
     <div className="flex h-full flex-col px-1">
-      {/* Weekday header */}
       <div className="grid grid-cols-[32px_repeat(7,1fr)] gap-px">
         <div />
         {weekDays.map((d) => (
           <div key={d} className="py-2 text-center text-sm font-medium text-muted-foreground">{d}</div>
         ))}
       </div>
-
-      {/* Weeks */}
       <div className="flex flex-1 flex-col gap-px">
         {weeks.map((week, wi) => {
           const weekNum = getISOWeek(week[0]);
           return (
             <div key={wi} className="grid min-h-[80px] flex-1 grid-cols-[32px_repeat(7,1fr)] gap-px">
               <div className="flex items-start justify-center pt-2">
-                <span className="text-xs text-muted-foreground/40">{weekNum}</span>
+                <span className="text-xs text-muted-foreground/40">S{weekNum}</span>
               </div>
               {week.map((day) => {
                 const dayItems = items.filter((it) => isSameDay(new Date(it.start_time), day));
-                const hasDots = dayItems.length > 0;
                 return (
                   <div
                     key={day.toISOString()}
@@ -547,7 +559,7 @@ function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent }: Hou
                       )}>
                         {format(day, "d")}
                       </span>
-                      {hasDots && (
+                      {dayItems.length > 0 && (
                         <div className="flex gap-[2px]">
                           {dayItems.slice(0, 4).map((it) => (
                             <span key={it.id} className="h-[5px] w-[5px] rounded-full" style={{ backgroundColor: it.color || "#3b82f6" }} />
@@ -556,12 +568,8 @@ function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent }: Hou
                       )}
                     </div>
                     <div className="mt-0.5 space-y-[1px]">
-                      {dayItems.slice(0, 3).map((it) => (
-                        <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />
-                      ))}
-                      {dayItems.length > 3 && (
-                        <span className="block text-center text-xs text-muted-foreground">+{dayItems.length - 3}</span>
-                      )}
+                      {dayItems.slice(0, 3).map((it) => <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />)}
+                      {dayItems.length > 3 && <span className="block text-center text-xs text-muted-foreground">+{dayItems.length - 3}</span>}
                     </div>
                   </div>
                 );
@@ -577,10 +585,7 @@ function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent }: Hou
 /* ─── Yearly View ───────────────────────────────────── */
 
 function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick }: {
-  date: Date;
-  items: CalendarItem[];
-  entries: any[];
-  tasks: Tables<"tasks">[];
+  date: Date; items: CalendarItem[]; entries: any[]; tasks: Tables<"tasks">[];
   getFinSummary: (s: Date, e: Date) => { rev: number; exp: number; balance: number };
   onMonthClick: (d: Date) => void;
 }) {
@@ -590,8 +595,7 @@ function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick }
   const yearFin = getFinSummary(yearStart, yearEnd);
   const totalTasks = tasks.filter(t => {
     if (!t.scheduled_date) return false;
-    const d = new Date(t.scheduled_date);
-    return d.getFullYear() === date.getFullYear();
+    return new Date(t.scheduled_date).getFullYear() === date.getFullYear();
   });
   const completedTasks = totalTasks.filter(t => t.is_completed);
   const brlFmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -614,7 +618,10 @@ function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick }
         </div>
         <div className="rounded-lg border border-border/30 p-3">
           <p className="text-xs text-muted-foreground">Tarefas anuais</p>
-          <p className="text-lg font-semibold">{completedTasks.length}<span className="text-sm text-muted-foreground">/{totalTasks.length}</span></p>
+          <p className="text-lg font-semibold">
+            <span className="text-[hsl(var(--success))]">{completedTasks.length}</span>
+            <span className="text-muted-foreground">/{totalTasks.length}</span>
+          </p>
         </div>
       </div>
 
@@ -627,6 +634,8 @@ function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick }
             const d = new Date(it.start_time);
             return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
           });
+          const taskCount = monthItems.filter(it => it.is_task).length;
+          const eventCount = monthItems.length - taskCount;
           const fin = getFinSummary(mStart, mEnd);
           const mDays = eachDayOfInterval({ start: startOfWeek(mStart, { locale: ptBR }), end: endOfWeek(mEnd, { locale: ptBR }) });
 
@@ -638,12 +647,15 @@ function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick }
             >
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm font-semibold capitalize">{format(month, "MMMM", { locale: ptBR })}</span>
-                <span className="text-xs text-muted-foreground">{monthItems.length}</span>
+                <div className="flex gap-1.5 text-xs">
+                  {eventCount > 0 && <span className="text-primary">{eventCount}📅</span>}
+                  {taskCount > 0 && <span className="text-[hsl(var(--success))]">{taskCount}✅</span>}
+                </div>
               </div>
 
               <div className="grid grid-cols-7 gap-[2px]">
                 {["D", "S", "T", "Q", "Q", "S", "S"].map((d, i) => (
-                  <span key={i} className="text-center text-[9px] text-muted-foreground">{d}</span>
+                  <span key={i} className="text-center text-[10px] text-muted-foreground">{d}</span>
                 ))}
                 {mDays.map((day, i) => {
                   const hasEvent = monthItems.some((it) => isSameDay(new Date(it.start_time), day));
@@ -651,7 +663,7 @@ function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick }
                     <span
                       key={i}
                       className={cn(
-                        "text-center text-[10px] leading-4",
+                        "text-center text-[11px] leading-5",
                         !isSameMonth(day, month) && "opacity-20",
                         isToday(day) && "rounded-full bg-primary text-primary-foreground font-bold",
                         hasEvent && !isToday(day) && "font-bold text-primary"
