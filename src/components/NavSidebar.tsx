@@ -1,6 +1,4 @@
-import { useState } from "react";
-import { useTheme } from "@/contexts/ThemeContext";
-import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
@@ -10,14 +8,11 @@ import {
   LayoutDashboard,
   ListTodo,
   User,
-  Moon,
-  Sun,
+  Settings,
   LogOut,
-  ChevronRight,
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
 
-export type ModuleKey = "calendar" | "projects" | "finances" | "dashboard" | "backlog" | "profile";
+export type ModuleKey = "calendar" | "projects" | "finances" | "dashboard" | "backlog" | "profile" | "preferences";
 
 interface NavItem {
   key: ModuleKey;
@@ -39,7 +34,6 @@ interface NavSidebarProps {
 }
 
 export default function NavSidebar({ activeModule, onModuleChange }: NavSidebarProps) {
-  const { theme, toggleTheme } = useTheme();
   const { signOut } = useAuth();
 
   return (
@@ -90,21 +84,26 @@ export default function NavSidebar({ activeModule, onModuleChange }: NavSidebarP
             </button>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={8}>
-            Perfil & Config.
+            Perfil
           </TooltipContent>
         </Tooltip>
 
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
             <button
-              onClick={toggleTheme}
-              className="flex h-11 w-11 items-center justify-center rounded-xl text-[hsl(var(--nav-foreground))] transition-colors hover:bg-[hsl(var(--nav-hover))] hover:text-foreground"
+              onClick={() => onModuleChange("preferences")}
+              className={cn(
+                "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200",
+                activeModule === "preferences"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-[hsl(var(--nav-foreground))] hover:bg-[hsl(var(--nav-hover))] hover:text-foreground"
+              )}
             >
-              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              <Settings className="h-5 w-5" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={8}>
-            {theme === "dark" ? "Modo Claro" : "Modo Escuro"}
+            Preferências
           </TooltipContent>
         </Tooltip>
 
