@@ -101,6 +101,8 @@ export default function FinancesView() {
   const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
   const [doarYear, setDoarYear] = useState(new Date().getFullYear());
   const [inlineEditId, setInlineEditId] = useState<string | null>(null);
+  const [revenueCollapsed, setRevenueCollapsed] = useState(false);
+  const [expenseCollapsed, setExpenseCollapsed] = useState(false);
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -553,6 +555,7 @@ export default function FinancesView() {
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; font-size: 9px; }
         @page { size: A4 landscape; margin: 10mm; }
+        @media print { body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; } }
         table { width: 100%; border-collapse: collapse; }
         th, td { border: 1px solid #ccc; padding: 3px 5px; text-align: right; }
         th { background: #f3f4f6; font-weight: bold; }
@@ -560,7 +563,6 @@ export default function FinancesView() {
         .section-header { background: #e5e7eb; font-weight: bold; text-align: left; }
         .total-row { background: #f9fafb; font-weight: bold; }
         .text-green { color: #16a34a; } .text-red { color: #dc2626; } .text-blue { color: #2563eb; }
-        h2 { font-size: 14px; margin-bottom: 8px; }
       </style></head><body>
       ${printContent.innerHTML}
       </body></html>
@@ -616,7 +618,7 @@ export default function FinancesView() {
         <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as ViewTab)}>
           <TabsList className="h-8">
             <TabsTrigger value="lancamentos" className="text-xs">Lançamentos</TabsTrigger>
-            <TabsTrigger value="doar" className="text-xs">DOAR / DRE</TabsTrigger>
+            <TabsTrigger value="doar" className="text-xs">DOAR</TabsTrigger>
             <TabsTrigger value="relatorios" className="text-xs">Relatórios</TabsTrigger>
             <TabsTrigger value="contas" className="text-xs">Contas</TabsTrigger>
           </TabsList>
@@ -828,29 +830,46 @@ export default function FinancesView() {
           </>
         )}
 
-        {/* ============ DOAR / DRE ============ */}
-        {viewTab === "doar" && (
+        {/* ============ DOAR ============ */}
+        {viewTab === "doar" && (() => {
+          const totalRevYear = dreData.monthTotalsRev.reduce((s, v) => s + v, 0);
+          const totalExpYear = dreData.monthTotalsExp.reduce((s, v) => s + v, 0);
+          const availableYears = [...new Set(entries.map(e => new Date(e.entry_date).getFullYear()))].sort((a, b) => b - a);
+          if (!availableYears.includes(doarYear)) availableYears.push(doarYear);
+          availableYears.sort((a, b) => b - a);
+
+          return (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold">DRE / DOAR — {doarYear}</h3>
-                <div className="flex gap-1">
-                  {[doarYear - 1, doarYear, doarYear + 1].map(y => (
-                    <Button key={y} size="sm" variant={y === doarYear ? "default" : "outline"} className="h-7 text-xs px-2"
-                      onClick={() => setDoarYear(y)}>{y}</Button>
-                  ))}
-                </div>
+                <Select value={String(doarYear)} onValueChange={(v) => setDoarYear(Number(v))}>
+                  <SelectTrigger className="h-8 w-24 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableYears.map(y => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handlePrintDOAR}>
-                <Printer className="mr-1 h-3 w-3" /> Imprimir A4
+              <Button size="icon" variant="outline" className="h-8 w-8" onClick={handlePrintDOAR} title="Imprimir DOAR em A4 Horizontal">
+                <Printer className="h-4 w-4" />
               </Button>
             </div>
 
             <div id="doar-print-area" className="rounded-lg border border-border overflow-auto">
               <table className="w-full text-xs border-collapse">
                 <thead>
+                  {/* Title row */}
+                  <tr className="bg-primary/10">
+                    <th colSpan={15} className="text-center p-3 border-b border-border font-bold text-sm text-primary tracking-wide">
+                      DOAR – DEMONSTRATIVO DE ORIGEM E APLICAÇÃO DE RECURSOS
+                    </th>
+                  </tr>
                   <tr className="bg-muted">
                     <th className="text-left p-2 border-b border-border font-bold min-w-[140px]">Descrição</th>
+                    <th className="text-right p-2 border-b border-border font-bold min-w-[50px]">%</th>
                     {dreData.months.map(m => (
                       <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px]">{m}</th>
                     ))}
@@ -862,6 +881,7 @@ export default function FinancesView() {
                   {dreData.carryOver !== 0 && (
                     <tr className="bg-primary/5">
                       <td className="p-2 border-b border-border font-bold text-primary">📦 Saldo Anterior</td>
+                      <td className="text-right p-2 border-b border-border text-muted-foreground">—</td>
                       {dreData.months.map((m, i) => (
                         <td key={m} className="text-right p-2 border-b border-border">
                           {i === 0 ? <span className={dreData.carryOver >= 0 ? "text-success" : "text-destructive"}>{brl(dreData.carryOver)}</span> : ""}
@@ -872,61 +892,103 @@ export default function FinancesView() {
                       </td>
                     </tr>
                   )}
-                  {/* Revenue header */}
-                  <tr className="bg-success/10">
-                    <td colSpan={14} className="p-2 border-b border-border font-bold text-success">▲ RECEITAS</td>
-                  </tr>
-                  {dreData.revRows.map(row => (
-                    <tr key={row.id} className="hover:bg-muted/30">
-                      <td className="p-2 border-b border-border pl-4">{row.name}</td>
-                      {row.months.map((v, i) => (
-                        <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-success" : "text-muted-foreground")}>
-                          {v > 0 ? brl(v) : "—"}
-                        </td>
-                      ))}
-                      <td className="text-right p-2 border-b border-border font-medium text-success">
-                        {brl(row.months.reduce((s, v) => s + v, 0))}
-                      </td>
-                    </tr>
-                  ))}
-                  {/* Revenue total */}
-                  <tr className="bg-success/5 font-bold">
-                    <td className="p-2 border-b-2 border-border text-success">TOTAL RECEITAS</td>
-                    {dreData.monthTotalsRev.map((v, i) => (
-                      <td key={i} className="text-right p-2 border-b-2 border-border text-success">{brl(v)}</td>
-                    ))}
-                    <td className="text-right p-2 border-b-2 border-border text-success">{brl(dreData.monthTotalsRev.reduce((s, v) => s + v, 0))}</td>
-                  </tr>
 
-                  {/* Expense header */}
-                  <tr className="bg-destructive/10">
-                    <td colSpan={14} className="p-2 border-b border-border font-bold text-destructive">▼ DESPESAS</td>
-                  </tr>
-                  {dreData.expRows.map(row => (
-                    <tr key={row.id} className="hover:bg-muted/30">
-                      <td className="p-2 border-b border-border pl-4">{row.name}</td>
-                      {row.months.map((v, i) => (
-                        <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-destructive" : "text-muted-foreground")}>
-                          {v > 0 ? brl(v) : "—"}
-                        </td>
-                      ))}
-                      <td className="text-right p-2 border-b border-border font-medium text-destructive">
-                        {brl(row.months.reduce((s, v) => s + v, 0))}
-                      </td>
-                    </tr>
-                  ))}
-                  {/* Expense total */}
-                  <tr className="bg-destructive/5 font-bold">
-                    <td className="p-2 border-b-2 border-border text-destructive">TOTAL DESPESAS</td>
-                    {dreData.monthTotalsExp.map((v, i) => (
-                      <td key={i} className="text-right p-2 border-b-2 border-border text-destructive">{brl(v)}</td>
+                  {/* Revenue header - collapsible */}
+                  <tr className="bg-success/10 cursor-pointer select-none" onClick={() => setRevenueCollapsed(!revenueCollapsed)}>
+                    <td colSpan={2} className="p-2 border-b border-border font-bold text-success">
+                      <span className="inline-flex items-center gap-1">
+                        {revenueCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                        RECEITAS
+                      </span>
+                    </td>
+                    {dreData.monthTotalsRev.map((v, i) => (
+                      <td key={i} className="text-right p-2 border-b border-border font-bold text-success">{revenueCollapsed ? brl(v) : ""}</td>
                     ))}
-                    <td className="text-right p-2 border-b-2 border-border text-destructive">{brl(dreData.monthTotalsExp.reduce((s, v) => s + v, 0))}</td>
+                    {revenueCollapsed && (
+                      <td className="text-right p-2 border-b border-border font-bold text-success">{brl(totalRevYear)}</td>
+                    )}
+                    {!revenueCollapsed && <td className="p-2 border-b border-border" />}
                   </tr>
+                  {!revenueCollapsed && dreData.revRows.map(row => {
+                    const rowTotal = row.months.reduce((s, v) => s + v, 0);
+                    const pct = totalRevYear > 0 ? ((rowTotal / totalRevYear) * 100).toFixed(1) : "0.0";
+                    return (
+                      <tr key={row.id} className="hover:bg-muted/30">
+                        <td className="p-2 border-b border-border pl-6">{row.name}</td>
+                        <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
+                        {row.months.map((v, i) => (
+                          <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-success" : "text-muted-foreground")}>
+                            {v > 0 ? brl(v) : "—"}
+                          </td>
+                        ))}
+                        <td className="text-right p-2 border-b border-border font-medium text-success">
+                          {brl(rowTotal)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {/* Revenue total */}
+                  {!revenueCollapsed && (
+                    <tr className="bg-success/5 font-bold">
+                      <td className="p-2 border-b-2 border-border text-success">TOTAL RECEITAS</td>
+                      <td className="text-right p-2 border-b-2 border-border text-success">100%</td>
+                      {dreData.monthTotalsRev.map((v, i) => (
+                        <td key={i} className="text-right p-2 border-b-2 border-border text-success">{brl(v)}</td>
+                      ))}
+                      <td className="text-right p-2 border-b-2 border-border text-success">{brl(totalRevYear)}</td>
+                    </tr>
+                  )}
+
+                  {/* Expense header - collapsible */}
+                  <tr className="bg-destructive/10 cursor-pointer select-none" onClick={() => setExpenseCollapsed(!expenseCollapsed)}>
+                    <td colSpan={2} className="p-2 border-b border-border font-bold text-destructive">
+                      <span className="inline-flex items-center gap-1">
+                        {expenseCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                        DESPESAS
+                      </span>
+                    </td>
+                    {dreData.monthTotalsExp.map((v, i) => (
+                      <td key={i} className="text-right p-2 border-b border-border font-bold text-destructive">{expenseCollapsed ? brl(v) : ""}</td>
+                    ))}
+                    {expenseCollapsed && (
+                      <td className="text-right p-2 border-b border-border font-bold text-destructive">{brl(totalExpYear)}</td>
+                    )}
+                    {!expenseCollapsed && <td className="p-2 border-b border-border" />}
+                  </tr>
+                  {!expenseCollapsed && dreData.expRows.map(row => {
+                    const rowTotal = row.months.reduce((s, v) => s + v, 0);
+                    const pct = totalExpYear > 0 ? ((rowTotal / totalExpYear) * 100).toFixed(1) : "0.0";
+                    return (
+                      <tr key={row.id} className="hover:bg-muted/30">
+                        <td className="p-2 border-b border-border pl-6">{row.name}</td>
+                        <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
+                        {row.months.map((v, i) => (
+                          <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-destructive" : "text-muted-foreground")}>
+                            {v > 0 ? brl(v) : "—"}
+                          </td>
+                        ))}
+                        <td className="text-right p-2 border-b border-border font-medium text-destructive">
+                          {brl(rowTotal)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {/* Expense total */}
+                  {!expenseCollapsed && (
+                    <tr className="bg-destructive/5 font-bold">
+                      <td className="p-2 border-b-2 border-border text-destructive">TOTAL DESPESAS</td>
+                      <td className="text-right p-2 border-b-2 border-border text-destructive">100%</td>
+                      {dreData.monthTotalsExp.map((v, i) => (
+                        <td key={i} className="text-right p-2 border-b-2 border-border text-destructive">{brl(v)}</td>
+                      ))}
+                      <td className="text-right p-2 border-b-2 border-border text-destructive">{brl(totalExpYear)}</td>
+                    </tr>
+                  )}
 
                   {/* Balance per month */}
                   <tr className="bg-primary/5 font-bold">
                     <td className="p-2 border-b border-border text-primary">RESULTADO DO MÊS</td>
+                    <td className="p-2 border-b border-border">—</td>
                     {dreData.monthBalance.map((v, i) => (
                       <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
                         {brl(v)}
@@ -940,6 +1002,7 @@ export default function FinancesView() {
                   {/* Accumulated */}
                   <tr className="bg-muted font-bold">
                     <td className="p-2 border-b border-border">SALDO ACUMULADO</td>
+                    <td className="p-2 border-b border-border">—</td>
                     {dreData.accumulated.map((v, i) => (
                       <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
                         {brl(v)}
@@ -953,7 +1016,8 @@ export default function FinancesView() {
               </table>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ============ RELATÓRIOS ============ */}
         {viewTab === "relatorios" && (
