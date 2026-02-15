@@ -5,6 +5,7 @@ import BacklogSidebar from "@/components/BacklogSidebar";
 import ProjectsView from "@/components/ProjectsView";
 import FinancesView from "@/components/FinancesView";
 import ProfileView from "@/components/ProfileView";
+import PreferencesView from "@/components/PreferencesView";
 import DashboardView from "@/components/DashboardView";
 
 export default function Dashboard() {
@@ -13,17 +14,13 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Vertical icon navigation */}
       <NavSidebar activeModule={activeModule} onModuleChange={setActiveModule} />
 
-      {/* Backlog sidebar - shown alongside calendar */}
       {activeModule === "backlog" && (
         <BacklogSidebar collapsed={backlogCollapsed} onToggle={() => setBacklogCollapsed(!backlogCollapsed)} />
       )}
 
-      {/* Main content */}
       <main className="flex flex-1 flex-col overflow-hidden">
-        {/* Header */}
         <header className="flex items-center gap-3 border-b border-border px-4 py-2">
           <h1 className="text-sm font-bold text-primary">Task Calendar</h1>
           <span className="text-xs text-muted-foreground capitalize">
@@ -32,7 +29,8 @@ export default function Dashboard() {
             {activeModule === "finances" && "Finanças"}
             {activeModule === "dashboard" && "Dashboard"}
             {activeModule === "backlog" && "Backlog"}
-            {activeModule === "profile" && "Perfil & Configurações"}
+            {activeModule === "profile" && "Perfil"}
+            {activeModule === "preferences" && "Preferências"}
           </span>
         </header>
 
@@ -43,6 +41,7 @@ export default function Dashboard() {
           {activeModule === "projects" && <ProjectsView />}
           {activeModule === "finances" && <FinancesView />}
           {activeModule === "profile" && <ProfileView />}
+          {activeModule === "preferences" && <PreferencesView />}
         </div>
       </main>
     </div>
