@@ -159,24 +159,24 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-sm">{item ? "Editar Evento" : "Novo Evento"}</DialogTitle>
+          <DialogTitle className="text-base">{item ? "Editar Evento" : "Novo Evento"}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
           <div>
-            <Label className="text-xs">Título</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} className="h-8 text-sm" placeholder="Nome do evento" />
+            <Label className="text-sm">Título</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} className="h-9 text-sm" placeholder="Nome do evento" />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs">Data</Label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-8 text-sm" />
+              <Label className="text-sm">Data</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 text-sm" />
             </div>
             <div className="flex items-end gap-2">
               <div className="flex items-center gap-1.5">
                 <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
-                <Label htmlFor="allday" className="text-xs">Dia inteiro</Label>
+                <Label htmlFor="allday" className="text-sm">Dia inteiro</Label>
               </div>
             </div>
           </div>
@@ -184,29 +184,29 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           {!allDay && (
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs">Início</Label>
-                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-8 text-sm" />
+              <Label className="text-sm">Início</Label>
+                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-9 text-sm" />
               </div>
               <div>
-                <Label className="text-xs">Fim</Label>
-                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="h-8 text-sm" />
+                <Label className="text-sm">Fim</Label>
+                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="h-9 text-sm" />
               </div>
             </div>
           )}
 
           <div>
-            <Label className="text-xs">Descrição</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} className="h-8 text-sm" placeholder="Opcional" />
+            <Label className="text-sm">Descrição</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} className="h-9 text-sm" placeholder="Opcional" />
           </div>
 
           <div>
-            <Label className="text-xs">Cor</Label>
-            <div className="mt-1 flex gap-1.5">
+            <Label className="text-sm">Cor</Label>
+            <div className="mt-1.5 flex gap-2">
               {COLORS.map((c) => (
                 <button
                   key={c}
                   onClick={() => setColor(c)}
-                  className="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110"
+                  className="h-6 w-6 rounded-full border-2 transition-transform hover:scale-110"
                   style={{
                     backgroundColor: c,
                     borderColor: color === c ? "hsl(var(--foreground))" : "transparent",
@@ -217,9 +217,9 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           </div>
 
           <div>
-            <Label className="text-xs">Recorrência</Label>
+            <Label className="text-sm">Recorrência</Label>
             <Select value={recurrence} onValueChange={setRecurrence}>
-              <SelectTrigger className="h-8 text-sm">
+              <SelectTrigger className="h-9 text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -232,8 +232,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
           {recurrence !== "none" && !item && (
             <div>
-              <Label className="text-xs">Quantidade de ocorrências</Label>
-              <Input type="number" min="1" max="365" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} className="h-8 text-sm" />
+              <Label className="text-sm">Quantidade de ocorrências</Label>
+              <Input type="number" min="1" max="365" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} className="h-9 text-sm" />
             </div>
           )}
         </div>
