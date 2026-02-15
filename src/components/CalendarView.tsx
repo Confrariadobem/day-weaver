@@ -190,7 +190,7 @@ export default function CalendarView() {
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => nav(-1)}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <h2 className="min-w-[180px] text-center text-sm font-semibold capitalize">{headerLabel}</h2>
+          <h2 className="min-w-[180px] text-center text-base font-semibold capitalize">{headerLabel}</h2>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => nav(1)}>
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -210,7 +210,7 @@ export default function CalendarView() {
               key={v.key}
               onClick={() => setViewMode(v.key)}
               className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 viewMode === v.key
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -311,7 +311,7 @@ function EventChip({ item, onToggle, onClick, compact }: { item: CalendarItem; o
       }}
       onClick={(e) => { e.stopPropagation(); onClick(item); }}
       className={cn(
-        "group flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 text-[10px] leading-tight transition-colors hover:brightness-110",
+        "group flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 text-xs leading-tight transition-colors hover:brightness-110",
         completed && "opacity-50 line-through",
         compact ? "truncate" : ""
       )}
@@ -338,7 +338,7 @@ function EventChip({ item, onToggle, onClick, compact }: { item: CalendarItem; o
 function FinBadge({ rev, exp }: { rev: number; exp: number }) {
   if (rev === 0 && exp === 0) return null;
   return (
-    <div className="flex gap-1.5 text-[9px] leading-none">
+    <div className="flex gap-1.5 text-xs leading-none">
       {rev > 0 && <span className="text-[hsl(var(--success))]">+{brl(rev)}</span>}
       {exp > 0 && <span className="text-destructive">-{brl(exp)}</span>}
     </div>
@@ -372,8 +372,8 @@ function DayColumnView({ days, items, onDrop, onToggle, onClick, onNewEvent, get
                   {format(day, "d")}
                 </span>
                 <div>
-                  <p className="text-xs font-medium capitalize">{format(day, "EEEE", { locale: ptBR })}</p>
-                  <p className="text-[10px] text-muted-foreground">{format(day, "d MMM", { locale: ptBR })}</p>
+                <p className="text-sm font-medium capitalize">{format(day, "EEEE", { locale: ptBR })}</p>
+                  <p className="text-xs text-muted-foreground">{format(day, "d MMM", { locale: ptBR })}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -385,7 +385,7 @@ function DayColumnView({ days, items, onDrop, onToggle, onClick, onNewEvent, get
             </div>
             <div className="flex-1 space-y-0.5 overflow-auto px-2 pb-2">
               {dayItems.length === 0 && (
-                <p className="py-6 text-center text-xs text-muted-foreground/50">Sem eventos</p>
+                <p className="py-6 text-center text-sm text-muted-foreground/50">Sem eventos</p>
               )}
               {dayItems.map((it) => (
                 <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} />
@@ -408,8 +408,8 @@ function WeeklyView({ date, items, onDrop, onToggle, onClick, onNewEvent, getFin
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 px-3 py-1.5">
-        <span className="text-[10px] text-muted-foreground">S{weekNum}</span>
+      <div className="flex items-center gap-2 px-3 py-2">
+        <span className="text-xs text-muted-foreground">S{weekNum}</span>
         <FinBadge rev={fin.rev} exp={fin.exp} />
       </div>
       <div className="grid flex-1 grid-cols-7 gap-px">
@@ -426,9 +426,9 @@ function WeeklyView({ date, items, onDrop, onToggle, onClick, onNewEvent, getFin
                 className={cn("flex flex-col items-center py-1.5", isToday(day) && "bg-primary/5")}
                 onClick={() => onNewEvent(day)}
               >
-                <span className="text-[10px] uppercase text-muted-foreground">{format(day, "EEE", { locale: ptBR })}</span>
+                <span className="text-xs uppercase text-muted-foreground">{format(day, "EEE", { locale: ptBR })}</span>
                 <span className={cn(
-                  "flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium",
+                  "flex h-7 w-7 items-center justify-center rounded-full text-sm font-medium",
                   isToday(day) ? "bg-primary text-primary-foreground" : ""
                 )}>
                   {format(day, "d")}
@@ -473,7 +473,7 @@ function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent, getFi
     <div className="flex h-full flex-col px-1">
       {/* Financial summary bar */}
       {(fin.rev > 0 || fin.exp > 0) && (
-        <div className="flex items-center gap-3 px-3 py-1 text-[10px]">
+        <div className="flex items-center gap-3 px-3 py-1.5 text-xs">
           <span className="text-muted-foreground">Resumo:</span>
           <span className="text-[hsl(var(--success))]">Receitas {brl(fin.rev)}</span>
           <span className="text-destructive">Despesas {brl(fin.exp)}</span>
@@ -487,7 +487,7 @@ function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent, getFi
       <div className="grid grid-cols-[28px_repeat(7,1fr)] gap-px">
         <div /> {/* week number column */}
         {weekDays.map((d) => (
-          <div key={d} className="py-1.5 text-center text-[10px] font-medium text-muted-foreground">{d}</div>
+          <div key={d} className="py-1.5 text-center text-xs font-medium text-muted-foreground">{d}</div>
         ))}
       </div>
 
@@ -499,7 +499,7 @@ function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent, getFi
             <div key={wi} className="grid min-h-[72px] flex-1 grid-cols-[28px_repeat(7,1fr)] gap-px">
               {/* Week number */}
               <div className="flex items-start justify-center pt-1">
-                <span className="text-[9px] text-muted-foreground/50">{weekNum}</span>
+                <span className="text-xs text-muted-foreground/50">{weekNum}</span>
               </div>
               {week.map((day) => {
                 const dayItems = items.filter((it) => isSameDay(new Date(it.start_time), day));
@@ -518,7 +518,7 @@ function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent, getFi
                   >
                     <div className="flex items-center justify-between px-0.5">
                       <span className={cn(
-                        "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium",
+                        "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
                         isToday(day) ? "bg-primary text-primary-foreground" : ""
                       )}>
                         {format(day, "d")}
@@ -536,7 +536,7 @@ function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent, getFi
                         <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />
                       ))}
                       {dayItems.length > 3 && (
-                        <span className="block text-center text-[8px] text-muted-foreground">+{dayItems.length - 3}</span>
+                        <span className="block text-center text-xs text-muted-foreground">+{dayItems.length - 3}</span>
                       )}
                     </div>
                   </div>
@@ -579,8 +579,8 @@ function YearlyView({ date, items, getFinSummary, onMonthClick }: {
             onClick={() => onMonthClick(month)}
           >
             <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-xs font-semibold capitalize">{format(month, "MMMM", { locale: ptBR })}</span>
-              <span className="text-[9px] text-muted-foreground">{monthItems.length} item(s)</span>
+              <span className="text-sm font-semibold capitalize">{format(month, "MMMM", { locale: ptBR })}</span>
+              <span className="text-xs text-muted-foreground">{monthItems.length} item(s)</span>
             </div>
 
             {/* Mini calendar grid */}
@@ -607,7 +607,7 @@ function YearlyView({ date, items, getFinSummary, onMonthClick }: {
             </div>
 
             {(fin.rev > 0 || fin.exp > 0) && (
-              <div className="mt-1.5 flex gap-2 text-[8px]">
+              <div className="mt-1.5 flex gap-2 text-xs">
                 {fin.rev > 0 && <span className="text-[hsl(var(--success))]">+{brl(fin.rev)}</span>}
                 {fin.exp > 0 && <span className="text-destructive">-{brl(fin.exp)}</span>}
               </div>

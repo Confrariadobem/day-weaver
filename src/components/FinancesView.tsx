@@ -618,8 +618,8 @@ export default function FinancesView() {
           <CardContent className="flex items-center gap-3 p-4">
             <TrendingUp className="h-5 w-5 text-success" />
             <div>
-              <p className="text-[10px] text-muted-foreground">Receitas</p>
-              <p className="text-sm font-bold text-success">{brl(totalRevenue)}</p>
+              <p className="text-xs text-muted-foreground">Receitas</p>
+              <p className="text-base font-bold text-success">{brl(totalRevenue)}</p>
             </div>
           </CardContent>
         </Card>
@@ -627,8 +627,8 @@ export default function FinancesView() {
           <CardContent className="flex items-center gap-3 p-4">
             <TrendingDown className="h-5 w-5 text-destructive" />
             <div>
-              <p className="text-[10px] text-muted-foreground">Despesas</p>
-              <p className="text-sm font-bold text-destructive">{brl(totalExpense)}</p>
+              <p className="text-xs text-muted-foreground">Despesas</p>
+              <p className="text-base font-bold text-destructive">{brl(totalExpense)}</p>
             </div>
           </CardContent>
         </Card>
@@ -636,8 +636,8 @@ export default function FinancesView() {
           <CardContent className="flex items-center gap-3 p-4">
             <Wallet className="h-5 w-5 text-primary" />
             <div>
-              <p className="text-[10px] text-muted-foreground">Saldo</p>
-              <p className={cn("text-sm font-bold", balance >= 0 ? "text-success" : "text-destructive")}>{brl(balance)}</p>
+              <p className="text-xs text-muted-foreground">Saldo</p>
+              <p className={cn("text-base font-bold", balance >= 0 ? "text-success" : "text-destructive")}>{brl(balance)}</p>
             </div>
           </CardContent>
         </Card>
@@ -645,8 +645,8 @@ export default function FinancesView() {
           <CardContent className="flex items-center gap-3 p-4">
             <Landmark className="h-5 w-5 text-primary" />
             <div>
-              <p className="text-[10px] text-muted-foreground">Caixa Disponível</p>
-              <p className={cn("text-sm font-bold", totalAvailable >= 0 ? "text-success" : "text-destructive")}>{brl(totalAvailable)}</p>
+              <p className="text-xs text-muted-foreground">Caixa Disponível</p>
+              <p className={cn("text-base font-bold", totalAvailable >= 0 ? "text-success" : "text-destructive")}>{brl(totalAvailable)}</p>
             </div>
           </CardContent>
         </Card>
@@ -655,11 +655,11 @@ export default function FinancesView() {
       {/* Tabs + Period filter */}
       <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
         <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as ViewTab)}>
-          <TabsList className="h-8">
-            <TabsTrigger value="previsao" className="text-xs">Previsão de Caixa</TabsTrigger>
-            <TabsTrigger value="doar" className="text-xs">DOAR</TabsTrigger>
-            <TabsTrigger value="relatorios" className="text-xs">Relatórios</TabsTrigger>
-            <TabsTrigger value="contas" className="text-xs">Carteira</TabsTrigger>
+          <TabsList className="h-9">
+            <TabsTrigger value="previsao" className="text-sm">Previsão de Caixa</TabsTrigger>
+            <TabsTrigger value="doar" className="text-sm">DOAR</TabsTrigger>
+            <TabsTrigger value="relatorios" className="text-sm">Relatórios</TabsTrigger>
+            <TabsTrigger value="contas" className="text-sm">Carteira</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -676,7 +676,7 @@ export default function FinancesView() {
                 placeholder="Pesquisar lançamentos por título ou categoria..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 text-xs bg-transparent border-0 border-b border-border/30 rounded-none focus-visible:ring-0 focus-visible:border-primary/40 placeholder:text-muted-foreground/40"
+                className="h-9 text-sm bg-transparent border-0 border-b border-border/30 rounded-none focus-visible:ring-0 focus-visible:border-primary/40 placeholder:text-muted-foreground/40"
               />
             </div>
 
@@ -695,7 +695,7 @@ export default function FinancesView() {
                     key={f.key}
                     size="sm"
                     variant={cashFlowFilter === f.key ? "default" : "ghost"}
-                    className={cn("h-6 text-[10px] px-2 gap-1 rounded-full", cashFlowFilter !== f.key && "text-muted-foreground hover:text-foreground")}
+                    className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", cashFlowFilter !== f.key && "text-muted-foreground hover:text-foreground")}
                     onClick={() => setCashFlowFilter(f.key)}
                   >
                     {f.label}
@@ -705,11 +705,11 @@ export default function FinancesView() {
               <div className="flex items-center gap-1.5 ml-auto">
                 {selectedIds.size > 0 && (
                   <>
-                    <span className="text-[10px] text-muted-foreground">{selectedIds.size} selecionados</span>
+                    <span className="text-xs text-muted-foreground">{selectedIds.size} selecionados</span>
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-6 px-2 text-[10px] gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                      className="h-7 px-2.5 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
                       onClick={async () => {
                         for (const id of selectedIds) {
                           await supabase.from("financial_entries").delete().eq("id", id);
@@ -723,7 +723,7 @@ export default function FinancesView() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-6 px-2 text-[10px] gap-1 text-muted-foreground rounded-full"
+                      className="h-7 px-2.5 text-xs gap-1 text-muted-foreground rounded-full"
                       onClick={() => {
                         const selected = filtered.filter(e => selectedIds.has(e.id));
                         const header = "Data,Título,Tipo,Categoria,Valor,Status\n";
@@ -744,7 +744,7 @@ export default function FinancesView() {
                 )}
                 <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
                   <DialogTrigger asChild>
-                    <Button size="sm" className="h-6 text-[10px] rounded-full px-3"><Plus className="mr-1 h-3 w-3" /> Lançamento</Button>
+                    <Button size="sm" className="h-7 text-xs rounded-full px-3"><Plus className="mr-1 h-3.5 w-3.5" /> Lançamento</Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader><DialogTitle>{editingEntry ? "Editar Lançamento" : "Novo Lançamento"}</DialogTitle></DialogHeader>
@@ -843,9 +843,9 @@ export default function FinancesView() {
 
             {/* Clean borderless table */}
             <div className="rounded-lg overflow-hidden">
-              <table className="w-full text-xs">
+              <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-[10px] text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
+                  <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
                     <th className="text-left py-2 px-2 w-8">
                       <Checkbox
                         checked={filtered.length > 0 && selectedIds.size === filtered.length}
@@ -905,7 +905,7 @@ export default function FinancesView() {
                         <td className={cn("py-2.5 px-2", e.is_paid && "line-through text-muted-foreground")}>{e.title}</td>
                         <td className="py-2.5 px-2 text-muted-foreground/60">{cat?.name || "—"}</td>
                         <td className="py-2.5 px-2">
-                          <span className={cn("text-[10px] font-medium", e.type === "revenue" ? "text-success" : "text-destructive")}>
+                          <span className={cn("text-xs font-medium", e.type === "revenue" ? "text-success" : "text-destructive")}>
                             {e.type === "revenue" ? "Receita" : "Despesa"}
                           </span>
                         </td>
@@ -917,20 +917,20 @@ export default function FinancesView() {
                         </td>
                         <td className="py-2.5 px-2 text-center">
                           {e.is_paid ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-success/60">
+                            <span className="inline-flex items-center gap-1 text-xs text-success/60">
                               <Check className="h-2.5 w-2.5" /> Pago
                             </span>
                           ) : isOverdue ? (
                             <button
                               onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); setIsPaid(true); }}
-                              className="inline-flex items-center gap-1 text-[10px] text-destructive hover:text-destructive/80 transition-colors"
+                              className="inline-flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors"
                             >
                               <AlertTriangle className="h-2.5 w-2.5" /> Atrasado
                             </button>
                           ) : (
                             <button
                               onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); setIsPaid(true); }}
-                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-success transition-colors"
+                              className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-success transition-colors"
                             >
                               <CircleDollarSign className="h-2.5 w-2.5" /> Baixa
                             </button>
@@ -1306,14 +1306,14 @@ export default function FinancesView() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Patrimônio Total</p>
+                    <p className="text-sm text-muted-foreground font-medium">Saldo Total</p>
                     <p className={cn("text-2xl font-bold mt-1", totalAvailable >= 0 ? "text-success" : "text-destructive")}>{brl(totalAvailable)}</p>
                   </div>
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
                     <Wallet className="h-7 w-7 text-primary" />
                   </div>
                 </div>
-                <div className="mt-4 flex gap-4 text-xs">
+                <div className="mt-4 flex gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Contas ativas</span>
                     <span className="ml-1 font-bold">{accounts.filter(a => a.is_active).length}</span>
@@ -1342,7 +1342,7 @@ export default function FinancesView() {
                           </div>
                           <div>
                             <p className="text-sm font-bold leading-tight">{acc.name}</p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">{typeInfo?.label}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{typeInfo?.label}</p>
                           </div>
                         </div>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1362,7 +1362,7 @@ export default function FinancesView() {
 
                       <div className="space-y-2">
                         <div>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Saldo atual</p>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider">Saldo atual</p>
                           <p className={cn("text-xl font-bold mt-0.5", acc.current_balance >= 0 ? "text-success" : "text-destructive")}>
                             {brl(acc.current_balance)}
                           </p>
@@ -1385,9 +1385,9 @@ export default function FinancesView() {
                                 style={{ width: `${Math.min(usedPercent, 100)}%` }}
                               />
                             </div>
-                            <p className="text-[10px] text-muted-foreground text-right">{usedPercent.toFixed(0)}% utilizado</p>
+                            <p className="text-xs text-muted-foreground text-right">{usedPercent.toFixed(0)}% utilizado</p>
                             {acc.closing_day && acc.due_day && (
-                              <div className="flex gap-3 text-[10px] text-muted-foreground pt-1">
+                              <div className="flex gap-3 text-xs text-muted-foreground pt-1">
                                 <span>📅 Fecha dia {acc.closing_day}</span>
                                 <span>💳 Vence dia {acc.due_day}</span>
                               </div>

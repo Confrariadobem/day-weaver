@@ -148,18 +148,18 @@ export default function ProfileView() {
   return (
     <div className="h-full overflow-auto p-6">
       <div className="mx-auto max-w-3xl space-y-6">
-        <h1 className="text-xl font-bold">Perfil & Configurações</h1>
+        <h1 className="text-2xl font-bold">Perfil & Configurações</h1>
 
         <Tabs defaultValue="profile">
           <TabsList>
-            <TabsTrigger value="profile" className="gap-1.5 text-xs">
-              <User className="h-3.5 w-3.5" /> Perfil
+            <TabsTrigger value="profile" className="gap-1.5 text-sm">
+              <User className="h-4 w-4" /> Perfil
             </TabsTrigger>
-            <TabsTrigger value="categories" className="gap-1.5 text-xs">
-              <Tag className="h-3.5 w-3.5" /> Categorias
+            <TabsTrigger value="categories" className="gap-1.5 text-sm">
+              <Tag className="h-4 w-4" /> Categorias
             </TabsTrigger>
-            <TabsTrigger value="preferences" className="gap-1.5 text-xs">
-              <Settings className="h-3.5 w-3.5" /> Preferências
+            <TabsTrigger value="preferences" className="gap-1.5 text-sm">
+              <Settings className="h-4 w-4" /> Preferências
             </TabsTrigger>
           </TabsList>
 
@@ -172,11 +172,11 @@ export default function ProfileView() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label className="text-xs">Email</Label>
+                  <Label className="text-sm">Email</Label>
                   <Input value={user?.email || ""} disabled className="mt-1" />
                 </div>
                 <div>
-                  <Label className="text-xs">Nome de Exibição</Label>
+                  <Label className="text-sm">Nome de Exibição</Label>
                   <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="mt-1" />
                 </div>
                 <Button onClick={saveProfile} size="sm" className="gap-1.5">
@@ -207,12 +207,12 @@ export default function ProfileView() {
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium">{cat.name}</span>
                         {cat.budget_amount > 0 && (
-                          <span className="ml-2 text-[10px] text-muted-foreground">
+                          <span className="ml-2 text-xs text-muted-foreground">
                             Orçamento: R$ {Number(cat.budget_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 text-[10px] shrink-0">
+                      <div className="flex items-center gap-1.5 text-xs shrink-0">
                         {cat.is_revenue && <span className="rounded bg-success/10 px-1.5 py-0.5 text-success">Receita</span>}
                         {cat.is_expense && <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-destructive">Despesa</span>}
                         {cat.is_project && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">Projeto</span>}
@@ -259,7 +259,7 @@ export default function ProfileView() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label className="text-xs">Idioma</Label>
+                  <Label className="text-sm">Idioma</Label>
                   <Select value={language} onValueChange={setLanguage}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -268,7 +268,7 @@ export default function ProfileView() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Moeda</Label>
+                  <Label className="text-sm">Moeda</Label>
                   <Select value={currency} onValueChange={setCurrency}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -277,7 +277,7 @@ export default function ProfileView() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Casas Decimais</Label>
+                  <Label className="text-sm">Casas Decimais</Label>
                   <Select value={decimalPlaces} onValueChange={setDecimalPlaces}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -301,11 +301,11 @@ export default function ProfileView() {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label className="text-xs">Nome</Label>
+                <Label className="text-sm">Nome</Label>
                 <Input value={catName} onChange={(e) => setCatName(e.target.value)} className="mt-1" placeholder="Ex: Alimentação" />
               </div>
               <div>
-                <Label className="text-xs">Ícone</Label>
+                <Label className="text-sm">Ícone</Label>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {CATEGORY_ICONS.map((icon) => (
                     <button
@@ -322,7 +322,7 @@ export default function ProfileView() {
                 </div>
               </div>
               <div>
-                <Label className="text-xs">Cor</Label>
+                <Label className="text-sm">Cor</Label>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {CATEGORY_COLORS.map((color) => (
                     <button
@@ -338,7 +338,7 @@ export default function ProfileView() {
                 </div>
               </div>
               <div>
-                <Label className="text-xs">Orçamento Mensal (planejamento)</Label>
+                <Label className="text-sm">Orçamento Mensal (planejamento)</Label>
                 <div className="relative mt-1">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
                   <Input
@@ -352,7 +352,7 @@ export default function ProfileView() {
                 </div>
               </div>
               <div className="space-y-3">
-                <Label className="text-xs">Usar em</Label>
+                <Label className="text-sm">Usar em</Label>
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-normal">Receitas</Label>
                   <Switch checked={catIsRevenue} onCheckedChange={setCatIsRevenue} />
