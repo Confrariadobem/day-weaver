@@ -451,16 +451,23 @@ export default function PreferencesView() {
                       <Switch checked={catIsProject} onCheckedChange={setCatIsProject} />
                     </div>
                   </div>
-                  {editingCat && (
-                    <Button
-                      variant="ghost"
-                      className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => { deleteCat(editingCat.id); setCatDialogOpen(false); }}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" /> Excluir Categoria
-                    </Button>
-                  )}
-                  <Button onClick={saveCat} className="w-full">Salvar</Button>
+                  {/* Standardized footer buttons */}
+                  <div className="flex items-center gap-2 pt-4 border-t border-border/20">
+                    {editingCat && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => { deleteCat(editingCat.id); setCatDialogOpen(false); }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Excluir
+                      </Button>
+                    )}
+                    <div className="flex gap-2 ml-auto">
+                      <Button variant="ghost" size="sm" onClick={() => setCatDialogOpen(false)}>Cancelar</Button>
+                      <Button size="sm" onClick={saveCat}>Salvar</Button>
+                    </div>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>

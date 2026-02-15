@@ -838,7 +838,12 @@ export default function FinancesView() {
                           <label htmlFor="is-paid" className="text-xs cursor-pointer">Marcar como pago</label>
                         </div>
                       </div>
-                      <Button onClick={createOrUpdateEntry} className="w-full">{editingEntry ? "Salvar Alterações" : "Salvar"}</Button>
+                      <div className="flex items-center gap-2 pt-4 border-t border-border/20">
+                        <div className="flex gap-2 ml-auto">
+                          <Button variant="ghost" size="sm" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancelar</Button>
+                          <Button size="sm" onClick={createOrUpdateEntry}>{editingEntry ? "Salvar" : "Salvar"}</Button>
+                        </div>
+                      </div>
                     </div>
                   </DialogContent>
                 </Dialog>
@@ -1256,8 +1261,9 @@ export default function FinancesView() {
 
         {/* ============ CARTEIRA ============ */}
         {viewTab === "contas" && (() => {
-          const activeAccounts = accounts.filter(a => a.is_active !== false);
-          const inactiveAccounts = accounts.filter(a => a.is_active === false);
+          const accQuery = searchQuery.toLowerCase().trim();
+          const activeAccounts = accounts.filter(a => a.is_active !== false && (!accQuery || a.name.toLowerCase().includes(accQuery) || (ACCOUNT_TYPE_LABELS[a.type as AccountType]?.label || "").toLowerCase().includes(accQuery)));
+          const inactiveAccounts = accounts.filter(a => a.is_active === false && (!accQuery || a.name.toLowerCase().includes(accQuery)));
 
           const openAccEdit = (acc: FinancialAccount) => {
             setEditingAccount(acc);
@@ -1324,19 +1330,22 @@ export default function FinancesView() {
 
           return (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold">Carteira</h2>
-                <p className="text-sm text-muted-foreground">Clique duas vezes em uma conta para editar</p>
-              </div>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-bold shrink-0">Carteira</h2>
+              <Input
+                placeholder="Pesquisar carteiras..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-9 max-w-xs bg-transparent border-0 border-b border-border/30 rounded-none focus-visible:ring-0 focus-visible:border-primary/40 placeholder:text-muted-foreground/40"
+              />
               <Dialog open={accountDialogOpen} onOpenChange={(o) => { setAccountDialogOpen(o); if (!o) resetAccForm(); }}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="h-9 gap-1.5"><Plus className="h-4 w-4" /> Nova Conta</Button>
+                  <Button size="sm" className="h-9 gap-1.5 shrink-0"><Plus className="h-4 w-4" /> Nova Carteira</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-md">
-                  <DialogHeader><DialogTitle>{editingAccount ? "Editar Conta" : "Nova Conta"}</DialogTitle></DialogHeader>
+                  <DialogHeader><DialogTitle>{editingAccount ? "Editar Carteira" : "Nova Carteira"}</DialogTitle></DialogHeader>
                   <div className="space-y-3">
-                    <Input placeholder="Nome da conta" value={accName} onChange={(e) => setAccName(e.target.value)} />
+                    <Input placeholder="Nome da carteira" value={accName} onChange={(e) => setAccName(e.target.value)} />
                     <Select value={accType} onValueChange={(v) => setAccType(v as AccountType)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -1362,19 +1371,26 @@ export default function FinancesView() {
                       </>
                     )}
                     <div className="flex items-center justify-between">
-                      <Label>Conta Ativa</Label>
+                      <Label>Carteira Ativa</Label>
                       <Switch checked={accIsActive} onCheckedChange={setAccIsActive} />
                     </div>
+                  </div>
+                  {/* Standardized footer buttons */}
+                  <div className="flex items-center gap-2 pt-4 border-t border-border/20">
                     {editingAccount && (
                       <Button
-                        variant="ghost"
-                        className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                        variant="destructive"
+                        size="sm"
+                        className="gap-1.5"
                         onClick={() => setDeleteConfirmId(editingAccount.id)}
                       >
-                        <Trash2 className="mr-2 h-4 w-4" /> Excluir Conta
+                        <Trash2 className="h-3.5 w-3.5" /> Excluir
                       </Button>
                     )}
-                    <Button onClick={saveAccount} className="w-full">Salvar</Button>
+                    <div className="flex gap-2 ml-auto">
+                      <Button variant="ghost" size="sm" onClick={() => { setAccountDialogOpen(false); resetAccForm(); }}>Cancelar</Button>
+                      <Button size="sm" onClick={saveAccount}>Salvar</Button>
+                    </div>
                   </div>
                 </DialogContent>
               </Dialog>
