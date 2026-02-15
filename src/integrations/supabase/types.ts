@@ -69,8 +69,10 @@ export type Database = {
       }
       categories: {
         Row: {
+          budget_amount: number | null
           color: string | null
           created_at: string
+          icon: string | null
           id: string
           is_expense: boolean | null
           is_project: boolean | null
@@ -79,8 +81,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          budget_amount?: number | null
           color?: string | null
           created_at?: string
+          icon?: string | null
           id?: string
           is_expense?: boolean | null
           is_project?: boolean | null
@@ -89,8 +93,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          budget_amount?: number | null
           color?: string | null
           created_at?: string
+          icon?: string | null
           id?: string
           is_expense?: boolean | null
           is_project?: boolean | null
@@ -231,8 +237,11 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          currency: string | null
+          decimal_places: number | null
           display_name: string | null
           id: string
+          language: string | null
           theme_preference: string | null
           updated_at: string
           user_id: string
@@ -240,8 +249,11 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          currency?: string | null
+          decimal_places?: number | null
           display_name?: string | null
           id?: string
+          language?: string | null
           theme_preference?: string | null
           updated_at?: string
           user_id: string
@@ -249,8 +261,11 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          currency?: string | null
+          decimal_places?: number | null
           display_name?: string | null
           id?: string
+          language?: string | null
           theme_preference?: string | null
           updated_at?: string
           user_id?: string
