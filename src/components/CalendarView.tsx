@@ -276,16 +276,16 @@ export default function CalendarView() {
             </Button>
           </div>
 
-          <Button variant="outline" size="sm" className="h-8 text-sm" onClick={handleToday}>Hoje</Button>
-          <Button variant="outline" size="sm" className="h-8 text-sm" onClick={() => openNew(currentDate)}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> Novo
-          </Button>
-
           <div className="flex rounded-lg bg-muted p-0.5">
             {views.map((v) => (
               <button
                 key={v.key}
-                onClick={() => setViewMode(v.key)}
+                onClick={() => {
+                  if (v.key === "today") {
+                    setCurrentDate(new Date());
+                  }
+                  setViewMode(v.key);
+                }}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                   viewMode === v.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
@@ -295,6 +295,10 @@ export default function CalendarView() {
               </button>
             ))}
           </div>
+
+          <Button variant="outline" size="sm" className="h-8 text-sm" onClick={() => openNew(currentDate)}>
+            <Plus className="mr-1 h-3.5 w-3.5" /> Novo
+          </Button>
 
           {/* 3-dot menu */}
           <DropdownMenu>
@@ -441,9 +445,6 @@ function HourlyDayView({ days, items, onDrop, onToggle, onClick, onNewEvent }: H
               <p className="text-sm font-medium capitalize">{format(day, "EEEE", { locale: ptBR })}</p>
               <p className="text-xs text-muted-foreground">{format(day, "d MMM yyyy", { locale: ptBR })}</p>
             </div>
-            <button onClick={() => onNewEvent(day)} className="ml-auto rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
-              <Plus className="h-4 w-4" />
-            </button>
           </div>
         ))}
       </div>
