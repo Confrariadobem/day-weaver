@@ -22,6 +22,46 @@ import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventE
 
 type ViewMode = "today" | "3days" | "weekly" | "monthly" | "yearly";
 
+// Brazilian official holidays (fixed + calculated)
+function getBrazilianHolidays(year: number): { date: Date; name: string }[] {
+  const holidays: { date: Date; name: string }[] = [
+    { date: new Date(year, 0, 1), name: "Confraternização Universal" },
+    { date: new Date(year, 3, 21), name: "Tiradentes" },
+    { date: new Date(year, 4, 1), name: "Dia do Trabalho" },
+    { date: new Date(year, 8, 7), name: "Independência do Brasil" },
+    { date: new Date(year, 9, 12), name: "Nossa Sra. Aparecida" },
+    { date: new Date(year, 10, 2), name: "Finados" },
+    { date: new Date(year, 10, 15), name: "Proclamação da República" },
+    { date: new Date(year, 11, 25), name: "Natal" },
+  ];
+  // Easter-based holidays (Meeus algorithm)
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31) - 1;
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  const easter = new Date(year, month, day);
+  
+  const addDaysToDate = (d: Date, n: number) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+  holidays.push(
+    { date: addDaysToDate(easter, -48), name: "Segunda de Carnaval" },
+    { date: addDaysToDate(easter, -47), name: "Terça de Carnaval" },
+    { date: addDaysToDate(easter, -2), name: "Sexta-feira Santa" },
+    { date: easter, name: "Páscoa" },
+    { date: addDaysToDate(easter, 60), name: "Corpus Christi" },
+  );
+  return holidays;
+}
+
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 export default function CalendarView() {
@@ -80,8 +120,23 @@ export default function CalendarView() {
         });
       }
     });
+    // Add Brazilian holidays
+    const yearsToCheck = new Set<number>();
+    yearsToCheck.add(currentDate.getFullYear());
+    yearsToCheck.add(currentDate.getFullYear() - 1);
+    yearsToCheck.add(currentDate.getFullYear() + 1);
+    yearsToCheck.forEach(yr => {
+      getBrazilianHolidays(yr).forEach(h => {
+        items.push({
+          id: `holiday-${h.name}-${yr}`, title: `🇧🇷 ${h.name}`,
+          start_time: h.date.toISOString(),
+          all_day: true, color: "#22c55e", description: "Feriado oficial do Brasil",
+          user_id: user?.id || "", is_task: false,
+        });
+      });
+    });
     return items;
-  }, [events, tasks]);
+  }, [events, tasks, currentDate, user]);
 
   const getFinancialSummary = useCallback((startDate: Date, endDate: Date) => {
     const rev = entries.filter((e) => {
@@ -453,29 +508,35 @@ function HourlyWeekView({ date, items, onDrop, onToggle, onClick, onNewEvent }: 
       {/* Week header */}
       <div className="grid grid-cols-[50px_repeat(7,1fr)] border-b border-border/20">
         <div className="flex items-center justify-center text-xs text-muted-foreground/50">S{weekNum}</div>
-        {days.map((day) => {
-          const dayItems = items.filter((it) => isSameDay(new Date(it.start_time), day));
-          return (
-            <div key={day.toISOString()} className={cn("flex flex-col items-center py-2 cursor-pointer hover:bg-accent/10", isToday(day) && "bg-primary/5")}
-              onClick={() => onNewEvent(day)}>
-              <span className="text-xs uppercase text-muted-foreground">{format(day, "EEE", { locale: ptBR })}</span>
-              <span className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold",
-                isToday(day) ? "bg-primary text-primary-foreground" : ""
-              )}>
-                {format(day, "d")}
-              </span>
-              {dayItems.length > 0 && (
-                <div className="mt-0.5 flex gap-0.5">
-                  {dayItems.slice(0, 3).map((it) => (
-                    <span key={it.id} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: it.color || "#3b82f6" }} />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {days.map((day) => (
+          <div key={day.toISOString()} className={cn("flex flex-col items-center py-2 cursor-pointer hover:bg-accent/10", isToday(day) && "bg-primary/5")}
+            onClick={() => onNewEvent(day)}>
+            <span className="text-xs uppercase text-muted-foreground">{format(day, "EEE", { locale: ptBR })}</span>
+            <span className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold",
+              isToday(day) ? "bg-primary text-primary-foreground" : ""
+            )}>
+              {format(day, "d")}
+            </span>
+          </div>
+        ))}
       </div>
+
+      {/* All-day events row */}
+      {days.some(day => items.some(it => isSameDay(new Date(it.start_time), day) && it.all_day)) && (
+        <div className="grid grid-cols-[50px_repeat(7,1fr)] border-b border-border/20">
+          <div className="flex items-center justify-end pr-2 text-xs text-muted-foreground">Dia</div>
+          {days.map((day) => {
+            const allDayItems = items.filter((it) => isSameDay(new Date(it.start_time), day) && it.all_day);
+            return (
+              <div key={day.toISOString()} className="px-1 py-1 space-y-0.5 border-l border-border/10">
+                {allDayItems.slice(0, 3).map((it) => <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />)}
+                {allDayItems.length > 3 && <span className="block text-center text-xs text-muted-foreground">+{allDayItems.length - 3}</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Scrollable hourly grid */}
       <div className="flex-1 overflow-auto">
