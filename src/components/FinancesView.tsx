@@ -457,15 +457,17 @@ export default function FinancesView() {
     const carryOver = prevYearEntries.reduce((s, e) =>
       s + (e.type === "revenue" ? Number(e.amount) : -Number(e.amount)), 0);
 
-    const revRows = revenueCategories.map(cat => ({
-      id: cat.id, name: cat.name, color: cat.color,
-      months: months.map(m => {
-        const mEntries = getMonthEntries(m).filter(e => e.type === "revenue" && e.category_id === cat.id);
-        return mEntries.reduce((s, e) => s + Number(e.amount), 0);
-      }),
-    }));
+    const revRows = revenueCategories
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+      .map(cat => ({
+        id: cat.id, name: cat.name, color: cat.color,
+        months: months.map(m => {
+          const mEntries = getMonthEntries(m).filter(e => e.type === "revenue" && e.category_id === cat.id);
+          return mEntries.reduce((s, e) => s + Number(e.amount), 0);
+        }),
+      }));
 
-    // Uncategorized revenue
+    // Uncategorized revenue - always last
     const uncatRev = months.map(m => {
       const mEntries = getMonthEntries(m).filter(e => e.type === "revenue" && !e.category_id);
       return mEntries.reduce((s, e) => s + Number(e.amount), 0);
@@ -474,13 +476,15 @@ export default function FinancesView() {
       revRows.push({ id: "uncat-rev", name: "Outras Receitas", color: "#6b7280", months: uncatRev });
     }
 
-    const expRows = expenseCategories.map(cat => ({
-      id: cat.id, name: cat.name, color: cat.color,
-      months: months.map(m => {
-        const mEntries = getMonthEntries(m).filter(e => e.type === "expense" && e.category_id === cat.id);
-        return mEntries.reduce((s, e) => s + Number(e.amount), 0);
-      }),
-    }));
+    const expRows = expenseCategories
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+      .map(cat => ({
+        id: cat.id, name: cat.name, color: cat.color,
+        months: months.map(m => {
+          const mEntries = getMonthEntries(m).filter(e => e.type === "expense" && e.category_id === cat.id);
+          return mEntries.reduce((s, e) => s + Number(e.amount), 0);
+        }),
+      }));
 
     const uncatExp = months.map(m => {
       const mEntries = getMonthEntries(m).filter(e => e.type === "expense" && !e.category_id);
@@ -644,29 +648,31 @@ export default function FinancesView() {
             <TabsTrigger value="previsao" className="text-xs">Previsão de Caixa</TabsTrigger>
             <TabsTrigger value="doar" className="text-xs">DOAR</TabsTrigger>
             <TabsTrigger value="relatorios" className="text-xs">Relatórios</TabsTrigger>
-            <TabsTrigger value="contas" className="text-xs">Contas</TabsTrigger>
+            <TabsTrigger value="contas" className="text-xs">Carteira</TabsTrigger>
           </TabsList>
         </Tabs>
 
-        <div className="flex items-center gap-2">
-          <Select value={period} onValueChange={(v) => setPeriod(v as PeriodFilter)}>
-            <SelectTrigger className="h-8 w-36 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PERIOD_OPTIONS.map(p => (
-                <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {period === "custom" && (
-            <div className="flex items-center gap-1">
-              <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="h-8 w-32 text-xs" />
-              <span className="text-xs text-muted-foreground">a</span>
-              <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="h-8 w-32 text-xs" />
-            </div>
-          )}
-        </div>
+        {(viewTab === "previsao" || viewTab === "relatorios") && (
+          <div className="flex items-center gap-2">
+            <Select value={period} onValueChange={(v) => setPeriod(v as PeriodFilter)}>
+              <SelectTrigger className="h-8 w-36 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PERIOD_OPTIONS.map(p => (
+                  <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {period === "custom" && (
+              <div className="flex items-center gap-1">
+                <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="h-8 w-32 text-xs" />
+                <span className="text-xs text-muted-foreground">a</span>
+                <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="h-8 w-32 text-xs" />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -1097,11 +1103,17 @@ export default function FinancesView() {
               <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleExportCSV}>
                 <FileDown className="mr-1 h-3 w-3" /> Exportar CSV
               </Button>
-              <div className="flex gap-1 ml-auto">
-                {[doarYear - 1, doarYear, doarYear + 1].map(y => (
-                  <Button key={y} size="sm" variant={y === doarYear ? "default" : "outline"} className="h-7 text-xs px-2"
-                    onClick={() => setDoarYear(y)}>{y}</Button>
-                ))}
+              <div className="ml-auto">
+                <Select value={String(doarYear)} onValueChange={(v) => setDoarYear(Number(v))}>
+                  <SelectTrigger className="h-8 w-24 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[...new Set(entries.map(e => new Date(e.entry_date).getFullYear())), doarYear].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => b - a).map(y => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -1191,13 +1203,18 @@ export default function FinancesView() {
           </div>
         )}
 
-        {/* ============ CONTAS ============ */}
+        {/* ============ CARTEIRA ============ */}
         {viewTab === "contas" && (
-          <div className="space-y-4">
-            <div className="flex justify-end">
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold">Carteira</h2>
+                <p className="text-xs text-muted-foreground">Gerencie suas contas bancárias, cartões, investimentos e criptoativos</p>
+              </div>
               <Dialog open={accountDialogOpen} onOpenChange={(o) => { setAccountDialogOpen(o); if (!o) resetAccForm(); }}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="h-8 text-xs"><Plus className="mr-1 h-3 w-3" /> Nova Conta</Button>
+                  <Button size="sm" className="h-9 gap-1.5"><Plus className="h-4 w-4" /> Nova Conta</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-md">
                   <DialogHeader><DialogTitle>{editingAccount ? "Editar Conta" : "Nova Conta"}</DialogTitle></DialogHeader>
@@ -1211,10 +1228,16 @@ export default function FinancesView() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <Input type="number" placeholder="Saldo inicial (R$)" value={accBalance} onChange={(e) => setAccBalance(e.target.value)} />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
+                      <Input type="text" inputMode="decimal" placeholder="0,00" value={accBalance} onChange={(e) => setAccBalance(e.target.value.replace(/[^0-9.,]/g, ""))} className="pl-9" />
+                    </div>
                     {accType === "credit_card" && (
                       <>
-                        <Input type="number" placeholder="Limite (R$)" value={accLimit} onChange={(e) => setAccLimit(e.target.value)} />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
+                          <Input type="text" inputMode="decimal" placeholder="Limite" value={accLimit} onChange={(e) => setAccLimit(e.target.value.replace(/[^0-9.,]/g, ""))} className="pl-9" />
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                           <Input type="number" placeholder="Dia Fechamento" min="1" max="31" value={accClosing} onChange={(e) => setAccClosing(e.target.value)} />
                           <Input type="number" placeholder="Dia Vencimento" min="1" max="31" value={accDue} onChange={(e) => setAccDue(e.target.value)} />
@@ -1231,21 +1254,49 @@ export default function FinancesView() {
               </Dialog>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Saldo Total Card */}
+            <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Patrimônio Total</p>
+                    <p className={cn("text-2xl font-bold mt-1", totalAvailable >= 0 ? "text-success" : "text-destructive")}>{brl(totalAvailable)}</p>
+                  </div>
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                    <Wallet className="h-7 w-7 text-primary" />
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-4 text-xs">
+                  <div>
+                    <span className="text-muted-foreground">Contas ativas</span>
+                    <span className="ml-1 font-bold">{accounts.filter(a => a.is_active).length}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Cartões</span>
+                    <span className="ml-1 font-bold">{accounts.filter(a => a.type === "credit_card").length}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Account Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {accounts.map(acc => {
                 const typeInfo = ACCOUNT_TYPE_LABELS[acc.type as AccountType];
                 const isCredit = acc.type === "credit_card";
-                const used = isCredit && acc.credit_limit ? acc.credit_limit - acc.current_balance : 0;
+                const usedPercent = isCredit && acc.credit_limit ? ((acc.credit_limit - acc.current_balance) / acc.credit_limit) * 100 : 0;
                 return (
-                  <Card key={acc.id} className="relative group">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${acc.color}20` }}>
-                          <span style={{ color: acc.color || undefined }}>{typeInfo?.icon}</span>
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-bold">{acc.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{typeInfo?.label}</p>
+                  <Card key={acc.id} className="group hover:shadow-md transition-all duration-200 border-l-4" style={{ borderLeftColor: acc.color || "hsl(var(--primary))" }}>
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl shadow-sm" style={{ background: `${acc.color}15`, border: `1px solid ${acc.color}30` }}>
+                            <span style={{ color: acc.color || undefined }}>{typeInfo?.icon}</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold leading-tight">{acc.name}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">{typeInfo?.label}</p>
+                          </div>
                         </div>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => {
@@ -1257,31 +1308,44 @@ export default function FinancesView() {
                             setAccDue(acc.due_day ? String(acc.due_day) : "");
                             setAccColor(acc.color || "#3b82f6");
                             setAccountDialogOpen(true);
-                          }} className="rounded p-1 hover:bg-muted"><Pencil className="h-3 w-3 text-muted-foreground" /></button>
-                          <button onClick={() => deleteAccount(acc.id)} className="rounded p-1 hover:bg-destructive/10"><Trash2 className="h-3 w-3 text-destructive" /></button>
+                          }} className="rounded-lg p-1.5 hover:bg-muted"><Pencil className="h-3.5 w-3.5 text-muted-foreground" /></button>
+                          <button onClick={() => deleteAccount(acc.id)} className="rounded-lg p-1.5 hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5 text-destructive" /></button>
                         </div>
                       </div>
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-muted-foreground">Saldo atual</span>
-                          <span className={cn("font-bold", acc.current_balance >= 0 ? "text-success" : "text-destructive")}>
+
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Saldo atual</p>
+                          <p className={cn("text-xl font-bold mt-0.5", acc.current_balance >= 0 ? "text-success" : "text-destructive")}>
                             {brl(acc.current_balance)}
-                          </span>
+                          </p>
                         </div>
+
                         {isCredit && acc.credit_limit && (
-                          <>
+                          <div className="space-y-2 pt-2 border-t border-border">
                             <div className="flex justify-between text-xs">
-                              <span className="text-muted-foreground">Limite</span>
+                              <span className="text-muted-foreground">Limite total</span>
                               <span className="font-medium">{brl(acc.credit_limit)}</span>
                             </div>
                             <div className="flex justify-between text-xs">
                               <span className="text-muted-foreground">Disponível</span>
-                              <span className="font-medium text-primary">{brl(acc.current_balance)}</span>
+                              <span className="font-bold text-primary">{brl(acc.current_balance)}</span>
                             </div>
+                            {/* Usage bar */}
+                            <div className="h-2 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className={cn("h-full rounded-full transition-all", usedPercent > 80 ? "bg-destructive" : usedPercent > 50 ? "bg-warning" : "bg-primary")}
+                                style={{ width: `${Math.min(usedPercent, 100)}%` }}
+                              />
+                            </div>
+                            <p className="text-[10px] text-muted-foreground text-right">{usedPercent.toFixed(0)}% utilizado</p>
                             {acc.closing_day && acc.due_day && (
-                              <p className="text-[10px] text-muted-foreground">Fecha dia {acc.closing_day} · Vence dia {acc.due_day}</p>
+                              <div className="flex gap-3 text-[10px] text-muted-foreground pt-1">
+                                <span>📅 Fecha dia {acc.closing_day}</span>
+                                <span>💳 Vence dia {acc.due_day}</span>
+                              </div>
                             )}
-                          </>
+                          </div>
                         )}
                       </div>
                     </CardContent>
@@ -1289,8 +1353,10 @@ export default function FinancesView() {
                 );
               })}
               {accounts.length === 0 && (
-                <div className="col-span-full text-center py-12 text-sm text-muted-foreground">
-                  Nenhuma conta cadastrada. Adicione suas contas bancárias, cartões, investimentos e criptoativos.
+                <div className="col-span-full text-center py-16">
+                  <Wallet className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground font-medium">Nenhuma conta cadastrada</p>
+                  <p className="text-xs text-muted-foreground mt-1">Adicione suas contas bancárias, cartões, investimentos e criptoativos.</p>
                 </div>
               )}
             </div>
