@@ -16,7 +16,7 @@ import {
   startOfYear, endOfYear, differenceInDays,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, MoreVertical, Search, CalendarDays, Calculator, Eye, Timer } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, MoreVertical, Search, CalendarDays, Calculator, Timer, Star, Eye } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
 
@@ -376,6 +376,16 @@ export default function CalendarView() {
             <Plus className="mr-1 h-3.5 w-3.5" /> Novo
           </Button>
 
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8", activeFilters.includes("favorites") ? "text-warning" : "text-muted-foreground")}
+            onClick={() => toggleFilter("favorites")}
+            title="Filtrar favoritos"
+          >
+            <Star className={cn("h-4 w-4", activeFilters.includes("favorites") && "fill-warning")} />
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -402,10 +412,7 @@ export default function CalendarView() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border/20 overflow-x-auto">
-        <span className="text-xs font-medium text-muted-foreground flex items-center gap-1 shrink-0">
-          <Eye className="h-3.5 w-3.5" /> Exibir
-        </span>
+      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/20 overflow-x-auto">
         {FILTER_OPTIONS.map((f) => (
           <label key={f.key} className="flex items-center gap-1.5 cursor-pointer text-sm shrink-0">
             <Checkbox
