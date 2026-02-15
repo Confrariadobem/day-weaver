@@ -25,13 +25,12 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-const navItems: NavItem[] = [
+const topNavItems: NavItem[] = [
   { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
   { key: "calendar", label: "Calendário", icon: <CalendarDays className="h-5 w-5" /> },
   { key: "backlog", label: "Backlog", icon: <ListTodo className="h-5 w-5" /> },
   { key: "projects", label: "Projetos", icon: <FolderKanban className="h-5 w-5" /> },
   { key: "finances", label: "Finanças", icon: <Wallet className="h-5 w-5" /> },
-  { key: "profile", label: "Perfil & Config.", icon: <User className="h-5 w-5" /> },
 ];
 
 interface NavSidebarProps {
@@ -52,7 +51,7 @@ export default function NavSidebar({ activeModule, onModuleChange }: NavSidebarP
 
       {/* Nav items */}
       <nav className="flex flex-1 flex-col items-center gap-1">
-        {navItems.map((item) => (
+        {topNavItems.map((item) => (
           <Tooltip key={item.key} delayDuration={200}>
             <TooltipTrigger asChild>
               <button
@@ -76,6 +75,25 @@ export default function NavSidebar({ activeModule, onModuleChange }: NavSidebarP
 
       {/* Bottom actions */}
       <div className="flex flex-col items-center gap-1">
+        <Tooltip delayDuration={200}>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => onModuleChange("profile")}
+              className={cn(
+                "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200",
+                activeModule === "profile"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-[hsl(var(--nav-foreground))] hover:bg-[hsl(var(--nav-hover))] hover:text-foreground"
+              )}
+            >
+              <User className="h-5 w-5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8}>
+            Perfil & Config.
+          </TooltipContent>
+        </Tooltip>
+
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
             <button

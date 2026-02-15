@@ -2,17 +2,26 @@ import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, Legend, AreaChart, Area,
+  PieChart, Pie, Cell, Line, Legend, ComposedChart,
 } from "recharts";
 import { format, startOfYear, endOfYear, eachMonthOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { TrendingUp, TrendingDown, Wallet, CheckCircle2, FolderKanban, ListTodo } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
 
 const COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
+
+const tooltipStyle = {
+  background: "hsl(0 0% 10%)",
+  border: "1px solid hsl(0 0% 20%)",
+  borderRadius: 8,
+  fontSize: 12,
+};
+
+const brlFormatter = (value: number) => `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 export default function DashboardView() {
   const { user } = useAuth();
@@ -20,7 +29,7 @@ export default function DashboardView() {
   const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
   const [projects, setProjects] = useState<Tables<"projects">[]>([]);
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
-  const [year, setYear] = useState(new Date().getFullYear().toString());
+  const [year, setYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
     if (!user) return;
@@ -39,19 +48,17 @@ export default function DashboardView() {
     fetch();
   }, [user]);
 
-  const selectedYear = parseInt(year);
-
-  // Monthly financial data (DOAR-style)
+  // Monthly financial data
   const monthlyData = useMemo(() => {
     const months = eachMonthOfInterval({
-      start: startOfYear(new Date(selectedYear, 0)),
-      end: endOfYear(new Date(selectedYear, 0)),
+      start: startOfYear(new Date(year, 0)),
+      end: endOfYear(new Date(year, 0)),
     });
     let accumulated = 0;
     return months.map((month) => {
       const monthEntries = entries.filter((e) => {
         const d = new Date(e.entry_date);
-        return d.getMonth() === month.getMonth() && d.getFullYear() === selectedYear;
+        return d.getMonth() === month.getMonth() && d.getFullYear() === year;
       });
       const revenue = monthEntries.filter((e) => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
       const expense = monthEntries.filter((e) => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
@@ -65,11 +72,11 @@ export default function DashboardView() {
         acumulado: accumulated,
       };
     });
-  }, [entries, selectedYear]);
+  }, [entries, year]);
 
   // Category breakdown for pie chart
   const categoryBreakdown = useMemo(() => {
-    const yearEntries = entries.filter((e) => new Date(e.entry_date).getFullYear() === selectedYear && e.type === "expense");
+    const yearEntries = entries.filter((e) => new Date(e.entry_date).getFullYear() === year && e.type === "expense");
     const map = new Map<string, number>();
     yearEntries.forEach((e) => {
       const cat = categories.find((c) => c.id === e.category_id);
@@ -77,31 +84,53 @@ export default function DashboardView() {
       map.set(name, (map.get(name) || 0) + Number(e.amount));
     });
     return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [entries, categories, selectedYear]);
+  }, [entries, categories, year]);
+
+  // Task stats by project
+  const projectStats = useMemo(() => {
+    return projects.map((p) => {
+      const pTasks = tasks.filter((t) => t.project_id === p.id);
+      const done = pTasks.filter((t) => t.is_completed).length;
+      return { name: p.name.length > 12 ? p.name.slice(0, 12) + "…" : p.name, total: pTasks.length, done, pending: pTasks.length - done };
+    }).filter((p) => p.total > 0);
+  }, [projects, tasks]);
 
   // Summary stats
   const totalRevenue = monthlyData.reduce((s, m) => s + m.receita, 0);
   const totalExpense = monthlyData.reduce((s, m) => s + m.despesa, 0);
+  const totalBalance = totalRevenue - totalExpense;
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.is_completed).length;
   const activeProjects = projects.filter((p) => p.status === "active").length;
+  const pendingTasks = totalTasks - completedTasks;
+
+  const yearOptions = [2024, 2025, 2026, 2027];
 
   return (
     <div className="h-full overflow-auto p-4">
+      {/* Header with year buttons */}
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">Dashboard</h1>
-        <Select value={year} onValueChange={setYear}>
-          <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {[2024, 2025, 2026, 2027].map((y) => (
-              <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-1">
+          {yearOptions.map((y) => (
+            <button
+              key={y}
+              onClick={() => setYear(y)}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                year === y
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              {y}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <TrendingUp className="h-5 w-5 text-success" />
@@ -122,7 +151,18 @@ export default function DashboardView() {
         </Card>
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
-            <CheckCircle2 className="h-5 w-5 text-primary" />
+            <Wallet className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-[10px] text-muted-foreground">Saldo</p>
+              <p className={cn("text-sm font-bold", totalBalance >= 0 ? "text-primary" : "text-destructive")}>
+                R$ {totalBalance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <CheckCircle2 className="h-5 w-5 text-success" />
             <div>
               <p className="text-[10px] text-muted-foreground">Tarefas</p>
               <p className="text-sm font-bold">{completedTasks}/{totalTasks}</p>
@@ -142,49 +182,24 @@ export default function DashboardView() {
 
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* DOAR - Revenue vs Expense Bar Chart */}
+        {/* Stacked Bar + Trend Line (inspired by reference image) */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Receita × Despesa Mensal (DOAR)</CardTitle>
+            <CardTitle className="text-sm">Análise de Saldo — Receita × Despesa + Saldo Acumulado</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[280px]">
+            <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData} barGap={2}>
+                <ComposedChart data={monthlyData} barGap={0}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
-                  <RechartsTooltip
-                    contentStyle={{ background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 }}
-                    formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
-                  />
+                  <RechartsTooltip contentStyle={tooltipStyle} formatter={brlFormatter} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="receita" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="despesa" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Accumulated Balance Line */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Saldo Acumulado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <RechartsTooltip
-                    contentStyle={{ background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 }}
-                    formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
-                  />
-                  <Area dataKey="acumulado" name="Acumulado" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} />
-                </AreaChart>
+                  <Bar dataKey="receita" name="Receita" stackId="a" fill="#22c55e" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="despesa" name="Despesa" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <Line type="monotone" dataKey="acumulado" name="Saldo Acumulado" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 4, fill: "#f59e0b" }} />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
@@ -196,7 +211,7 @@ export default function DashboardView() {
             <CardTitle className="text-sm">Despesas por Categoria</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[220px]">
+            <div className="h-[240px]">
               {categoryBreakdown.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -205,14 +220,37 @@ export default function DashboardView() {
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
                       ))}
                     </Pie>
-                    <RechartsTooltip
-                      contentStyle={{ background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 }}
-                      formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
-                    />
+                    <RechartsTooltip contentStyle={tooltipStyle} formatter={brlFormatter} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tasks by Project - horizontal bar */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Tarefas por Projeto</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[240px]">
+              {projectStats.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={projectStats} layout="vertical" barSize={16}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
+                    <XAxis type="number" tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
+                    <RechartsTooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="done" name="Concluídas" stackId="a" fill="#22c55e" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="pending" name="Pendentes" stackId="a" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Sem projetos com tarefas</div>
               )}
             </div>
           </CardContent>
