@@ -662,30 +662,38 @@ export default function FinancesView() {
     });
   };
 
-  const toggleExpandAll = () => {
-    const allIds = [...dreData.revRows, ...dreData.expRows].map(r => r.id);
-    if (expandedCats.size === allIds.length) {
-      setExpandedCats(new Set());
-    } else {
-      setExpandedCats(new Set(allIds));
-    }
-  };
+  // 3-level expand/collapse cycle:
+  // Level 1: Everything collapsed (only Receitas/Despesas headers)
+  // Level 2: Receitas/Despesas expanded, categories visible (items hidden)
+  // Level 3: Everything expanded (categories + items)
+  const [doarExpandLevel, setDoarExpandLevel] = useState(2); // default: categories visible
 
-  const toggleCollapseAll = () => {
-    if (revenueCollapsed && expenseCollapsed) {
-      setRevenueCollapsed(false);
-      setExpenseCollapsed(false);
-    } else {
+  const cycleDoarExpand = () => {
+    const nextLevel = doarExpandLevel >= 3 ? 1 : doarExpandLevel + 1;
+    setDoarExpandLevel(nextLevel);
+    if (nextLevel === 1) {
+      // Collapse everything
       setRevenueCollapsed(true);
       setExpenseCollapsed(true);
       setExpandedCats(new Set());
+    } else if (nextLevel === 2) {
+      // Show Receitas/Despesas + Categories, hide items
+      setRevenueCollapsed(false);
+      setExpenseCollapsed(false);
+      setExpandedCats(new Set());
+    } else {
+      // Expand everything including items
+      setRevenueCollapsed(false);
+      setExpenseCollapsed(false);
+      const allIds = [...dreData.revRows, ...dreData.expRows].map(r => r.id);
+      setExpandedCats(new Set(allIds));
     }
   };
 
   // Entry dialog content (shared)
   const renderEntryDialog = () => (
     <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-      <DialogHeader><DialogTitle>{editingEntry ? "Editar Lançamento" : "Novo Lançamento"}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{editingEntry ? "Editar fluxo de caixa" : "Novo lançamento"}</DialogTitle></DialogHeader>
       <div className="space-y-3">
         <Input placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
         <div className="grid grid-cols-2 gap-2">
@@ -1143,7 +1151,7 @@ export default function FinancesView() {
                 <Input placeholder="Pesquisar categorias..."
                   value={doarSearchQuery} onChange={(e) => setDoarSearchQuery(e.target.value)}
                   className="h-8 w-48 text-xs bg-transparent border-0 border-b border-border/30 rounded-none focus-visible:ring-0 focus-visible:border-primary/40 placeholder:text-muted-foreground/40" />
-                <Button size="icon" variant="outline" className="h-8 w-8" onClick={toggleCollapseAll} title="Contrair/Expandir tudo">
+                <Button size="icon" variant="outline" className="h-8 w-8" onClick={cycleDoarExpand} title={`Nível ${doarExpandLevel}/3`}>
                   <ChevronsUpDown className="h-4 w-4" />
                 </Button>
                 <Button size="icon" variant="outline" className="h-8 w-8" onClick={handlePrintDOAR} title="Imprimir">

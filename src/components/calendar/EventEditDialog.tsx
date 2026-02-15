@@ -41,12 +41,11 @@ interface EventEditDialogProps {
   onSaved: () => void;
 }
 
-type EventType = "birthday" | "event" | "favorite" | "cashflow" | "investment" | "project" | "task";
+type EventType = "birthday" | "event" | "cashflow" | "investment" | "project" | "task";
 
 const EVENT_TYPES: { value: EventType; label: string; icon: string; color: string }[] = [
   { value: "birthday", label: "Aniversário", icon: "🎂", color: "#ec4899" },
   { value: "event", label: "Evento", icon: "📅", color: "#3b82f6" },
-  { value: "favorite", label: "Favorito", icon: "⭐", color: "#eab308" },
   { value: "cashflow", label: "Fluxo de caixa", icon: "💵", color: "#22c55e" },
   { value: "investment", label: "Investimento", icon: "📈", color: "#d4a017" },
   { value: "project", label: "Projeto", icon: "📁", color: "#eab308" },
@@ -116,7 +115,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       // Detect type from description
       const desc = item.description || "";
       if (desc.includes("[tipo:birthday]")) setEventType("birthday");
-      else if (desc.includes("[tipo:favorite]")) setEventType("favorite");
+      else if (desc.includes("[tipo:favorite]")) setEventType("event");
       else if (desc.includes("[tipo:cashflow]") || desc.includes("[tipo:bill]") || desc.includes("[tipo:receivable]")) setEventType("cashflow");
       else if (desc.includes("[tipo:investment]")) setEventType("investment");
       else if (desc.includes("[tipo:project]")) setEventType("project");
@@ -259,7 +258,11 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base">{item ? "Editar" : "Novo"}</DialogTitle>
+          <DialogTitle className="text-base">
+            {item
+              ? `Editar ${EVENT_TYPES.find(t => t.value === eventType)?.label || "item"}`
+              : "Novo lançamento"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -327,6 +330,13 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </>
           )}
 
+          {/* ─── Description (moved here, below title) ─── */}
+          <div>
+            <Label className="text-sm">Descrição</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)}
+              placeholder="Opcional" rows={2} className="resize-none" />
+          </div>
+
           {/* ─── Type-specific fields ─── */}
 
           {/* Cashflow: direction + amount */}
@@ -381,12 +391,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
           {/* ─── Extra fields ─── */}
           <div>
-            <Label className="text-sm">Descrição</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)}
-              placeholder="Opcional" rows={2} className="resize-none" />
-          </div>
-
-          <div>
             <Label className="text-sm flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Lembrete</Label>
             <Select value={reminder} onValueChange={setReminder}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -396,23 +400,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          <div>
-            <Label className="text-sm">Cor</Label>
-            <div className="mt-1.5 flex gap-2 flex-wrap">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setColor(c)}
-                  className="h-6 w-6 rounded-full border-2 transition-transform hover:scale-110"
-                  style={{
-                    backgroundColor: c,
-                    borderColor: color === c ? "hsl(var(--foreground))" : "transparent",
-                  }}
-                />
-              ))}
-            </div>
           </div>
 
           <div>

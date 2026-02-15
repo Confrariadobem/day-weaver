@@ -91,6 +91,7 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
   const [taskEditDefaultDate, setTaskEditDefaultDate] = useState<Date>(new Date());
 
   const lastProjClickRef = useRef<{ id: string; time: number } | null>(null);
+  const lastTaskClickRef = useRef<{ id: string; time: number } | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -319,17 +320,40 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
     </div>
   );
 
+
+
+  const handleTaskDoubleClick = (task: Tables<"tasks">) => {
+    const now = Date.now();
+    if (lastTaskClickRef.current?.id === task.id && now - lastTaskClickRef.current.time < 400) {
+      // Open edit dialog via EventEditDialog
+      const calItem: CalendarItem = {
+        id: `task-${task.id}`, title: task.title,
+        start_time: task.scheduled_date ? new Date(`${task.scheduled_date}T00:00:00`).toISOString() : new Date().toISOString(),
+        all_day: true, color: "#f97316", description: task.description,
+        task_id: task.id, user_id: task.user_id, is_task: true, is_completed: task.is_completed,
+      };
+      setEditingTaskItem(null); // Use null so EventEditDialog creates fresh
+      setTaskEditDefaultDate(task.scheduled_date ? new Date(task.scheduled_date) : new Date());
+      setTaskEditDialogOpen(true);
+      lastTaskClickRef.current = null;
+    } else {
+      lastTaskClickRef.current = { id: task.id, time: now };
+    }
+  };
+
   const TaskRow = ({ task }: { task: Tables<"tasks"> }) => {
     const priority = getPriorityFromDesc(task.description);
     return (
       <div
         draggable
         onDragStart={(e) => { e.dataTransfer.setData("task-id", task.id); e.dataTransfer.setData("task-title", task.title); }}
-        className="group flex items-center gap-1.5 rounded-md px-2 py-1 text-xs hover:bg-accent/50 cursor-grab"
+        onClick={() => handleTaskDoubleClick(task)}
+        className="group flex items-center gap-1.5 rounded-md px-2 py-1 text-xs hover:bg-accent/50 cursor-pointer"
       >
         <Checkbox
           checked={!!task.is_completed}
-          onCheckedChange={() => toggleTaskComplete(task)}
+          onCheckedChange={(e) => { e; toggleTaskComplete(task); }}
+          onClick={(e) => e.stopPropagation()}
           className="h-3.5 w-3.5 shrink-0"
         />
         <span className="flex-1 truncate">{task.title}</span>
@@ -337,10 +361,10 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
         {task.scheduled_date && (
           <span className="text-[10px] text-muted-foreground shrink-0">{format(new Date(task.scheduled_date), "dd/MM")}</span>
         )}
-        <button onClick={() => toggleFavorite(task)} className="shrink-0 opacity-0 group-hover:opacity-100">
+        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(task); }} className="shrink-0 opacity-0 group-hover:opacity-100">
           <Star className={cn("h-3 w-3", task.is_favorite ? "fill-warning text-warning" : "text-muted-foreground")} />
         </button>
-        <button onClick={() => deleteTask(task.id)} className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive">
+        <button onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive">
           <Trash2 className="h-3 w-3 text-muted-foreground" />
         </button>
       </div>
@@ -415,9 +439,36 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
                           <Progress value={pTasks.length > 0 ? (pDone / pTasks.length) * 100 : 0} className="h-1.5" />
                           <p className="text-[10px] text-muted-foreground mt-0.5">{pTasks.length > 0 ? Math.round((pDone / pTasks.length) * 100) : 0}% concluído</p>
                         </div>
-                        {sortTasks(pTasks.filter(t => !t.is_completed)).map((task) => (
+                         {sortTasks(pTasks.filter(t => !t.is_completed)).map((task) => (
                           <TaskRow key={task.id} task={task} />
                         ))}
+                        {/* Add task to project */}
+                        <div className="flex gap-1 mt-1">
+                          <Input
+                            placeholder="Nova tarefa..."
+                            value={newTask}
+                            onChange={(e) => setNewTask(e.target.value)}
+                            onKeyDown={async (e) => {
+                              if (e.key === "Enter" && newTask.trim() && user) {
+                                await supabase.from("tasks").insert({
+                                  title: newTask.trim(), user_id: user.id, project_id: p.id,
+                                });
+                                setNewTask(""); fetchData();
+                              }
+                            }}
+                            className="h-6 text-[10px]"
+                          />
+                          <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={async () => {
+                            if (newTask.trim() && user) {
+                              await supabase.from("tasks").insert({
+                                title: newTask.trim(), user_id: user.id, project_id: p.id,
+                              });
+                              setNewTask(""); fetchData();
+                            }
+                          }}>
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
                         {pTasks.filter(t => t.is_completed).length > 0 && (
                           <p className="text-[10px] text-muted-foreground/50 px-2 pt-1">
                             +{pTasks.filter(t => t.is_completed).length} concluída(s)

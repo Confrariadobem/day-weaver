@@ -195,6 +195,7 @@ export default function PreferencesView() {
           <TabsList className="w-full justify-start">
             <TabsTrigger value="general">Geral</TabsTrigger>
             <TabsTrigger value="calendar">Calendário</TabsTrigger>
+            <TabsTrigger value="types">Tipos</TabsTrigger>
             <TabsTrigger value="categories">Categorias</TabsTrigger>
             <TabsTrigger value="data">Dados</TabsTrigger>
           </TabsList>
@@ -331,6 +332,41 @@ export default function PreferencesView() {
             <Button onClick={savePrefs} className="gap-2">
               <Save className="h-4 w-4" /> Salvar Preferências
             </Button>
+          </TabsContent>
+
+          {/* ===== TIPOS DE LANÇAMENTO ===== */}
+          <TabsContent value="types" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CalendarDays className="h-4 w-4" /> Tipos de Lançamento
+                </CardTitle>
+                <CardDescription>Tipos disponíveis para lançamentos no calendário e seus filtros de visualização.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {[
+                    { icon: "🎂", label: "Aniversário", color: "#ec4899", desc: "Datas de aniversário com recorrência anual" },
+                    { icon: "📅", label: "Evento", color: "#3b82f6", desc: "Compromissos e eventos gerais" },
+                    { icon: "💵", label: "Fluxo de Caixa", color: "#22c55e", desc: "Contas a pagar e receber" },
+                    { icon: "📈", label: "Investimento", color: "#d4a017", desc: "Aportes e resgates de investimentos" },
+                    { icon: "📁", label: "Projeto", color: "#eab308", desc: "Marcos e entregas de projetos" },
+                    { icon: "☑️", label: "Tarefa", color: "#f97316", desc: "Tarefas com prazo e prioridade" },
+                    { icon: "🏳️", label: "Feriado", color: "#6b7280", desc: "Feriados nacionais (automático)" },
+                    { icon: "⭐", label: "Favorito", color: "#eab308", desc: "Filtro para itens marcados como favoritos" },
+                  ].map((type) => (
+                    <div key={type.label} className="flex items-center gap-3 rounded-lg border border-border p-3">
+                      <span className="text-lg shrink-0">{type.icon}</span>
+                      <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: type.color }} />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium">{type.label}</span>
+                        <p className="text-xs text-muted-foreground">{type.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ===== DADOS ===== */}
