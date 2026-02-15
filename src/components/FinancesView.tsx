@@ -90,7 +90,7 @@ export default function FinancesView() {
   const [projects, setProjects] = useState<DBTables<"projects">[]>([]);
   const [categories, setCategories] = useState<DBTables<"categories">[]>([]);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
-  const [period, setPeriod] = useState<PeriodFilter>("monthly");
+  const [period, setPeriod] = useState<PeriodFilter>("yearly");
   const [sortField, setSortField] = useState<SortField>("entry_date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -108,7 +108,8 @@ export default function FinancesView() {
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const [cashFlowFilter, setCashFlowFilter] = useState<CashFlowFilter>("all");
-  const [hidePaid, setHidePaid] = useState(true);
+  const [hidePaid] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Form state
   const [title, setTitle] = useState("");
@@ -323,13 +324,16 @@ export default function FinancesView() {
     fetchData();
   };
 
+  const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
+
   const saveAccount = async () => {
     if (!accName.trim() || !user) return;
+    const bal = parseNum(accBalance);
     const data = {
       user_id: user.id, name: accName, type: accType,
-      initial_balance: parseFloat(accBalance) || 0,
-      current_balance: editingAccount ? editingAccount.current_balance : (parseFloat(accBalance) || 0),
-      credit_limit: accLimit ? parseFloat(accLimit) : null,
+      initial_balance: bal,
+      current_balance: editingAccount ? editingAccount.current_balance : bal,
+      credit_limit: accLimit ? parseNum(accLimit) : null,
       closing_day: accClosing ? parseInt(accClosing) : null,
       due_day: accDue ? parseInt(accDue) : null,
       color: accColor,
@@ -364,6 +368,7 @@ export default function FinancesView() {
   const filtered = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const query = searchQuery.toLowerCase().trim();
     return entries
       .filter((e) => {
         const d = new Date(e.entry_date);
@@ -377,9 +382,14 @@ export default function FinancesView() {
         }
         if (cashFlowFilter === "paid") return e.is_paid;
         if (cashFlowFilter === "pending") return !e.is_paid;
-        // "all" filter: respect hidePaid toggle
+        // "all" filter: hide paid by default
         if (hidePaid && e.is_paid) return false;
         return true;
+      })
+      .filter((e) => {
+        if (!query) return true;
+        const cat = categories.find(c => c.id === e.category_id)?.name || "";
+        return e.title.toLowerCase().includes(query) || cat.toLowerCase().includes(query);
       })
       .sort((a, b) => {
         let aVal: any, bVal: any;
@@ -396,7 +406,7 @@ export default function FinancesView() {
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, periodRange, sortField, sortDir, categories, cashFlowFilter, hidePaid]);
+  }, [entries, periodRange, sortField, sortDir, categories, cashFlowFilter, hidePaid, searchQuery]);
 
   const totalRevenue = filtered.filter((e) => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
   const totalExpense = filtered.filter((e) => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
@@ -651,28 +661,6 @@ export default function FinancesView() {
             <TabsTrigger value="contas" className="text-xs">Carteira</TabsTrigger>
           </TabsList>
         </Tabs>
-
-        {(viewTab === "previsao" || viewTab === "relatorios") && (
-          <div className="flex items-center gap-2">
-            <Select value={period} onValueChange={(v) => setPeriod(v as PeriodFilter)}>
-              <SelectTrigger className="h-8 w-36 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PERIOD_OPTIONS.map(p => (
-                  <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {period === "custom" && (
-              <div className="flex items-center gap-1">
-                <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="h-8 w-32 text-xs" />
-                <span className="text-xs text-muted-foreground">a</span>
-                <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="h-8 w-32 text-xs" />
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Content */}
@@ -681,9 +669,19 @@ export default function FinancesView() {
         {/* ============ LANÇAMENTOS ============ */}
         {viewTab === "previsao" && (
           <>
+            {/* Search bar */}
+            <div className="mb-2">
+              <Input
+                placeholder="Pesquisar lançamentos por título ou categoria..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+
+            {/* Quick filters below search */}
             <div className="mb-3 flex items-center gap-2 flex-wrap">
-              {/* Cash flow filters */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap">
                 <Button size="sm" variant={cashFlowFilter === "all" ? "default" : "outline"} className="h-7 text-[11px] px-2.5" onClick={() => setCashFlowFilter("all")}>
                   Todos
                 </Button>
@@ -696,12 +694,14 @@ export default function FinancesView() {
                 <Button size="sm" variant={cashFlowFilter === "overdue" ? "destructive" : "outline"} className="h-7 text-[11px] px-2.5 gap-1" onClick={() => setCashFlowFilter("overdue")}>
                   <AlertTriangle className="h-3 w-3" /> Atrasados
                 </Button>
+                <Button size="sm" variant={cashFlowFilter === "pending" ? "default" : "outline"} className="h-7 text-[11px] px-2.5 gap-1" onClick={() => setCashFlowFilter("pending")}>
+                  <Filter className="h-3 w-3" /> Contas Pendentes
+                </Button>
+                <Button size="sm" variant={cashFlowFilter === "paid" ? "default" : "outline"} className="h-7 text-[11px] px-2.5 gap-1" onClick={() => setCashFlowFilter("paid")}>
+                  <Check className="h-3 w-3" /> Contas Pagas
+                </Button>
               </div>
               <div className="flex items-center gap-2 ml-auto">
-                <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
-                  <Checkbox checked={hidePaid} onCheckedChange={(c) => setHidePaid(!!c)} className="h-3.5 w-3.5" />
-                  Ocultar pagos
-                </label>
                 <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
                   <DialogTrigger asChild>
                     <Button size="sm" className="h-7 text-[11px]"><Plus className="mr-1 h-3 w-3" /> Lançamento</Button>
@@ -781,7 +781,7 @@ export default function FinancesView() {
                         </SelectContent>
                       </Select>
 
-                      {/* Payment info - moved below project */}
+                      {/* Payment info */}
                       <div className="rounded-lg border border-border p-3 space-y-2">
                          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                            <Wallet className="h-3.5 w-3.5" /> Pagamento {isPaid && <span className="text-destructive">*</span>}
@@ -818,10 +818,10 @@ export default function FinancesView() {
             </div>
 
             {/* Cash Flow Forecast Table */}
-            <div className="rounded-lg border border-border">
+            <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="border-b border-border">
                     <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("entry_date")}>Data <SortIcon field="entry_date" /></TableHead>
                     <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("title")}>Título <SortIcon field="title" /></TableHead>
                     <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("category")}>Categoria <SortIcon field="category" /></TableHead>
