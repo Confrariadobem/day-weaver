@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Save, Calendar, Clock, Bell, Tag } from "lucide-react";
+import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
@@ -45,6 +45,8 @@ const EVENT_TYPES: { value: EventType; label: string; icon: string }[] = [
   { value: "bill", label: "Conta a Pagar", icon: "💳" },
 ];
 
+type RecurrenceDateMode = "same_date" | "first_business_day";
+
 const RECURRENCE_OPTIONS = [
   { value: "none", label: "Sem recorrência" },
   { value: "FREQ=DAILY", label: "Diário" },
@@ -82,6 +84,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const [color, setColor] = useState("#3b82f6");
   const [recurrence, setRecurrence] = useState("none");
   const [recurrenceCount, setRecurrenceCount] = useState("12");
+  const [recurrenceDateMode, setRecurrenceDateMode] = useState<RecurrenceDateMode>("same_date");
   const [reminder, setReminder] = useState("none");
   // Task-specific
   const [priority, setPriority] = useState("medium");
@@ -118,6 +121,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setColor("#3b82f6");
       setRecurrence("none");
       setRecurrenceCount("12");
+      setRecurrenceDateMode("same_date");
       setEventType("event");
       setReminder("none");
       setPriority("medium");
@@ -164,12 +168,21 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
       if (recurrence !== "none") {
         const count = Math.max(1, parseInt(recurrenceCount) || 12);
+        const isBusinessDay = (dt: Date) => { const day = dt.getDay(); return day !== 0 && day !== 6; };
+        const getNextBusinessDay = (dt: Date) => { const r = new Date(dt); while (!isBusinessDay(r)) r.setDate(r.getDate() + 1); return r; };
         const events = Array.from({ length: count }, (_, i) => {
           const d = new Date(startDt);
           if (recurrence === "FREQ=DAILY") d.setDate(d.getDate() + i);
           else if (recurrence === "FREQ=WEEKLY") d.setDate(d.getDate() + i * 7);
           else if (recurrence === "FREQ=BIWEEKLY") d.setDate(d.getDate() + i * 14);
-          else if (recurrence === "FREQ=MONTHLY") d.setMonth(d.getMonth() + i);
+          else if (recurrence === "FREQ=MONTHLY") {
+            d.setMonth(d.getMonth() + i);
+            if (recurrenceDateMode === "first_business_day") {
+              d.setDate(1);
+              const bd = getNextBusinessDay(d);
+              d.setDate(bd.getDate());
+            }
+          }
           else if (recurrence === "FREQ=YEARLY") d.setFullYear(d.getFullYear() + i);
           return {
             user_id: userId,
@@ -261,7 +274,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           {/* Date & time */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> Data início</Label>
+              <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary-foreground" /> Data início</Label>
               <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             {(eventType === "event" || eventType === "countdown") && (
@@ -377,10 +390,24 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           </div>
 
           {recurrence !== "none" && !item && (
-            <div>
-              <Label className="text-sm">Quantidade de ocorrências</Label>
-              <Input type="number" min="1" max="365" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} />
-            </div>
+            <>
+              <div>
+                <Label className="text-sm flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Quantidade de ocorrências</Label>
+                <Input type="number" min="1" max="365" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} />
+              </div>
+              {recurrence === "FREQ=MONTHLY" && (
+                <div>
+                  <Label className="text-sm">Repetir na:</Label>
+                  <Select value={recurrenceDateMode} onValueChange={(v) => setRecurrenceDateMode(v as RecurrenceDateMode)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="same_date">Mesma data</SelectItem>
+                      <SelectItem value="first_business_day">Primeiro dia útil do mês</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -392,7 +419,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </Button>
           )}
           <div className="flex gap-2 ml-auto">
-            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button size="sm" onClick={handleSave} className="gap-1.5">
               <Save className="h-3.5 w-3.5" /> Salvar
             </Button>

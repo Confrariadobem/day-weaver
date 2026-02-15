@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
-  Plus, TrendingUp, TrendingDown, Wallet, Trash2,
+  Plus, TrendingUp, TrendingDown, Wallet, Trash2, Save,
   Printer, FileDown, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
   CircleDollarSign, AlertTriangle, Search,
@@ -86,8 +86,8 @@ export default function FinancesView() {
   const [projects, setProjects] = useState<DBTables<"projects">[]>([]);
   const [categories, setCategories] = useState<DBTables<"categories">[]>([]);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
-  const [period, setPeriod] = useState<PeriodFilter>("yearly");
-  const [doarPeriod, setDoarPeriod] = useState<PeriodFilter>("yearly");
+  const [period] = useState<PeriodFilter>("custom");
+  const [doarPeriod] = useState<PeriodFilter>("yearly");
   const [sortField, setSortField] = useState<SortField>("entry_date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -758,8 +758,8 @@ export default function FinancesView() {
           </Button>
         )}
         <div className="flex gap-2 ml-auto">
-          <Button variant="ghost" size="sm" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancelar</Button>
-          <Button size="sm" onClick={createOrUpdateEntry}>Salvar</Button>
+          <Button variant="outline" size="sm" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancelar</Button>
+          <Button size="sm" onClick={createOrUpdateEntry} className="gap-1.5"><Save className="h-3.5 w-3.5" /> Salvar</Button>
         </div>
       </div>
     </DialogContent>
@@ -825,11 +825,11 @@ export default function FinancesView() {
         {/* ============ FLUXO DE CAIXA ============ */}
         {viewTab === "previsao" && (
           <>
-            {/* Period selector */}
-            <div className="mb-2">
-              <PeriodSelector value={period} onChange={setPeriod}
-                customS={customStart} customE={customEnd}
-                onCustomS={setCustomStart} onCustomE={setCustomEnd} />
+            {/* Custom date filter only */}
+            <div className="mb-2 flex items-center gap-1.5">
+              <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="h-7 text-xs w-32" />
+              <span className="text-xs text-muted-foreground">a</span>
+              <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="h-7 text-xs w-32" />
             </div>
 
             {/* Search bar */}
@@ -1012,23 +1012,28 @@ export default function FinancesView() {
 
           const renderCategoryEntries = (row: typeof dreData.revRows[0]) => {
             if (!expandedCats.has(row.id)) return null;
-            // Show individual entries for this category across all months
-            const allEntries = row.entries.flat().sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+            // Group entries by title - show one row per unique title with values in month columns
+            const allEntries = row.entries.flat();
             if (allEntries.length === 0) return null;
-            return allEntries.map(e => (
-              <tr key={e.id} className="bg-muted/10 text-xs">
-                <td className="p-1.5 border-b border-border/50 pl-10 text-muted-foreground">{e.title}</td>
-                <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground">{format(new Date(e.entry_date), "dd/MM")}</td>
-                {dreData.months.map((m, mi) => {
-                  const eMonth = new Date(e.entry_date).getMonth();
-                  return (
-                    <td key={mi} className="text-right p-1.5 border-b border-border/50 text-muted-foreground">
-                      {eMonth === mi ? brl(Number(e.amount)) : ""}
-                    </td>
-                  );
-                })}
+            const grouped = new Map<string, { title: string; monthAmounts: number[] }>();
+            allEntries.forEach(e => {
+              const key = e.title.replace(/\s*\(\d+\/\d+\)$/, ""); // strip installment suffix
+              if (!grouped.has(key)) {
+                grouped.set(key, { title: key, monthAmounts: new Array(12).fill(0) });
+              }
+              const mi = new Date(e.entry_date).getMonth();
+              grouped.get(key)!.monthAmounts[mi] += Number(e.amount);
+            });
+            return Array.from(grouped.values()).map(g => (
+              <tr key={g.title} className="bg-muted/10 text-xs">
+                <td className="p-1.5 border-b border-border/50 pl-10 text-muted-foreground" colSpan={2}>{g.title}</td>
+                {g.monthAmounts.map((v, mi) => (
+                  <td key={mi} className="text-right p-1.5 border-b border-border/50 text-muted-foreground">
+                    {v > 0 ? brl(v) : ""}
+                  </td>
+                ))}
                 <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground font-medium">
-                  {brl(Number(e.amount))}
+                  {brl(g.monthAmounts.reduce((s, v) => s + v, 0))}
                 </td>
               </tr>
             ));
@@ -1045,25 +1050,6 @@ export default function FinancesView() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center gap-1.5">
-                {/* View mode filters */}
-                {([ 
-                  { key: "categories" as DoarViewMode, label: "Categorias" },
-                  { key: "expenses_revenues" as DoarViewMode, label: "Despesas e Receitas" },
-                  { key: "entries" as DoarViewMode, label: "Lançamentos" },
-                ] as const).map(m => (
-                  <Button key={m.key} size="sm"
-                    variant={doarViewMode === m.key ? "default" : "ghost"}
-                    className={cn("h-7 text-xs px-2.5 rounded-full", doarViewMode !== m.key && "text-muted-foreground hover:text-foreground")}
-                    onClick={() => {
-                      setDoarViewMode(m.key);
-                      if (m.key === "entries") setExpandedCats(new Set([...dreData.revRows, ...dreData.expRows].map(r => r.id)));
-                      else if (m.key === "expenses_revenues") setExpandedCats(new Set());
-                      else setExpandedCats(new Set());
-                    }}
-                  >{m.label}</Button>
-                ))}
-              </div>
               <div className="flex items-center gap-2">
                 <Input placeholder="Pesquisar categorias..."
                   value={doarSearchQuery} onChange={(e) => setDoarSearchQuery(e.target.value)}
@@ -1073,11 +1059,6 @@ export default function FinancesView() {
                 </Button>
               </div>
             </div>
-
-            {/* Period selector for DOAR */}
-            <PeriodSelector value={doarPeriod} onChange={setDoarPeriod}
-              customS={doarCustomStart} customE={doarCustomEnd}
-              onCustomS={setDoarCustomStart} onCustomE={setDoarCustomEnd} />
 
             <div id="doar-print-area" className="rounded-lg border border-border overflow-auto">
               <table className="w-full text-xs border-collapse">
@@ -1468,8 +1449,8 @@ export default function FinancesView() {
                       </Button>
                     )}
                     <div className="flex gap-2 ml-auto">
-                      <Button variant="ghost" size="sm" onClick={() => { setAccountDialogOpen(false); resetAccForm(); }}>Cancelar</Button>
-                      <Button size="sm" onClick={saveAccount}>Salvar</Button>
+                      <Button variant="outline" size="sm" onClick={() => { setAccountDialogOpen(false); resetAccForm(); }}>Cancelar</Button>
+                      <Button size="sm" onClick={saveAccount} className="gap-1.5"><Save className="h-3.5 w-3.5" /> Salvar</Button>
                     </div>
                   </div>
                 </DialogContent>
