@@ -3,16 +3,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import {
   CalendarDays,
-  FolderKanban,
   Wallet,
   LayoutDashboard,
-  ListTodo,
   User,
   Settings,
   LogOut,
 } from "lucide-react";
 
-export type ModuleKey = "calendar" | "projects" | "finances" | "dashboard" | "backlog" | "profile" | "preferences";
+export type ModuleKey = "calendar" | "finances" | "dashboard" | "profile" | "preferences";
 
 interface NavItem {
   key: ModuleKey;
@@ -23,8 +21,6 @@ interface NavItem {
 const topNavItems: NavItem[] = [
   { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
   { key: "calendar", label: "Calendário", icon: <CalendarDays className="h-5 w-5" /> },
-  { key: "backlog", label: "Backlog", icon: <ListTodo className="h-5 w-5" /> },
-  { key: "projects", label: "Projetos", icon: <FolderKanban className="h-5 w-5" /> },
   { key: "finances", label: "Finanças", icon: <Wallet className="h-5 w-5" /> },
 ];
 
