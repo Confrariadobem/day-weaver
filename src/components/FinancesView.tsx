@@ -33,7 +33,7 @@ type SortDir = "asc" | "desc";
 type RecurrenceType = "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
 type ViewTab = "previsao" | "doar" | "relatorios" | "contas";
 type AccountType = "bank_account" | "credit_card" | "investment" | "wallet" | "cash" | "crypto";
-type CashFlowFilter = "all" | "payable" | "receivable" | "overdue";
+type CashFlowFilter = "all" | "payable" | "receivable" | "overdue" | "paid" | "pending";
 
 interface FinancialAccount {
   id: string;
@@ -108,7 +108,7 @@ export default function FinancesView() {
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const [cashFlowFilter, setCashFlowFilter] = useState<CashFlowFilter>("all");
-  const [hidePaid, setHidePaid] = useState(false);
+  const [hidePaid, setHidePaid] = useState(true);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -206,6 +206,7 @@ export default function FinancesView() {
 
   const createOrUpdateEntry = async () => {
     if (!title.trim() || !amount || !user) return;
+    if (isPaid && (!accountId || !paymentMethod)) return;
 
     if (editingEntry) {
       const updateData: any = {
@@ -367,7 +368,6 @@ export default function FinancesView() {
       .filter((e) => {
         const d = new Date(e.entry_date);
         if (d < periodRange.start || d > periodRange.end) return false;
-        if (hidePaid && e.is_paid) return false;
         if (cashFlowFilter === "payable") return e.type === "expense" && !e.is_paid;
         if (cashFlowFilter === "receivable") return e.type === "revenue" && !e.is_paid;
         if (cashFlowFilter === "overdue") {
@@ -375,6 +375,10 @@ export default function FinancesView() {
           entryDate.setHours(0, 0, 0, 0);
           return !e.is_paid && entryDate < today;
         }
+        if (cashFlowFilter === "paid") return e.is_paid;
+        if (cashFlowFilter === "pending") return !e.is_paid;
+        // "all" filter: respect hidePaid toggle
+        if (hidePaid && e.is_paid) return false;
         return true;
       })
       .sort((a, b) => {
@@ -773,12 +777,12 @@ export default function FinancesView() {
 
                       {/* Payment info - moved below project */}
                       <div className="rounded-lg border border-border p-3 space-y-2">
-                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                          <Wallet className="h-3.5 w-3.5" /> Pagamento
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Select value={accountId} onValueChange={setAccountId}>
-                            <SelectTrigger className="text-xs"><SelectValue placeholder="Conta (opcional)" /></SelectTrigger>
+                         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                           <Wallet className="h-3.5 w-3.5" /> Pagamento {isPaid && <span className="text-destructive">*</span>}
+                         </div>
+                         <div className="grid grid-cols-2 gap-2">
+                           <Select value={accountId} onValueChange={setAccountId}>
+                             <SelectTrigger className={cn("text-xs", isPaid && !accountId && "border-destructive")}><SelectValue placeholder={isPaid ? "Conta (obrigatório)" : "Conta (opcional)"} /></SelectTrigger>
                             <SelectContent>
                               {accounts.filter(a => a.is_active).map(a => (
                                 <SelectItem key={a.id} value={a.id}>
@@ -787,8 +791,8 @@ export default function FinancesView() {
                               ))}
                             </SelectContent>
                           </Select>
-                          <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                            <SelectTrigger className="text-xs"><SelectValue placeholder="Forma Pgto" /></SelectTrigger>
+                           <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                             <SelectTrigger className={cn("text-xs", isPaid && !paymentMethod && "border-destructive")}><SelectValue placeholder={isPaid ? "Forma Pgto (obrigatório)" : "Forma Pgto"} /></SelectTrigger>
                             <SelectContent>
                               {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                             </SelectContent>
@@ -812,12 +816,12 @@ export default function FinancesView() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs w-[100px] text-right font-bold">Saldo</TableHead>
                     <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("entry_date")}>Data <SortIcon field="entry_date" /></TableHead>
                     <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("title")}>Título <SortIcon field="title" /></TableHead>
                     <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("category")}>Categoria <SortIcon field="category" /></TableHead>
                     <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("type")}>Tipo <SortIcon field="type" /></TableHead>
                     <TableHead className="cursor-pointer text-right text-xs" onClick={() => toggleSort("amount")}>Valor <SortIcon field="amount" /></TableHead>
+                    <TableHead className="text-xs w-[110px] text-right font-bold">Saldo</TableHead>
                     <TableHead className="text-xs text-center">Status</TableHead>
                     <TableHead className="w-16 text-xs text-center">Ações</TableHead>
                   </TableRow>
@@ -836,15 +840,12 @@ export default function FinancesView() {
                         key={e.id}
                         className={cn(
                           "group cursor-pointer transition-colors",
-                          isBreakEven && "bg-yellow-100/60 dark:bg-yellow-900/20",
+                          isBreakEven && "bg-primary/10 dark:bg-primary/15",
                           e.is_paid && "opacity-60",
                           isOverdue && !isBreakEven && "bg-destructive/5"
                         )}
                         onClick={() => handleRowClick(e)}
                       >
-                        <TableCell className={cn("text-right text-xs font-bold tabular-nums", runningBal >= 0 ? "text-success" : "text-destructive")}>
-                          {brl(runningBal)}
-                        </TableCell>
                         <TableCell className="text-xs">{format(new Date(e.entry_date), "dd/MM/yyyy")}</TableCell>
                         <TableCell className={cn("text-xs", e.is_paid && "line-through text-muted-foreground")}>{e.title}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{cat?.name || "—"}</TableCell>
@@ -858,18 +859,24 @@ export default function FinancesView() {
                         <TableCell className={cn("text-right text-xs font-medium tabular-nums",
                           e.type === "revenue" ? "text-success" : "text-destructive"
                         )}>{brl(Number(e.amount))}</TableCell>
+                        <TableCell className={cn("text-right text-xs font-bold tabular-nums", runningBal >= 0 ? "text-primary" : "text-destructive")}>
+                          {brl(runningBal)}
+                        </TableCell>
                         <TableCell className="text-center">
                           {e.is_paid ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success">
                               <Check className="h-2.5 w-2.5" /> Pago
                             </span>
                           ) : isOverdue ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
+                            <button
+                              onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); setIsPaid(true); }}
+                              className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive hover:bg-destructive/20 transition-colors"
+                            >
                               <AlertTriangle className="h-2.5 w-2.5" /> Atrasado
-                            </span>
+                            </button>
                           ) : (
                             <button
-                              onClick={(ev) => { ev.stopPropagation(); togglePaid(e); }}
+                              onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); setIsPaid(true); }}
                               className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-success/10 hover:text-success hover:border-success/30 transition-colors"
                             >
                               <CircleDollarSign className="h-2.5 w-2.5" /> Dar baixa
