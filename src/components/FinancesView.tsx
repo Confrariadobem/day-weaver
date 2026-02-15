@@ -12,7 +12,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Plus, ArrowUpDown, TrendingUp, TrendingDown, Wallet, Trash2, Pencil,
   Printer, FileDown, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
-  Banknote, Bitcoin, ChevronDown, ChevronUp, Check,
+  Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays, Filter,
+  CircleDollarSign, AlertTriangle, ArrowDownCircle, ArrowUpCircle,
 } from "lucide-react";
 import {
   format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
@@ -30,8 +31,9 @@ type PeriodFilter = "daily" | "3days" | "weekly" | "monthly" | "yearly" | "custo
 type SortField = "title" | "amount" | "entry_date" | "type" | "category" | "is_paid";
 type SortDir = "asc" | "desc";
 type RecurrenceType = "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
-type ViewTab = "lancamentos" | "doar" | "relatorios" | "contas";
+type ViewTab = "previsao" | "doar" | "relatorios" | "contas";
 type AccountType = "bank_account" | "credit_card" | "investment" | "wallet" | "cash" | "crypto";
+type CashFlowFilter = "all" | "payable" | "receivable" | "overdue";
 
 interface FinancialAccount {
   id: string;
@@ -93,7 +95,7 @@ export default function FinancesView() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<any | null>(null);
-  const [viewTab, setViewTab] = useState<ViewTab>("lancamentos");
+  const [viewTab, setViewTab] = useState<ViewTab>("previsao");
   const [customStart, setCustomStart] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEnd, setCustomEnd] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [recurrenceEditDialog, setRecurrenceEditDialog] = useState<{ entry: any; mode: "single" | "all" | null }>({ entry: null, mode: null });
@@ -105,6 +107,8 @@ export default function FinancesView() {
   const [expenseCollapsed, setExpenseCollapsed] = useState(false);
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
+  const [cashFlowFilter, setCashFlowFilter] = useState<CashFlowFilter>("all");
+  const [hidePaid, setHidePaid] = useState(false);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -357,10 +361,21 @@ export default function FinancesView() {
   }, [period, customStart, customEnd]);
 
   const filtered = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     return entries
       .filter((e) => {
         const d = new Date(e.entry_date);
-        return d >= periodRange.start && d <= periodRange.end;
+        if (d < periodRange.start || d > periodRange.end) return false;
+        if (hidePaid && e.is_paid) return false;
+        if (cashFlowFilter === "payable") return e.type === "expense" && !e.is_paid;
+        if (cashFlowFilter === "receivable") return e.type === "revenue" && !e.is_paid;
+        if (cashFlowFilter === "overdue") {
+          const entryDate = new Date(e.entry_date);
+          entryDate.setHours(0, 0, 0, 0);
+          return !e.is_paid && entryDate < today;
+        }
+        return true;
       })
       .sort((a, b) => {
         let aVal: any, bVal: any;
@@ -377,23 +392,28 @@ export default function FinancesView() {
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, periodRange, sortField, sortDir, categories]);
+  }, [entries, periodRange, sortField, sortDir, categories, cashFlowFilter, hidePaid]);
 
   const totalRevenue = filtered.filter((e) => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
   const totalExpense = filtered.filter((e) => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
   const balance = totalRevenue - totalExpense;
 
-  // Break-even line index
-  const breakEvenIndex = useMemo(() => {
-    let runningBalance = 0;
-    for (let i = 0; i < filtered.length; i++) {
-      const prev = runningBalance;
-      runningBalance += filtered[i].type === "revenue" ? Number(filtered[i].amount) : -Number(filtered[i].amount);
-      if ((prev >= 0 && runningBalance < 0) || (prev < 0 && runningBalance >= 0)) {
-        return i;
+  // Running balance for cash flow forecast
+  const runningBalances = useMemo(() => {
+    // Sort by date ascending for running balance
+    const sorted = [...filtered].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+    let running = 0;
+    const balanceMap = new Map<string, number>();
+    let breakEvenId: string | null = null;
+    for (const e of sorted) {
+      const prev = running;
+      running += e.type === "revenue" ? Number(e.amount) : -Number(e.amount);
+      balanceMap.set(e.id, running);
+      if (breakEvenId === null && ((prev < 0 && running >= 0) || (prev >= 0 && running < 0))) {
+        breakEvenId = e.id;
       }
     }
-    return -1;
+    return { balanceMap, breakEvenId };
   }, [filtered]);
 
   const totalAvailable = accounts.reduce((s, a) => {
@@ -617,7 +637,7 @@ export default function FinancesView() {
       <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
         <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as ViewTab)}>
           <TabsList className="h-8">
-            <TabsTrigger value="lancamentos" className="text-xs">Lançamentos</TabsTrigger>
+            <TabsTrigger value="previsao" className="text-xs">Previsão de Caixa</TabsTrigger>
             <TabsTrigger value="doar" className="text-xs">DOAR</TabsTrigger>
             <TabsTrigger value="relatorios" className="text-xs">Relatórios</TabsTrigger>
             <TabsTrigger value="contas" className="text-xs">Contas</TabsTrigger>
@@ -649,120 +669,156 @@ export default function FinancesView() {
       <div className="flex-1 overflow-auto">
 
         {/* ============ LANÇAMENTOS ============ */}
-        {viewTab === "lancamentos" && (
+        {viewTab === "previsao" && (
           <>
-            <div className="mb-2 flex justify-end">
-              <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="h-8 text-xs"><Plus className="mr-1 h-3 w-3" /> Lançamento</Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                  <DialogHeader><DialogTitle>{editingEntry ? "Editar Lançamento" : "Novo Lançamento"}</DialogTitle></DialogHeader>
-                  <div className="space-y-3">
-                    <Input placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input type="number" placeholder="Valor (R$)" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                      <Select value={type} onValueChange={(v) => setType(v as "revenue" | "expense")}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="revenue">🟢 Receita</SelectItem>
-                          <SelectItem value="expense">🔴 Despesa</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
-                      {!editingEntry && recurrence === "none" && (
-                        <Input type="number" placeholder="Parcelas" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} />
-                      )}
-                    </div>
-
-                    {/* Recurrence */}
-                    {!editingEntry && (
-                      <div className="rounded-lg border border-border p-3 space-y-2">
-                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                          <Repeat className="h-3.5 w-3.5" /> Recorrência
+            <div className="mb-3 flex items-center gap-2 flex-wrap">
+              {/* Cash flow filters */}
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant={cashFlowFilter === "all" ? "default" : "outline"} className="h-7 text-[11px] px-2.5" onClick={() => setCashFlowFilter("all")}>
+                  Todos
+                </Button>
+                <Button size="sm" variant={cashFlowFilter === "payable" ? "default" : "outline"} className="h-7 text-[11px] px-2.5 gap-1" onClick={() => setCashFlowFilter("payable")}>
+                  <ArrowDownCircle className="h-3 w-3" /> Contas a Pagar
+                </Button>
+                <Button size="sm" variant={cashFlowFilter === "receivable" ? "default" : "outline"} className="h-7 text-[11px] px-2.5 gap-1" onClick={() => setCashFlowFilter("receivable")}>
+                  <ArrowUpCircle className="h-3 w-3" /> Contas a Receber
+                </Button>
+                <Button size="sm" variant={cashFlowFilter === "overdue" ? "destructive" : "outline"} className="h-7 text-[11px] px-2.5 gap-1" onClick={() => setCashFlowFilter("overdue")}>
+                  <AlertTriangle className="h-3 w-3" /> Atrasados
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 ml-auto">
+                <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
+                  <Checkbox checked={hidePaid} onCheckedChange={(c) => setHidePaid(!!c)} className="h-3.5 w-3.5" />
+                  Ocultar pagos
+                </label>
+                <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="h-7 text-[11px]"><Plus className="mr-1 h-3 w-3" /> Lançamento</Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader><DialogTitle>{editingEntry ? "Editar Lançamento" : "Novo Lançamento"}</DialogTitle></DialogHeader>
+                    <div className="space-y-3">
+                      <Input placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="0,00"
+                            value={amount}
+                            onChange={(e) => {
+                              const v = e.target.value.replace(/[^0-9.,]/g, "");
+                              setAmount(v);
+                            }}
+                            className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Select value={recurrence} onValueChange={(v) => setRecurrence(v as RecurrenceType)}>
-                            <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Nenhuma</SelectItem>
-                              <SelectItem value="daily">Diária</SelectItem>
-                              <SelectItem value="weekly">Semanal</SelectItem>
-                              <SelectItem value="biweekly">Quinzenal</SelectItem>
-                              <SelectItem value="monthly">Mensal</SelectItem>
-                              <SelectItem value="yearly">Anual</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          {recurrence !== "none" && (
-                            <Input type="number" placeholder="Qtd. ocorrências" min="1" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} className="text-xs" />
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Payment info */}
-                    <div className="rounded-lg border border-border p-3 space-y-2">
-                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                        <Wallet className="h-3.5 w-3.5" /> Pagamento
+                        <Select value={type} onValueChange={(v) => setType(v as "revenue" | "expense")}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="revenue">🟢 Receita</SelectItem>
+                            <SelectItem value="expense">🔴 Despesa</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <Select value={accountId} onValueChange={setAccountId}>
-                          <SelectTrigger className="text-xs"><SelectValue placeholder="Conta (opcional)" /></SelectTrigger>
-                          <SelectContent>
-                            {accounts.filter(a => a.is_active).map(a => (
-                              <SelectItem key={a.id} value={a.id}>
-                                {ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon} {a.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                          <SelectTrigger className="text-xs"><SelectValue placeholder="Forma Pgto" /></SelectTrigger>
-                          <SelectContent>
-                            {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+                        <div className="relative">
+                          <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className="pl-10" />
+                        </div>
+                        {!editingEntry && recurrence === "none" && (
+                          <Input type="number" placeholder="Parcelas" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} />
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid" />
-                        <label htmlFor="is-paid" className="text-xs cursor-pointer">Marcar como pago</label>
-                      </div>
-                    </div>
 
-                    <Select value={categoryId} onValueChange={setCategoryId}>
-                      <SelectTrigger><SelectValue placeholder="Categoria (opcional)" /></SelectTrigger>
-                      <SelectContent>
-                        {finCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Select value={projectId} onValueChange={setProjectId}>
-                      <SelectTrigger><SelectValue placeholder="Projeto (opcional)" /></SelectTrigger>
-                      <SelectContent>
-                        {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Button onClick={createOrUpdateEntry} className="w-full">{editingEntry ? "Salvar Alterações" : "Salvar"}</Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+                      {/* Recurrence */}
+                      {!editingEntry && (
+                        <div className="rounded-lg border border-border p-3 space-y-2">
+                          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                            <Repeat className="h-3.5 w-3.5" /> Recorrência
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Select value={recurrence} onValueChange={(v) => setRecurrence(v as RecurrenceType)}>
+                              <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Nenhuma</SelectItem>
+                                <SelectItem value="daily">Diária</SelectItem>
+                                <SelectItem value="weekly">Semanal</SelectItem>
+                                <SelectItem value="biweekly">Quinzenal</SelectItem>
+                                <SelectItem value="monthly">Mensal</SelectItem>
+                                <SelectItem value="yearly">Anual</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {recurrence !== "none" && (
+                              <Input type="number" placeholder="Qtd. ocorrências" min="1" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} className="text-xs" />
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <Select value={categoryId} onValueChange={setCategoryId}>
+                        <SelectTrigger><SelectValue placeholder="Categoria (opcional)" /></SelectTrigger>
+                        <SelectContent>
+                          {finCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={projectId} onValueChange={setProjectId}>
+                        <SelectTrigger><SelectValue placeholder="Projeto (opcional)" /></SelectTrigger>
+                        <SelectContent>
+                          {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+
+                      {/* Payment info - moved below project */}
+                      <div className="rounded-lg border border-border p-3 space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                          <Wallet className="h-3.5 w-3.5" /> Pagamento
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Select value={accountId} onValueChange={setAccountId}>
+                            <SelectTrigger className="text-xs"><SelectValue placeholder="Conta (opcional)" /></SelectTrigger>
+                            <SelectContent>
+                              {accounts.filter(a => a.is_active).map(a => (
+                                <SelectItem key={a.id} value={a.id}>
+                                  {ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon} {a.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                            <SelectTrigger className="text-xs"><SelectValue placeholder="Forma Pgto" /></SelectTrigger>
+                            <SelectContent>
+                              {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid" />
+                          <label htmlFor="is-paid" className="text-xs cursor-pointer">Marcar como pago</label>
+                        </div>
+                      </div>
+
+                      <Button onClick={createOrUpdateEntry} className="w-full">{editingEntry ? "Salvar Alterações" : "Salvar"}</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
 
-            {/* Table */}
+            {/* Cash Flow Forecast Table */}
             <div className="rounded-lg border border-border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="cursor-pointer text-xs w-8" onClick={() => toggleSort("is_paid")}>
-                      <Check className="h-3 w-3 inline" /><SortIcon field="is_paid" />
-                    </TableHead>
+                    <TableHead className="text-xs w-[100px] text-right font-bold">Saldo</TableHead>
                     <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("entry_date")}>Data <SortIcon field="entry_date" /></TableHead>
                     <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("title")}>Título <SortIcon field="title" /></TableHead>
                     <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("category")}>Categoria <SortIcon field="category" /></TableHead>
                     <TableHead className="cursor-pointer text-xs" onClick={() => toggleSort("type")}>Tipo <SortIcon field="type" /></TableHead>
-                    <TableHead className="text-xs">Conta</TableHead>
                     <TableHead className="cursor-pointer text-right text-xs" onClick={() => toggleSort("amount")}>Valor <SortIcon field="amount" /></TableHead>
+                    <TableHead className="text-xs text-center">Status</TableHead>
                     <TableHead className="w-16 text-xs text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -770,58 +826,63 @@ export default function FinancesView() {
                   {filtered.length === 0 && (
                     <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">Sem lançamentos neste período</TableCell></TableRow>
                   )}
-                  {filtered.map((e, idx) => {
+                  {filtered.map((e) => {
                     const cat = categories.find(c => c.id === e.category_id);
-                    const acc = accounts.find(a => a.id === e.account_id);
-                    const showBreakEven = breakEvenIndex === idx;
+                    const runningBal = runningBalances.balanceMap.get(e.id) ?? 0;
+                    const isBreakEven = runningBalances.breakEvenId === e.id;
+                    const isOverdue = !e.is_paid && new Date(e.entry_date) < new Date();
                     return (
-                      <> 
-                        {showBreakEven && (
-                          <TableRow key={`be-${idx}`}>
-                            <TableCell colSpan={8} className="py-0 px-0">
-                              <div className="flex items-center gap-2 px-4">
-                                <div className="flex-1 border-t-2 border-dashed border-warning" />
-                                <span className="text-[10px] font-bold text-warning whitespace-nowrap">⚖️ PONTO DE EQUILÍBRIO</span>
-                                <div className="flex-1 border-t-2 border-dashed border-warning" />
-                              </div>
-                            </TableCell>
-                          </TableRow>
+                      <TableRow
+                        key={e.id}
+                        className={cn(
+                          "group cursor-pointer transition-colors",
+                          isBreakEven && "bg-yellow-100/60 dark:bg-yellow-900/20",
+                          e.is_paid && "opacity-60",
+                          isOverdue && !isBreakEven && "bg-destructive/5"
                         )}
-                        <TableRow
-                          key={e.id}
-                          className={cn("group cursor-pointer", e.is_paid && "opacity-70")}
-                          onClick={() => handleRowClick(e)}
-                        >
-                          <TableCell className="text-center">
-                            <Checkbox
-                              checked={e.is_paid || false}
-                              onCheckedChange={() => togglePaid(e)}
-                              onClick={(ev) => ev.stopPropagation()}
-                              className="h-3.5 w-3.5"
-                            />
-                          </TableCell>
-                          <TableCell className="text-xs">{format(new Date(e.entry_date), "dd/MM/yyyy")}</TableCell>
-                          <TableCell className={cn("text-xs", e.is_paid && "line-through")}>{e.title}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{cat?.name || "—"}</TableCell>
-                          <TableCell>
-                            <span className={cn("rounded px-2 py-0.5 text-[10px] font-medium",
-                              e.type === "revenue" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
-                            )}>
-                              {e.type === "revenue" ? "Receita" : "Despesa"}
+                        onClick={() => handleRowClick(e)}
+                      >
+                        <TableCell className={cn("text-right text-xs font-bold tabular-nums", runningBal >= 0 ? "text-success" : "text-destructive")}>
+                          {brl(runningBal)}
+                        </TableCell>
+                        <TableCell className="text-xs">{format(new Date(e.entry_date), "dd/MM/yyyy")}</TableCell>
+                        <TableCell className={cn("text-xs", e.is_paid && "line-through text-muted-foreground")}>{e.title}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{cat?.name || "—"}</TableCell>
+                        <TableCell>
+                          <span className={cn("rounded px-2 py-0.5 text-[10px] font-medium",
+                            e.type === "revenue" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+                          )}>
+                            {e.type === "revenue" ? "Receita" : "Despesa"}
+                          </span>
+                        </TableCell>
+                        <TableCell className={cn("text-right text-xs font-medium tabular-nums",
+                          e.type === "revenue" ? "text-success" : "text-destructive"
+                        )}>{brl(Number(e.amount))}</TableCell>
+                        <TableCell className="text-center">
+                          {e.is_paid ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success">
+                              <Check className="h-2.5 w-2.5" /> Pago
                             </span>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{acc?.name || "—"}</TableCell>
-                          <TableCell className={cn("text-right text-xs font-medium",
-                            e.type === "revenue" ? "text-success" : "text-destructive"
-                          )}>{brl(Number(e.amount))}</TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }} className="rounded p-1 hover:bg-muted"><Pencil className="h-3 w-3 text-muted-foreground" /></button>
-                              <button onClick={(ev) => { ev.stopPropagation(); deleteEntry(e.id); }} className="rounded p-1 hover:bg-destructive/10"><Trash2 className="h-3 w-3 text-destructive" /></button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      </>
+                          ) : isOverdue ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
+                              <AlertTriangle className="h-2.5 w-2.5" /> Atrasado
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(ev) => { ev.stopPropagation(); togglePaid(e); }}
+                              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-success/10 hover:text-success hover:border-success/30 transition-colors"
+                            >
+                              <CircleDollarSign className="h-2.5 w-2.5" /> Dar baixa
+                            </button>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }} className="rounded p-1 hover:bg-muted"><Pencil className="h-3 w-3 text-muted-foreground" /></button>
+                            <button onClick={(ev) => { ev.stopPropagation(); deleteEntry(e.id); }} className="rounded p-1 hover:bg-destructive/10"><Trash2 className="h-3 w-3 text-destructive" /></button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
                 </TableBody>
