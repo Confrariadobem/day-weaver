@@ -34,15 +34,17 @@ interface EventEditDialogProps {
   onSaved: () => void;
 }
 
-type EventType = "event" | "task" | "birthday" | "celebration" | "countdown" | "bill";
+type EventType = "event" | "task" | "birthday" | "celebration" | "countdown" | "bill" | "receivable" | "project";
 
 const EVENT_TYPES: { value: EventType; label: string; icon: string }[] = [
-  { value: "event", label: "Evento", icon: "📅" },
-  { value: "task", label: "Tarefa", icon: "✅" },
   { value: "birthday", label: "Aniversário", icon: "🎂" },
   { value: "celebration", label: "Comemoração", icon: "🎉" },
-  { value: "countdown", label: "Contagem Regressiva", icon: "⏳" },
   { value: "bill", label: "Conta a Pagar", icon: "💳" },
+  { value: "receivable", label: "Conta a Receber", icon: "💰" },
+  { value: "countdown", label: "Contagem Regressiva", icon: "⏳" },
+  { value: "event", label: "Evento", icon: "📅" },
+  { value: "project", label: "Projeto", icon: "📋" },
+  { value: "task", label: "Tarefa", icon: "✅" },
 ];
 
 type RecurrenceDateMode = "same_date" | "first_business_day";
@@ -223,7 +225,9 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
     else if (t === "celebration") setColor("#f59e0b");
     else if (t === "countdown") setColor("#06b6d4");
     else if (t === "bill") setColor("#ef4444");
+    else if (t === "receivable") setColor("#22c55e");
     else if (t === "task") setColor("#8b5cf6");
+    else if (t === "project") setColor("#f97316");
     else setColor("#3b82f6");
 
     if (t === "birthday" || t === "celebration") {
@@ -313,8 +317,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </div>
           )}
 
-          {/* Bill amount */}
-          {eventType === "bill" && (
+          {/* Bill/Receivable amount */}
+          {(eventType === "bill" || eventType === "receivable") && (
             <div>
               <Label className="text-sm">Valor (R$)</Label>
               <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
