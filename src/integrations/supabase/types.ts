@@ -272,6 +272,41 @@ export type Database = {
         }
         Relationships: []
       }
+      project_resources: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+          role: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          project_id: string
+          role?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: string
+          role?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_resources_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           budget: number | null
@@ -280,6 +315,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          responsible: string | null
           status: string | null
           updated_at: string
           user_id: string
@@ -291,6 +327,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          responsible?: string | null
           status?: string | null
           updated_at?: string
           user_id: string
@@ -302,6 +339,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          responsible?: string | null
           status?: string | null
           updated_at?: string
           user_id?: string

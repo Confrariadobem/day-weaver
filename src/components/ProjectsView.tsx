@@ -5,20 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
-  Plus, Star, ChevronDown, Check, Trash2, Pencil, FolderOpen, Save,
-  CalendarDays, DollarSign, User, Tag, FileText, GripVertical, Search,
-  Filter, ArrowUpDown, PanelLeftClose, PanelLeft, X,
+  Plus, Star, ChevronDown, ChevronUp, Check, Trash2, FolderOpen, Save,
+  CalendarDays, DollarSign, User, Tag, GripVertical, Search,
+  Filter, PanelLeftClose, PanelLeft, X, Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
+import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
@@ -31,13 +33,19 @@ export default function ProjectsView() {
   const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
   const [entries, setEntries] = useState<any[]>([]);
+  const [resources, setResources] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
-  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Tables<"projects"> | null>(null);
-  const [editingTask, setEditingTask] = useState<Tables<"tasks"> | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showCompletedProjects, setShowCompletedProjects] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<string | null>(null);
+
+  // Unified task dialog via EventEditDialog
+  const [taskEditDialogOpen, setTaskEditDialogOpen] = useState(false);
+  const [editingTaskItem, setEditingTaskItem] = useState<CalendarItem | null>(null);
+  const [taskEditDefaultDate, setTaskEditDefaultDate] = useState<Date>(new Date());
 
   // Task toolbar state
   const [taskSearch, setTaskSearch] = useState("");
@@ -57,27 +65,30 @@ export default function ProjectsView() {
   const [projBudget, setProjBudget] = useState("");
   const [projStatus, setProjStatus] = useState("active");
   const [projCategoryId, setProjCategoryId] = useState("");
+  const [projResponsible, setProjResponsible] = useState("");
+  const [projDialogTab, setProjDialogTab] = useState("details");
 
-  // Task form
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskDescription, setTaskDescription] = useState("");
-  const [taskScheduledDate, setTaskScheduledDate] = useState("");
-  const [taskAssignee, setTaskAssignee] = useState("");
-  const [taskCategoryId, setTaskCategoryId] = useState("");
-  const [taskIsFavorite, setTaskIsFavorite] = useState(false);
+  // Resource form
+  const [resName, setResName] = useState("");
+  const [resRole, setResRole] = useState("");
+
+  // Double-click refs
+  const lastProjClickRef = useRef<{ id: string; time: number } | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [projRes, taskRes, catRes, entRes] = await Promise.all([
+    const [projRes, taskRes, catRes, entRes, resourceRes] = await Promise.all([
       supabase.from("projects").select("*").eq("user_id", user.id).order("created_at"),
       supabase.from("tasks").select("*").eq("user_id", user.id).order("sort_order"),
       supabase.from("categories").select("*").eq("user_id", user.id),
       supabase.from("financial_entries").select("*").eq("user_id", user.id),
+      supabase.from("project_resources").select("*"),
     ]);
     if (projRes.data) setProjects(projRes.data);
     if (taskRes.data) setTasks(taskRes.data);
     if (catRes.data) setCategories(catRes.data);
     if (entRes.data) setEntries(entRes.data);
+    if (resourceRes.data) setResources(resourceRes.data);
   }, [user]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -90,10 +101,27 @@ export default function ProjectsView() {
     return { totalCost, totalRevenue, paidCost, pendingCost: totalCost - paidCost };
   }, [entries]);
 
+  // Sorted categories alphabetically
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => {
+      const aIsOutros = a.name.toLowerCase().includes("outro");
+      const bIsOutros = b.name.toLowerCase().includes("outro");
+      if (aIsOutros && !bIsOutros) return 1;
+      if (!aIsOutros && bIsOutros) return -1;
+      return a.name.localeCompare(b.name, "pt-BR");
+    });
+  }, [categories]);
+
+  const projectCategories = sortedCategories.filter(c => c.is_project);
+
+  // Separate active and completed projects
+  const activeProjects = projects.filter(p => p.status !== "completed");
+  const completedProjects = projects.filter(p => p.status === "completed");
+
   // Project form handlers
   const resetProjectForm = () => {
-    setProjName(""); setProjDescription(""); setProjBudget(""); setProjStatus("active"); setProjCategoryId("");
-    setEditingProject(null);
+    setProjName(""); setProjDescription(""); setProjBudget(""); setProjStatus("active");
+    setProjCategoryId(""); setProjResponsible(""); setEditingProject(null); setProjDialogTab("details");
   };
 
   const openEditProject = (p: Tables<"projects">) => {
@@ -103,17 +131,42 @@ export default function ProjectsView() {
     setProjBudget(p.budget ? String(p.budget) : "");
     setProjStatus(p.status || "active");
     setProjCategoryId(p.category_id || "");
+    setProjResponsible((p as any).responsible || "");
+    setProjDialogTab("details");
     setProjectDialogOpen(true);
+  };
+
+  const handleProjectClick = (p: Tables<"projects">) => {
+    const now = Date.now();
+    if (lastProjClickRef.current?.id === p.id && now - lastProjClickRef.current.time < 400) {
+      openEditProject(p);
+      lastProjClickRef.current = null;
+    } else {
+      setSelectedProject(p.id);
+      lastProjClickRef.current = { id: p.id, time: now };
+    }
   };
 
   const saveProject = async () => {
     if (!projName.trim() || !user) return;
+
+    // If marking as completed, check all tasks are completed
+    if (projStatus === "completed" && editingProject) {
+      const projTasks = tasks.filter(t => t.project_id === editingProject.id);
+      const incompleteTasks = projTasks.filter(t => !t.is_completed);
+      if (incompleteTasks.length > 0) {
+        alert(`Não é possível concluir o projeto. Existem ${incompleteTasks.length} tarefa(s) pendente(s).`);
+        return;
+      }
+    }
+
     const data: any = {
       name: projName.trim(),
       description: projDescription || null,
       budget: projBudget ? parseFloat(projBudget.replace(/\./g, "").replace(",", ".")) : 0,
       status: projStatus,
       category_id: projCategoryId || null,
+      responsible: projResponsible || null,
       user_id: user.id,
     };
     if (editingProject) {
@@ -127,80 +180,71 @@ export default function ProjectsView() {
   };
 
   const deleteProject = async (id: string) => {
+    // Check for associated tasks
+    const projTasks = tasks.filter(t => t.project_id === id);
+    if (projTasks.length > 0) {
+      alert(`Não é possível excluir o projeto. Existem ${projTasks.length} tarefa(s) associada(s). Remova as tarefas primeiro.`);
+      setDeleteProjectConfirm(null);
+      return;
+    }
     await supabase.from("projects").delete().eq("id", id);
     if (selectedProject === id) setSelectedProject(null);
+    setDeleteProjectConfirm(null);
+    setProjectDialogOpen(false);
+    resetProjectForm();
     fetchData();
   };
 
-  // Task form handlers
-  const resetTaskForm = () => {
-    setTaskTitle(""); setTaskDescription(""); setTaskScheduledDate("");
-    setTaskAssignee(""); setTaskCategoryId(""); setTaskIsFavorite(false);
-    setEditingTask(null);
+  // Resource handlers
+  const addResource = async () => {
+    if (!resName.trim() || !editingProject || !user) return;
+    await supabase.from("project_resources").insert({
+      project_id: editingProject.id,
+      user_id: user.id,
+      name: resName.trim(),
+      role: resRole || null,
+    });
+    setResName(""); setResRole("");
+    fetchData();
+  };
+
+  const removeResource = async (id: string) => {
+    await supabase.from("project_resources").delete().eq("id", id);
+    fetchData();
+  };
+
+  const projectResources = useMemo(() => {
+    if (!editingProject) return [];
+    return resources.filter((r: any) => r.project_id === editingProject.id);
+  }, [resources, editingProject]);
+
+  // Task handlers via unified EventEditDialog
+  const openNewTask = () => {
+    setEditingTaskItem(null);
+    setTaskEditDefaultDate(new Date());
+    setTaskEditDialogOpen(true);
   };
 
   const openEditTask = (t: Tables<"tasks">) => {
-    setEditingTask(t);
-    setTaskTitle(t.title);
-    setTaskDescription(t.description || "");
-    setTaskScheduledDate(t.scheduled_date || "");
-    setTaskAssignee(t.assignee || "");
-    setTaskCategoryId(t.category_id || "");
-    setTaskIsFavorite(t.is_favorite || false);
-    setTaskDialogOpen(true);
-  };
-
-  const saveTask = async () => {
-    if (!taskTitle.trim() || !selectedProject || !user) return;
-    const data: any = {
-      title: taskTitle.trim(),
-      description: taskDescription || null,
-      scheduled_date: taskScheduledDate || null,
-      assignee: taskAssignee || null,
-      category_id: taskCategoryId || null,
-      is_favorite: taskIsFavorite,
-      project_id: selectedProject,
-      user_id: user.id,
+    // Convert task to CalendarItem for the unified dialog
+    const item: CalendarItem = {
+      id: `task-proj-${t.id}`,
+      title: t.title,
+      start_time: t.scheduled_date ? new Date(`${t.scheduled_date}T00:00:00`).toISOString() : new Date().toISOString(),
+      all_day: true,
+      color: "#8b5cf6",
+      description: t.description,
+      task_id: t.id,
+      user_id: t.user_id,
+      is_task: true,
+      is_completed: t.is_completed,
     };
-    if (editingTask) {
-      await supabase.from("tasks").update(data).eq("id", editingTask.id);
-    } else {
-      await supabase.from("tasks").insert(data);
-    }
-    if (taskScheduledDate) {
-      if (editingTask) {
-        const { data: existingEvent } = await supabase
-          .from("calendar_events").select("id").eq("task_id", editingTask.id).maybeSingle();
-        if (existingEvent) {
-          await supabase.from("calendar_events").update({
-            title: taskTitle.trim(),
-            start_time: new Date(`${taskScheduledDate}T00:00:00`).toISOString(),
-          }).eq("id", existingEvent.id);
-        }
-      } else {
-        const { data: newTask } = await supabase.from("tasks").select("id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).single();
-        if (newTask) {
-          await supabase.from("calendar_events").insert({
-            user_id: user.id, task_id: newTask.id, title: taskTitle.trim(),
-            start_time: new Date(`${taskScheduledDate}T00:00:00`).toISOString(),
-            all_day: true, color: "#8b5cf6",
-          });
-        }
-      }
-    }
-    resetTaskForm();
-    setTaskDialogOpen(false);
-    fetchData();
+    setEditingTaskItem(item);
+    setTaskEditDialogOpen(true);
   };
 
   const toggleComplete = async (task: Tables<"tasks">) => {
     await supabase.from("tasks").update({ is_completed: !task.is_completed }).eq("id", task.id);
-    fetchData();
-  };
-
-  const deleteTask = async (id: string) => {
-    await supabase.from("calendar_events").delete().eq("task_id", id);
-    await supabase.from("tasks").delete().eq("id", id);
     fetchData();
   };
 
@@ -210,7 +254,6 @@ export default function ProjectsView() {
     const reordered = [...taskList];
     const [moved] = reordered.splice(fromIdx, 1);
     reordered.splice(toIdx, 0, moved);
-    // Update sort_order in DB
     const updates = reordered.map((t, i) => supabase.from("tasks").update({ sort_order: i }).eq("id", t.id));
     await Promise.all(updates);
     setDragIdx(null);
@@ -249,20 +292,48 @@ export default function ProjectsView() {
   const progress = allSelectedTasks.length > 0 ? (allCompleted.length / allSelectedTasks.length) * 100 : 0;
   const currentProject = projects.find(p => p.id === selectedProject);
   const projectCosts = selectedProject ? getProjectCosts(selectedProject) : null;
-  const projectCategories = categories.filter(c => c.is_project);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortField(field); setSortDir("asc"); }
   };
 
+  // Sort icon matching finances style (dual arrow)
   const SortIcon = ({ field }: { field: SortField }) => (
-    <span className={cn("ml-1 inline-flex", sortField === field ? "text-primary" : "text-muted-foreground/40")}>
-      {sortField === field && sortDir === "desc" ? "↓" : "↑"}
+    <span className="ml-1 inline-flex flex-col leading-none">
+      <ChevronUp className={cn("h-2.5 w-2.5", sortField === field && sortDir === "asc" ? "text-foreground" : "text-muted-foreground/40")} />
+      <ChevronDown className={cn("h-2.5 w-2.5 -mt-0.5", sortField === field && sortDir === "desc" ? "text-foreground" : "text-muted-foreground/40")} />
     </span>
   );
 
   const hasActiveTaskFilters = taskSearch || taskFilterCategory !== "all" || taskFilterStatus !== "all";
+
+  const renderProjectItem = (p: Tables<"projects">, isCompleted = false) => {
+    const costs = getProjectCosts(p.id);
+    const pTasks = tasks.filter(t => t.project_id === p.id);
+    const pDone = pTasks.filter(t => t.is_completed).length;
+    const pTotal = pTasks.length;
+    return (
+      <div
+        key={p.id}
+        onClick={() => handleProjectClick(p)}
+        className={cn(
+          "group flex items-center gap-3 rounded-lg px-3 py-2.5 cursor-pointer transition-colors",
+          selectedProject === p.id ? "bg-primary/10 text-primary" : "hover:bg-accent/50",
+          isCompleted && "opacity-60"
+        )}
+      >
+        <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="flex-1 min-w-0">
+          <p className={cn("text-sm font-medium truncate", isCompleted && "line-through")}>{p.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {pDone}/{pTotal} tarefas
+            {costs.totalCost > 0 && ` • ${brl(costs.totalCost)}`}
+          </p>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-full">
@@ -288,41 +359,23 @@ export default function ProjectsView() {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 pt-0 space-y-1">
-            {projects.map((p) => {
-              const costs = getProjectCosts(p.id);
-              const pTasks = tasks.filter(t => t.project_id === p.id);
-              const pDone = pTasks.filter(t => t.is_completed).length;
-              const pTotal = pTasks.length;
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => setSelectedProject(p.id)}
-                  className={cn(
-                    "group flex items-center gap-3 rounded-lg px-3 py-2.5 cursor-pointer transition-colors",
-                    selectedProject === p.id ? "bg-primary/10 text-primary" : "hover:bg-accent/50"
-                  )}
-                >
-                  <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {pDone}/{pTotal} tarefas
-                      {costs.totalCost > 0 && ` • ${brl(costs.totalCost)}`}
-                    </p>
-                  </div>
-                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); openEditProject(p); }} className="rounded p-1 hover:bg-muted">
-                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); deleteProject(p.id); }} className="rounded p-1 hover:bg-destructive/10">
-                      <Trash2 className="h-3.5 w-3.5 text-destructive/60" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {projects.length === 0 && (
+            {activeProjects.map((p) => renderProjectItem(p))}
+            {activeProjects.length === 0 && completedProjects.length === 0 && (
               <p className="py-8 text-center text-sm text-muted-foreground">Nenhum projeto</p>
+            )}
+
+            {/* Completed projects group */}
+            {completedProjects.length > 0 && (
+              <Collapsible open={showCompletedProjects} onOpenChange={setShowCompletedProjects} className="mt-4">
+                <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full px-2 py-1.5">
+                  <ChevronDown className={cn("h-4 w-4 transition-transform", !showCompletedProjects && "-rotate-90")} />
+                  <Check className="h-3.5 w-3.5" />
+                  Concluídos ({completedProjects.length})
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-1 mt-1">
+                  {completedProjects.map((p) => renderProjectItem(p, true))}
+                </CollapsibleContent>
+              </Collapsible>
             )}
           </div>
         </div>
@@ -340,20 +393,20 @@ export default function ProjectsView() {
                   {currentProject.description && (
                     <p className="text-sm text-muted-foreground mt-0.5">{currentProject.description}</p>
                   )}
+                  {(currentProject as any).responsible && (
+                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                      <User className="h-3 w-3" /> {(currentProject as any).responsible}
+                    </p>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    "text-xs px-2.5 py-1 rounded-full font-medium",
-                    currentProject.status === "active" ? "bg-success/10 text-success" :
-                    currentProject.status === "completed" ? "bg-primary/10 text-primary" :
-                    "bg-muted text-muted-foreground"
-                  )}>
-                    {currentProject.status === "active" ? "Ativo" : currentProject.status === "completed" ? "Concluído" : "Pausado"}
-                  </span>
-                  <Button size="sm" variant="ghost" onClick={() => openEditProject(currentProject)}>
-                    <Pencil className="h-4 w-4 mr-1" /> Editar
-                  </Button>
-                </div>
+                <span className={cn(
+                  "text-xs px-2.5 py-1 rounded-full font-medium",
+                  currentProject.status === "active" ? "bg-success/10 text-success" :
+                  currentProject.status === "completed" ? "bg-primary/10 text-primary" :
+                  "bg-muted text-muted-foreground"
+                )}>
+                  {currentProject.status === "active" ? "Ativo" : currentProject.status === "completed" ? "Concluído" : "Pausado"}
+                </span>
               </div>
 
               <div className="flex items-center gap-3 mb-4">
@@ -379,7 +432,9 @@ export default function ProjectsView() {
                   </CardContent></Card>
                   <Card><CardContent className="p-3">
                     <p className="text-xs text-muted-foreground">Pendente</p>
-                    <p className="text-base font-bold text-warning">{brl(projectCosts.pendingCost)}</p>
+                    <p className={cn("text-base font-bold", projectCosts.pendingCost > 0 ? "text-warning" : "text-success")}>
+                      {projectCosts.pendingCost > 0 ? brl(projectCosts.pendingCost) : "✓ Quitado"}
+                    </p>
                   </CardContent></Card>
                   {currentProject.budget && Number(currentProject.budget) > 0 && (
                     <Card><CardContent className="p-3">
@@ -425,7 +480,7 @@ export default function ProjectsView() {
                     <SelectContent>
                       <SelectItem value="all">Todas categorias</SelectItem>
                       <SelectItem value="none">Sem categoria</SelectItem>
-                      {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
+                      {sortedCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <Select value={taskFilterStatus} onValueChange={setTaskFilterStatus}>
@@ -449,19 +504,19 @@ export default function ProjectsView() {
                       <th className="text-left py-2.5 px-3 w-8"></th>
                       <th className="text-left py-2.5 px-3 w-8">#</th>
                       <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("title")}>
-                        Tarefa <SortIcon field="title" />
+                        <span className="inline-flex items-center">Tarefa <SortIcon field="title" /></span>
                       </th>
                       <th className="text-left py-2.5 px-3 w-28 cursor-pointer select-none" onClick={() => toggleSort("assignee")}>
-                        Responsável <SortIcon field="assignee" />
+                        <span className="inline-flex items-center">Responsável <SortIcon field="assignee" /></span>
                       </th>
                       <th className="text-left py-2.5 px-3 w-28 cursor-pointer select-none" onClick={() => toggleSort("scheduled_date")}>
-                        Data <SortIcon field="scheduled_date" />
+                        <span className="inline-flex items-center">Data <SortIcon field="scheduled_date" /></span>
                       </th>
                       <th className="text-left py-2.5 px-3 w-24 cursor-pointer select-none" onClick={() => toggleSort("category")}>
-                        Categoria <SortIcon field="category" />
+                        <span className="inline-flex items-center">Categoria <SortIcon field="category" /></span>
                       </th>
                       <th className="text-center py-2.5 px-3 w-16 cursor-pointer select-none" onClick={() => toggleSort("status")}>
-                        Status <SortIcon field="status" />
+                        <span className="inline-flex items-center">Status <SortIcon field="status" /></span>
                       </th>
                     </tr>
                   </thead>
@@ -525,7 +580,7 @@ export default function ProjectsView() {
               <Button
                 variant="ghost" size="sm"
                 className="mt-3 text-sm text-muted-foreground hover:text-foreground gap-1.5"
-                onClick={() => { resetTaskForm(); setTaskDialogOpen(true); }}
+                onClick={openNewTask}
               >
                 <Plus className="h-4 w-4" /> Nova Tarefa
               </Button>
@@ -539,7 +594,7 @@ export default function ProjectsView() {
                   <CollapsibleContent className="mt-2">
                     <table className="w-full">
                       <tbody>
-                        {completedTasks.map((task, idx) => (
+                        {completedTasks.map((task) => (
                           <tr key={task.id}
                             className="group cursor-pointer transition-colors hover:bg-muted/20 border-t border-border/10 opacity-50"
                             onClick={() => openEditTask(task)}>
@@ -577,117 +632,140 @@ export default function ProjectsView() {
             <div className="text-center">
               <FolderOpen className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
               <p className="text-base font-medium">Selecione um projeto</p>
-              <p className="text-sm text-muted-foreground/60 mt-1">Escolha um projeto na barra lateral para ver as tarefas</p>
+              <p className="text-sm text-muted-foreground/60 mt-1">Clique duas vezes em um projeto para editar</p>
             </div>
           </div>
         )}
       </div>
 
-      {/* Project Dialog */}
+      {/* Project Dialog with Tabs */}
       <Dialog open={projectDialogOpen} onOpenChange={(o) => { setProjectDialogOpen(o); if (!o) resetProjectForm(); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base">{editingProject ? "Editar Projeto" : "Novo Projeto"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm">Nome do Projeto</Label>
-              <Input value={projName} onChange={(e) => setProjName(e.target.value)} className="mt-1" placeholder="Ex: Reforma do escritório" />
-            </div>
-            <div>
-              <Label className="text-sm">Descrição</Label>
-              <Textarea value={projDescription} onChange={(e) => setProjDescription(e.target.value)} className="mt-1" placeholder="Descrição do projeto (opcional)" rows={3} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+
+          <Tabs value={projDialogTab} onValueChange={setProjDialogTab}>
+            <TabsList className="w-full">
+              <TabsTrigger value="details" className="flex-1 text-xs">Detalhes</TabsTrigger>
+              {editingProject && <TabsTrigger value="resources" className="flex-1 text-xs">Recursos ({projectResources.length})</TabsTrigger>}
+            </TabsList>
+
+            <TabsContent value="details" className="space-y-4 mt-4">
               <div>
-                <Label className="text-sm">Orçamento</Label>
-                <div className="relative mt-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">R$</span>
-                  <Input type="text" inputMode="decimal" placeholder="0,00" value={projBudget} onChange={(e) => setProjBudget(e.target.value.replace(/[^0-9.,]/g, ""))} className="pl-10" />
+                <Label className="text-sm">Nome do Projeto</Label>
+                <Input value={projName} onChange={(e) => setProjName(e.target.value)} className="mt-1" placeholder="Ex: Reforma do escritório" />
+              </div>
+              <div>
+                <Label className="text-sm">Descrição</Label>
+                <Textarea value={projDescription} onChange={(e) => setProjDescription(e.target.value)} className="mt-1" placeholder="Descrição do projeto (opcional)" rows={3} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm">Orçamento</Label>
+                  <div className="relative mt-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">R$</span>
+                    <Input type="text" inputMode="decimal" placeholder="0,00" value={projBudget} onChange={(e) => setProjBudget(e.target.value.replace(/[^0-9.,]/g, ""))} className="pl-10" />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm">Status</Label>
+                  <Select value={projStatus} onValueChange={setProjStatus}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Ativo</SelectItem>
+                      <SelectItem value="paused">Pausado</SelectItem>
+                      <SelectItem value="completed">Concluído</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div>
-                <Label className="text-sm">Status</Label>
-                <Select value={projStatus} onValueChange={setProjStatus}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <Label className="text-sm flex items-center gap-1.5"><User className="h-3.5 w-3.5" /> Responsável</Label>
+                <Input value={projResponsible} onChange={(e) => setProjResponsible(e.target.value)} className="mt-1" placeholder="Nome do responsável" />
+              </div>
+              <div>
+                <Label className="text-sm">Categoria</Label>
+                <Select value={projCategoryId} onValueChange={setProjCategoryId}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Selecionar categoria" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Ativo</SelectItem>
-                    <SelectItem value="paused">Pausado</SelectItem>
-                    <SelectItem value="completed">Concluído</SelectItem>
+                    {projectCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
+            </TabsContent>
+
+            {editingProject && (
+              <TabsContent value="resources" className="mt-4">
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input placeholder="Nome" value={resName} onChange={(e) => setResName(e.target.value)} className="flex-1 text-sm" />
+                    <Input placeholder="Função" value={resRole} onChange={(e) => setResRole(e.target.value)} className="w-32 text-sm" />
+                    <Button size="sm" onClick={addResource} className="shrink-0"><Plus className="h-3.5 w-3.5" /></Button>
+                  </div>
+                  <div className="space-y-2">
+                    {projectResources.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">Nenhum recurso alocado</p>
+                    )}
+                    {projectResources.map((r: any) => (
+                      <div key={r.id} className="flex items-center gap-3 rounded-lg border border-border/30 p-2.5">
+                        <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{r.name}</p>
+                          {r.role && <p className="text-xs text-muted-foreground">{r.role}</p>}
+                        </div>
+                        <button onClick={() => removeResource(r.id)} className="rounded p-1 hover:bg-destructive/10">
+                          <Trash2 className="h-3.5 w-3.5 text-destructive/60" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </TabsContent>
+            )}
+          </Tabs>
+
+          {/* Standardized footer */}
+          <div className="flex items-center gap-2 pt-4 border-t border-border/20">
+            {editingProject && (
+              <Button variant="destructive" size="sm" className="gap-1.5"
+                onClick={() => setDeleteProjectConfirm(editingProject.id)}>
+                <Trash2 className="h-3.5 w-3.5" /> Excluir
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button variant="outline" size="sm" onClick={() => { setProjectDialogOpen(false); resetProjectForm(); }}>Cancelar</Button>
+              <Button size="sm" onClick={saveProject} className="gap-1.5">
+                <Save className="h-3.5 w-3.5" /> Salvar
+              </Button>
             </div>
-            <div>
-              <Label className="text-sm">Categoria</Label>
-              <Select value={projCategoryId} onValueChange={setProjCategoryId}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecionar categoria" /></SelectTrigger>
-                <SelectContent>
-                  {projectCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={saveProject} className="w-full gap-2">
-              <Save className="h-4 w-4" /> {editingProject ? "Salvar Alterações" : "Criar Projeto"}
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Task Dialog */}
-      <Dialog open={taskDialogOpen} onOpenChange={(o) => { setTaskDialogOpen(o); if (!o) resetTaskForm(); }}>
-        <DialogContent className="max-w-md">
+      {/* Delete project confirmation */}
+      <Dialog open={!!deleteProjectConfirm} onOpenChange={(o) => { if (!o) setDeleteProjectConfirm(null); }}>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-base">{editingTask ? "Editar Tarefa" : "Nova Tarefa"}</DialogTitle>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
+            <DialogDescription>Tem certeza que deseja excluir este projeto? Esta ação não pode ser desfeita.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm">Título da Tarefa</Label>
-              <Input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} className="mt-1" placeholder="O que precisa ser feito?" />
-            </div>
-            <div>
-              <Label className="text-sm">Notas / Descrição</Label>
-              <Textarea value={taskDescription} onChange={(e) => setTaskDescription(e.target.value)} className="mt-1" placeholder="Detalhes, links, observações..." rows={3} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm flex items-center gap-1.5"><CalendarDays className="h-4 w-4" /> Data</Label>
-                <Input type="date" value={taskScheduledDate} onChange={(e) => setTaskScheduledDate(e.target.value)} className="mt-1" />
-              </div>
-              <div>
-                <Label className="text-sm flex items-center gap-1.5"><User className="h-4 w-4" /> Responsável</Label>
-                <Input value={taskAssignee} onChange={(e) => setTaskAssignee(e.target.value)} className="mt-1" placeholder="Nome" />
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm flex items-center gap-1.5"><Tag className="h-4 w-4" /> Categoria</Label>
-              <Select value={taskCategoryId} onValueChange={setTaskCategoryId}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecionar categoria" /></SelectTrigger>
-                <SelectContent>
-                  {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox checked={taskIsFavorite} onCheckedChange={(c) => setTaskIsFavorite(!!c)} id="task-fav" />
-              <label htmlFor="task-fav" className="text-sm cursor-pointer flex items-center gap-1.5">
-                <Star className="h-4 w-4 text-warning" /> Marcar como favorita
-              </label>
-            </div>
-            <DialogFooter className="flex gap-2">
-              {editingTask && (
-                <Button variant="destructive" onClick={() => { deleteTask(editingTask.id); setTaskDialogOpen(false); }} className="gap-1">
-                  <Trash2 className="h-4 w-4" /> Excluir
-                </Button>
-              )}
-              <Button variant="outline" onClick={() => setTaskDialogOpen(false)}>Cancelar</Button>
-              <Button onClick={saveTask} className="gap-1">
-                <Save className="h-4 w-4" /> {editingTask ? "Salvar" : "Criar"}
-              </Button>
-            </DialogFooter>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" size="sm" onClick={() => setDeleteProjectConfirm(null)}>Cancelar</Button>
+            <Button variant="destructive" size="sm" onClick={() => deleteProjectConfirm && deleteProject(deleteProjectConfirm)}>Excluir</Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Unified Task Dialog via EventEditDialog */}
+      <EventEditDialog
+        open={taskEditDialogOpen}
+        onOpenChange={setTaskEditDialogOpen}
+        item={editingTaskItem}
+        defaultDate={taskEditDefaultDate}
+        userId={user?.id || ""}
+        onSaved={fetchData}
+      />
     </div>
   );
 }
