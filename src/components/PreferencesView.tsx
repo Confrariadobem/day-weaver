@@ -196,6 +196,7 @@ export default function PreferencesView() {
             <TabsTrigger value="general">Geral</TabsTrigger>
             <TabsTrigger value="calendar">Calendário</TabsTrigger>
             <TabsTrigger value="categories">Categorias</TabsTrigger>
+            <TabsTrigger value="data">Dados</TabsTrigger>
           </TabsList>
 
           {/* ===== GERAL ===== */}
@@ -330,6 +331,38 @@ export default function PreferencesView() {
             <Button onClick={savePrefs} className="gap-2">
               <Save className="h-4 w-4" /> Salvar Preferências
             </Button>
+          </TabsContent>
+
+          {/* ===== DADOS ===== */}
+          <TabsContent value="data" className="space-y-6 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base text-destructive">
+                  <Trash2 className="h-4 w-4" /> Limpar Dados
+                </CardTitle>
+                <CardDescription>Apague todos os dados cadastrados e reinicie o sistema para novos testes.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="destructive" onClick={async () => {
+                  if (!user) return;
+                  const confirmed = window.confirm("ATENÇÃO: Todos os seus dados (tarefas, eventos, projetos, finanças, categorias) serão apagados permanentemente. Deseja continuar?");
+                  if (!confirmed) return;
+                  await Promise.all([
+                    supabase.from("calendar_events").delete().eq("user_id", user.id),
+                    supabase.from("financial_entries").delete().eq("user_id", user.id),
+                    supabase.from("project_resources").delete().eq("user_id", user.id),
+                  ]);
+                  await supabase.from("tasks").delete().eq("user_id", user.id);
+                  await supabase.from("projects").delete().eq("user_id", user.id);
+                  await supabase.from("categories").delete().eq("user_id", user.id);
+                  await supabase.from("financial_accounts").delete().eq("user_id", user.id);
+                  toast({ title: "Dados apagados com sucesso!", description: "O sistema foi resetado." });
+                  fetchCategories();
+                }} className="gap-2">
+                  <Trash2 className="h-4 w-4" /> Limpar todos os dados
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ===== CATEGORIAS ===== */}

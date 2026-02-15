@@ -26,6 +26,10 @@ export interface CalendarItem {
   is_holiday?: boolean;
   is_finance?: boolean;
   is_project?: boolean;
+  is_birthday?: boolean;
+  is_favorite?: boolean;
+  is_investment?: boolean;
+  is_cashflow?: boolean;
 }
 
 interface EventEditDialogProps {
@@ -37,17 +41,16 @@ interface EventEditDialogProps {
   onSaved: () => void;
 }
 
-type EventType = "event" | "task" | "birthday" | "celebration" | "countdown" | "bill" | "receivable" | "project";
+type EventType = "birthday" | "event" | "favorite" | "cashflow" | "investment" | "project" | "task";
 
-const EVENT_TYPES: { value: EventType; label: string; icon: string }[] = [
-  { value: "birthday", label: "Aniversário", icon: "🎂" },
-  { value: "celebration", label: "Comemoração", icon: "🎉" },
-  { value: "bill", label: "Conta a Pagar", icon: "💳" },
-  { value: "receivable", label: "Conta a Receber", icon: "💰" },
-  { value: "countdown", label: "Contagem Regressiva", icon: "⏳" },
-  { value: "event", label: "Evento", icon: "📅" },
-  { value: "project", label: "Projeto", icon: "📋" },
-  { value: "task", label: "Tarefa", icon: "✅" },
+const EVENT_TYPES: { value: EventType; label: string; icon: string; color: string }[] = [
+  { value: "birthday", label: "Aniversário", icon: "🎂", color: "#ec4899" },
+  { value: "event", label: "Evento", icon: "📅", color: "#3b82f6" },
+  { value: "favorite", label: "Favorito", icon: "⭐", color: "#eab308" },
+  { value: "cashflow", label: "Fluxo de caixa", icon: "💵", color: "#22c55e" },
+  { value: "investment", label: "Investimento", icon: "📈", color: "#d4a017" },
+  { value: "project", label: "Projeto", icon: "📁", color: "#eab308" },
+  { value: "task", label: "Tarefa", icon: "☑️", color: "#f97316" },
 ];
 
 type RecurrenceDateMode = "same_date" | "first_business_day";
@@ -74,7 +77,7 @@ const REMINDER_OPTIONS = [
 
 const COLORS = [
   "#3b82f6", "#22c55e", "#ef4444", "#f59e0b", "#8b5cf6",
-  "#ec4899", "#06b6d4", "#f97316",
+  "#ec4899", "#06b6d4", "#f97316", "#d4a017", "#6b7280",
 ];
 
 export default function EventEditDialog({ open, onOpenChange, item, defaultDate, userId, onSaved }: EventEditDialogProps) {
@@ -91,10 +94,9 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const [recurrenceCount, setRecurrenceCount] = useState("12");
   const [recurrenceDateMode, setRecurrenceDateMode] = useState<RecurrenceDateMode>("same_date");
   const [reminder, setReminder] = useState("none");
-  // Task-specific
   const [priority, setPriority] = useState("medium");
-  // Bill-specific
   const [billAmount, setBillAmount] = useState("");
+  const [cashflowDirection, setCashflowDirection] = useState<"expense" | "revenue">("expense");
 
   useEffect(() => {
     if (item) {
@@ -111,7 +113,15 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setDescription(item.description || "");
       setColor(item.color || "#3b82f6");
       setRecurrence(item.recurrence_rule || "none");
-      setEventType(item.is_task ? "task" : "event");
+      // Detect type from description
+      const desc = item.description || "";
+      if (desc.includes("[tipo:birthday]")) setEventType("birthday");
+      else if (desc.includes("[tipo:favorite]")) setEventType("favorite");
+      else if (desc.includes("[tipo:cashflow]") || desc.includes("[tipo:bill]") || desc.includes("[tipo:receivable]")) setEventType("cashflow");
+      else if (desc.includes("[tipo:investment]")) setEventType("investment");
+      else if (desc.includes("[tipo:project]")) setEventType("project");
+      else if (item.is_task) setEventType("task");
+      else setEventType("event");
       setReminder("none");
     } else {
       const d = defaultDate || new Date();
@@ -131,6 +141,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setReminder("none");
       setPriority("medium");
       setBillAmount("");
+      setCashflowDirection("expense");
     }
   }, [item, defaultDate, open]);
 
@@ -146,7 +157,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       eventType !== "event" ? `[tipo:${eventType}]` : "",
       reminder !== "none" ? `[lembrete:${reminder}min]` : "",
       eventType === "task" ? `[prioridade:${priority}]` : "",
-      eventType === "bill" && billAmount ? `[valor:${billAmount}]` : "",
+      (eventType === "cashflow" || eventType === "investment") && billAmount ? `[valor:${billAmount}]` : "",
+      eventType === "cashflow" ? `[direcao:${cashflowDirection}]` : "",
     ].filter(Boolean).join(" ");
 
     if (item) {
@@ -161,7 +173,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         await supabase.from("tasks").update({ title }).eq("id", item.task_id);
       }
     } else {
-      // If it's a task type, also create a task record
       let taskId: string | null = null;
       if (eventType === "task") {
         const { data } = await supabase.from("tasks").insert({
@@ -169,6 +180,21 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           scheduled_date: startDate, is_completed: false,
         }).select("id").single();
         if (data) taskId = data.id;
+      }
+
+      // For cashflow, also create a financial entry
+      if (eventType === "cashflow" && billAmount) {
+        const amount = parseFloat(billAmount.replace(/\./g, "").replace(",", ".")) || 0;
+        if (amount > 0) {
+          await supabase.from("financial_entries").insert({
+            user_id: userId,
+            title,
+            amount,
+            type: cashflowDirection,
+            entry_date: startDate,
+            is_paid: false,
+          });
+        }
       }
 
       if (recurrence !== "none") {
@@ -221,22 +247,12 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
     onOpenChange(false);
   };
 
-  // Auto-set color based on type
   const handleTypeChange = (t: EventType) => {
     setEventType(t);
-    if (t === "birthday") setColor("#ec4899");
-    else if (t === "celebration") setColor("#f59e0b");
-    else if (t === "countdown") setColor("#06b6d4");
-    else if (t === "bill") setColor("#ef4444");
-    else if (t === "receivable") setColor("#22c55e");
-    else if (t === "task") setColor("#8b5cf6");
-    else if (t === "project") setColor("#f97316");
-    else setColor("#3b82f6");
-
-    if (t === "birthday" || t === "celebration") {
-      setAllDay(true);
-      setRecurrence("FREQ=YEARLY");
-    }
+    const typeConfig = EVENT_TYPES.find(et => et.value === t);
+    if (typeConfig) setColor(typeConfig.color);
+    if (t === "birthday") { setAllDay(true); setRecurrence("FREQ=YEARLY"); }
+    if (t === "project") { setAllDay(true); }
   };
 
   return (
@@ -247,65 +263,32 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Event type selector */}
-          {!item && (
-            <div className="flex flex-wrap gap-1.5">
-              {EVENT_TYPES.map((t) => (
-                <button
-                  key={t.value}
-                  onClick={() => handleTypeChange(t.value)}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
-                    eventType === t.value
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <span>{t.icon}</span>
-                  <span>{t.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Title */}
+          {/* ─── Common fields ─── */}
           <div>
             <Label className="text-sm">Título</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={
               eventType === "birthday" ? "Nome do aniversariante" :
-              eventType === "bill" ? "Nome da conta" :
-              eventType === "countdown" ? "Nome do evento" :
+              eventType === "cashflow" ? "Descrição do lançamento" :
+              eventType === "investment" ? "Nome do investimento" :
               "Nome do evento ou tarefa"
             } />
           </div>
 
-          {/* Date & time */}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary-foreground" /> Data início</Label>
               <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
-            {(eventType === "event" || eventType === "countdown") && (
-              <div>
-                <Label className="text-sm">Data fim</Label>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-              </div>
-            )}
-            {eventType !== "event" && eventType !== "countdown" && (
-              <div className="flex items-end">
-                <div className="flex items-center gap-1.5">
-                  <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
-                  <Label htmlFor="allday" className="text-sm">Dia inteiro</Label>
-                </div>
-              </div>
-            )}
+            <div>
+              <Label className="text-sm">Data fim</Label>
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
           </div>
 
-          {(eventType === "event" || eventType === "task") && (
-            <div className="flex items-center gap-1.5">
-              <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday2" />
-              <Label htmlFor="allday2" className="text-sm">Dia inteiro</Label>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
+            <Label htmlFor="allday" className="text-sm">Dia inteiro</Label>
+          </div>
 
           {!allDay && (
             <div className="grid grid-cols-2 gap-2">
@@ -320,8 +303,59 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </div>
           )}
 
-          {/* Bill/Receivable amount */}
-          {(eventType === "bill" || eventType === "receivable") && (
+          {/* ─── Type selector ─── */}
+          {!item && (
+            <>
+              <Label className="text-sm text-muted-foreground">Tipo de lançamento</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {EVENT_TYPES.map((t) => (
+                  <button
+                    key={t.value}
+                    onClick={() => handleTypeChange(t.value)}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
+                      eventType === t.value
+                        ? "text-white shadow-sm"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                    style={eventType === t.value ? { backgroundColor: t.color } : {}}
+                  >
+                    <span>{t.icon}</span>
+                    <span>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ─── Type-specific fields ─── */}
+
+          {/* Cashflow: direction + amount */}
+          {(eventType === "cashflow") && (
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCashflowDirection("expense")}
+                  className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
+                    cashflowDirection === "expense" ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"
+                  )}
+                >💳 Pagar</button>
+                <button
+                  onClick={() => setCashflowDirection("revenue")}
+                  className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
+                    cashflowDirection === "revenue" ? "bg-[hsl(var(--success))] text-white" : "bg-muted text-muted-foreground"
+                  )}
+                >💰 Receber</button>
+              </div>
+              <div>
+                <Label className="text-sm">Valor (R$)</Label>
+                <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
+                  onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
+              </div>
+            </div>
+          )}
+
+          {/* Investment amount */}
+          {eventType === "investment" && (
             <div>
               <Label className="text-sm">Valor (R$)</Label>
               <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
@@ -345,14 +379,13 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </div>
           )}
 
-          {/* Description */}
+          {/* ─── Extra fields ─── */}
           <div>
             <Label className="text-sm">Descrição</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder="Opcional" rows={2} className="resize-none" />
           </div>
 
-          {/* Reminder */}
           <div>
             <Label className="text-sm flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Lembrete</Label>
             <Select value={reminder} onValueChange={setReminder}>
@@ -365,10 +398,9 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </Select>
           </div>
 
-          {/* Color */}
           <div>
             <Label className="text-sm">Cor</Label>
-            <div className="mt-1.5 flex gap-2">
+            <div className="mt-1.5 flex gap-2 flex-wrap">
               {COLORS.map((c) => (
                 <button
                   key={c}
@@ -383,7 +415,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </div>
           </div>
 
-          {/* Recurrence */}
           <div>
             <Label className="text-sm">Recorrência</Label>
             <Select value={recurrence} onValueChange={setRecurrence}>
@@ -418,7 +449,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           )}
         </div>
 
-        {/* Footer with standardized buttons */}
         <div className="flex items-center gap-2 pt-4 border-t border-border/20">
           {item && (
             <Button variant="destructive" size="sm" onClick={handleDelete} className="gap-1.5">
@@ -435,4 +465,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       </DialogContent>
     </Dialog>
   );
+}
+
+function cn(...classes: (string | boolean | undefined)[]) {
+  return classes.filter(Boolean).join(" ");
 }
