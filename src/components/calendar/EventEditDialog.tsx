@@ -6,9 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash, Star } from "lucide-react";
+import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash, Star, Wallet, Repeat } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export interface CalendarItem {
   id: string;
@@ -48,7 +49,7 @@ const EVENT_TYPES: { value: EventType; label: string; icon: string; color: strin
   { value: "cashflow", label: "Fluxo de caixa", icon: "💵", color: "#22c55e" },
   { value: "event", label: "Evento", icon: "📅", color: "#3b82f6" },
   { value: "investment", label: "Investimento", icon: "📈", color: "#d4a017" },
-  { value: "project", label: "Projeto", icon: "📁", color: "#eab308" },
+  { value: "project", label: "Projetos e tarefas", icon: "📁", color: "#eab308" },
   { value: "task", label: "Tarefa", icon: "☑️", color: "#f97316" },
 ];
 
@@ -60,6 +61,8 @@ const RECURRENCE_OPTIONS = [
   { value: "FREQ=WEEKLY", label: "Semanal" },
   { value: "FREQ=BIWEEKLY", label: "Quinzenal" },
   { value: "FREQ=MONTHLY", label: "Mensal" },
+  { value: "FREQ=QUARTERLY", label: "Trimestral" },
+  { value: "FREQ=SEMIANNUAL", label: "Semestral" },
   { value: "FREQ=YEARLY", label: "Anual" },
 ];
 
@@ -73,6 +76,8 @@ const REMINDER_OPTIONS = [
   { value: "1440", label: "1 dia antes" },
   { value: "10080", label: "1 semana antes" },
 ];
+
+const PAYMENT_METHODS = ["Débito", "Crédito", "PIX", "Boleto", "Transferência", "Dinheiro", "Crypto"];
 
 export default function EventEditDialog({ open, onOpenChange, item, defaultDate, userId, onSaved }: EventEditDialogProps) {
   const [eventType, setEventType] = useState<EventType>("event");
@@ -93,6 +98,35 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const [billAmount, setBillAmount] = useState("");
   const [cashflowDirection, setCashflowDirection] = useState<"expense" | "revenue">("expense");
 
+  // Primary group fields
+  const [categoryId, setCategoryId] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [categories, setCategories] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+
+  // Cashflow extra fields
+  const [accountId, setAccountId] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [isPaid, setIsPaid] = useState(false);
+  const [installments, setInstallments] = useState("1");
+  const [accounts, setAccounts] = useState<any[]>([]);
+
+  // Fetch categories, projects, and accounts
+  useEffect(() => {
+    if (!userId || !open) return;
+    const fetch = async () => {
+      const [catRes, projRes, accRes] = await Promise.all([
+        supabase.from("categories").select("*").eq("user_id", userId).order("name"),
+        supabase.from("projects").select("*").eq("user_id", userId).order("name"),
+        supabase.from("financial_accounts").select("*").eq("user_id", userId).eq("is_active", true).order("name"),
+      ]);
+      if (catRes.data) setCategories(catRes.data);
+      if (projRes.data) setProjects(projRes.data);
+      if (accRes.data) setAccounts(accRes.data);
+    };
+    fetch();
+  }, [userId, open]);
+
   useEffect(() => {
     if (item) {
       setTitle(item.title);
@@ -108,10 +142,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setDescription(item.description || "");
       setColor(item.color || "#3b82f6");
       setRecurrence(item.recurrence_rule || "none");
-      // Detect favorite
       const desc = item.description || "";
       setIsFavorite(desc.includes("[favorito:true]") || !!item.is_favorite);
-      // Detect type from description
       if (desc.includes("[tipo:birthday]")) setEventType("birthday");
       else if (desc.includes("[tipo:cashflow]") || desc.includes("[tipo:bill]") || desc.includes("[tipo:receivable]")) setEventType("cashflow");
       else if (desc.includes("[tipo:investment]")) setEventType("investment");
@@ -139,12 +171,17 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setPriority("medium");
       setBillAmount("");
       setCashflowDirection("expense");
+      setCategoryId("");
+      setProjectId("");
+      setAccountId("");
+      setPaymentMethod("");
+      setIsPaid(false);
+      setInstallments("1");
     }
   }, [item, defaultDate, open]);
 
-  // Clean description of meta tags for display
   const cleanDescription = (desc: string) => {
-    return desc.replace(/\[tipo:\w+\]/g, "").replace(/\[lembrete:\w+\]/g, "").replace(/\[prioridade:\w+\]/g, "").replace(/\[valor:[\d.,]+\]/g, "").replace(/\[direcao:\w+\]/g, "").replace(/\[favorito:\w+\]/g, "").trim();
+    return desc.replace(/\[tipo:\w+\]/g, "").replace(/\[lembrete:\w+\]/g, "").replace(/\[prioridade:\w+\]/g, "").replace(/\[valor:[\d.,]+\]/g, "").replace(/\[direcao:\w+\]/g, "").replace(/\[favorito:\w+\]/g, "").replace(/\[categoria:\w+\]/g, "").replace(/\[projeto:\w+\]/g, "").trim();
   };
 
   const displayDescription = item ? cleanDescription(description) : description;
@@ -177,51 +214,94 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       }).eq("id", item.id);
 
       if (item.task_id) {
-        await supabase.from("tasks").update({ title, is_favorite: isFavorite }).eq("id", item.task_id);
+        await supabase.from("tasks").update({
+          title, is_favorite: isFavorite,
+          category_id: categoryId || null,
+          project_id: projectId || null,
+        }).eq("id", item.task_id);
       }
     } else {
       let taskId: string | null = null;
-      if (eventType === "task") {
+      if (eventType === "task" || eventType === "project") {
         const { data } = await supabase.from("tasks").insert({
           user_id: userId, title, description: displayDescription,
           scheduled_date: startDate, is_completed: false, is_favorite: isFavorite,
+          category_id: categoryId || null,
+          project_id: projectId || null,
         }).select("id").single();
         if (data) taskId = data.id;
       }
 
-      // For cashflow, also create a financial entry
+      // For cashflow, create a financial entry with all fields
       if (eventType === "cashflow" && billAmount) {
         const amount = parseFloat(billAmount.replace(/\./g, "").replace(",", ".")) || 0;
         if (amount > 0) {
-          await supabase.from("financial_entries").insert({
-            user_id: userId,
-            title,
-            amount,
-            type: cashflowDirection,
-            entry_date: startDate,
-            is_paid: false,
-          });
+          const numInst = Math.max(1, parseInt(installments) || 1);
+          const instGroup = numInst > 1 ? crypto.randomUUID() : null;
+
+          if (recurrence !== "none") {
+            const count = Math.max(1, parseInt(recurrenceCount) || 12);
+            const group = crypto.randomUUID();
+            const entriesToInsert = Array.from({ length: count }, (_, i) => {
+              const d = new Date(startDt);
+              if (recurrence === "FREQ=DAILY") d.setDate(d.getDate() + i);
+              else if (recurrence === "FREQ=WEEKLY") d.setDate(d.getDate() + i * 7);
+              else if (recurrence === "FREQ=BIWEEKLY") d.setDate(d.getDate() + i * 14);
+              else if (recurrence === "FREQ=MONTHLY") d.setMonth(d.getMonth() + i);
+              else if (recurrence === "FREQ=QUARTERLY") d.setMonth(d.getMonth() + i * 3);
+              else if (recurrence === "FREQ=SEMIANNUAL") d.setMonth(d.getMonth() + i * 6);
+              else if (recurrence === "FREQ=YEARLY") d.setFullYear(d.getFullYear() + i);
+              if (recurrenceDateMode === "first_business_day" && (recurrence === "FREQ=MONTHLY" || recurrence === "FREQ=QUARTERLY" || recurrence === "FREQ=SEMIANNUAL")) {
+                d.setDate(1);
+                while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+              }
+              return {
+                user_id: userId, title: `${title} (${i + 1}/${count})`,
+                amount, type: cashflowDirection,
+                category_id: categoryId || null, project_id: projectId || null,
+                entry_date: format(d, "yyyy-MM-dd"),
+                installment_group: group, installment_number: i + 1, total_installments: count,
+                account_id: accountId || null, payment_method: paymentMethod || null,
+                is_paid: i === 0 ? isPaid : false,
+              };
+            });
+            await supabase.from("financial_entries").insert(entriesToInsert);
+          } else {
+            const entriesToInsert = Array.from({ length: numInst }, (_, i) => {
+              const d = new Date(startDt);
+              d.setMonth(d.getMonth() + i);
+              return {
+                user_id: userId,
+                title: numInst > 1 ? `${title} (${i + 1}/${numInst})` : title,
+                amount: amount / numInst, type: cashflowDirection,
+                category_id: categoryId || null, project_id: projectId || null,
+                entry_date: format(d, "yyyy-MM-dd"),
+                installment_group: instGroup, installment_number: i + 1, total_installments: numInst,
+                account_id: accountId || null, payment_method: paymentMethod || null,
+                is_paid: i === 0 ? isPaid : false,
+              };
+            });
+            await supabase.from("financial_entries").insert(entriesToInsert);
+          }
         }
       }
 
+      // Create calendar events
       if (recurrence !== "none") {
         const count = Math.max(1, parseInt(recurrenceCount) || 12);
-        const isBusinessDay = (dt: Date) => { const day = dt.getDay(); return day !== 0 && day !== 6; };
-        const getNextBusinessDay = (dt: Date) => { const r = new Date(dt); while (!isBusinessDay(r)) r.setDate(r.getDate() + 1); return r; };
         const events = Array.from({ length: count }, (_, i) => {
           const d = new Date(startDt);
           if (recurrence === "FREQ=DAILY") d.setDate(d.getDate() + i);
           else if (recurrence === "FREQ=WEEKLY") d.setDate(d.getDate() + i * 7);
           else if (recurrence === "FREQ=BIWEEKLY") d.setDate(d.getDate() + i * 14);
-          else if (recurrence === "FREQ=MONTHLY") {
-            d.setMonth(d.getMonth() + i);
-            if (recurrenceDateMode === "first_business_day") {
-              d.setDate(1);
-              const bd = getNextBusinessDay(d);
-              d.setDate(bd.getDate());
-            }
-          }
+          else if (recurrence === "FREQ=MONTHLY") d.setMonth(d.getMonth() + i);
+          else if (recurrence === "FREQ=QUARTERLY") d.setMonth(d.getMonth() + i * 3);
+          else if (recurrence === "FREQ=SEMIANNUAL") d.setMonth(d.getMonth() + i * 6);
           else if (recurrence === "FREQ=YEARLY") d.setFullYear(d.getFullYear() + i);
+          if (recurrenceDateMode === "first_business_day" && (recurrence === "FREQ=MONTHLY" || recurrence === "FREQ=QUARTERLY" || recurrence === "FREQ=SEMIANNUAL")) {
+            d.setDate(1);
+            while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+          }
           return {
             user_id: userId,
             title: `${title} (${i + 1}/${count})`,
@@ -243,6 +323,19 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         });
       }
     }
+
+    // Update account balance if paid
+    if (isPaid && accountId && eventType === "cashflow" && billAmount) {
+      const amount = parseFloat(billAmount.replace(/\./g, "").replace(",", ".")) || 0;
+      const account = accounts.find((a: any) => a.id === accountId);
+      if (account) {
+        const delta = cashflowDirection === "revenue" ? amount : -amount;
+        await supabase.from("financial_accounts").update({
+          current_balance: account.current_balance + delta,
+        }).eq("id", accountId);
+      }
+    }
+
     onSaved();
     onOpenChange(false);
   };
@@ -264,7 +357,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
   const getDialogTitle = () => {
     const typeLabel = EVENT_TYPES.find(t => t.value === eventType)?.label || "item";
-    return item ? `Editar ${typeLabel.toLowerCase()}` : "Novo lançamento";
+    return item ? `Editar ${typeLabel.toLowerCase()}` : "Central de Lançamentos";
   };
 
   return (
@@ -275,67 +368,57 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* ─── Title + Favorite star ─── */}
-          <div>
-            <Label className="text-sm">Título</Label>
-            <div className="flex gap-2 items-center">
-              <Input className="flex-1" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={
-                eventType === "birthday" ? "Nome do aniversariante" :
-                eventType === "cashflow" ? "Descrição do lançamento" :
-                eventType === "investment" ? "Nome do investimento" :
-                "Nome do evento ou tarefa"
-              } />
-              <button
-                type="button"
-                onClick={() => setIsFavorite(!isFavorite)}
-                className="shrink-0 p-1 rounded hover:bg-accent/50 transition-colors"
-                title="Favoritar"
-              >
-                <Star className={cn("h-5 w-5", isFavorite ? "fill-warning text-warning" : "text-muted-foreground")} />
-              </button>
-            </div>
-          </div>
-
-          {/* ─── Description right after title ─── */}
-          <div>
-            <Label className="text-sm">Descrição</Label>
-            <Textarea value={displayDescription} onChange={(e) => setDescription(e.target.value)}
-              placeholder="Opcional" rows={2} className="resize-none" />
-          </div>
-
-          {/* ─── Dates ─── */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* ─── PRIMARY GROUP: Título, Descrição, Categoria, Projeto ─── */}
+          <div className="space-y-3 rounded-lg border border-border/30 p-3">
             <div>
-              <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary-foreground" /> Data início</Label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-sm">Data fim</Label>
-              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
-            <Label htmlFor="allday" className="text-sm">Dia inteiro</Label>
-          </div>
-
-          {!allDay && (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-sm flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Início</Label>
-                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-sm">Fim</Label>
-                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+              <Label className="text-sm">Título</Label>
+              <div className="flex gap-2 items-center">
+                <Input className="flex-1" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nome do lançamento" />
+                <button
+                  type="button"
+                  onClick={() => setIsFavorite(!isFavorite)}
+                  className="shrink-0 p-1 rounded hover:bg-accent/50 transition-colors"
+                  title="Favoritar"
+                >
+                  <Star className={cn("h-5 w-5", isFavorite ? "fill-warning text-warning" : "text-muted-foreground")} />
+                </button>
               </div>
             </div>
-          )}
 
-          {/* ─── Type selector ─── */}
+            <div>
+              <Label className="text-sm">Descrição</Label>
+              <Textarea value={displayDescription} onChange={(e) => setDescription(e.target.value)}
+                placeholder="Opcional" rows={2} className="resize-none" />
+            </div>
+
+            <div>
+              <Label className="text-sm">Categoria</Label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger><SelectValue placeholder="Selecionar categoria" /></SelectTrigger>
+                <SelectContent>
+                  {categories.sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm">Projeto</Label>
+              <Select value={projectId} onValueChange={setProjectId}>
+                <SelectTrigger><SelectValue placeholder="Selecionar projeto (opcional)" /></SelectTrigger>
+                <SelectContent>
+                  {projects.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* ─── SECONDARY GROUP: Type selector ─── */}
           {!item && (
-            <>
+            <div className="space-y-2 rounded-lg border border-border/30 p-3">
               <Label className="text-sm text-muted-foreground">Tipo de lançamento</Label>
               <div className="flex flex-wrap gap-1.5">
                 {EVENT_TYPES.map((t) => (
@@ -354,13 +437,45 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                   </button>
                 ))}
               </div>
-            </>
+            </div>
           )}
 
-          {/* ─── Type-specific fields ─── */}
+          {/* ─── TERTIARY GROUP: Type-specific fields ─── */}
 
-          {/* Cashflow: direction + amount */}
-          {(eventType === "cashflow") && (
+          {/* Dates - common for all */}
+          <div className="space-y-3 rounded-lg border border-border/30 p-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Data início</Label>
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-sm">Data fim</Label>
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
+              <Label htmlFor="allday" className="text-sm">Dia inteiro</Label>
+            </div>
+
+            {!allDay && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-sm flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Início</Label>
+                  <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-sm">Fim</Label>
+                  <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Cashflow: direction + amount + payment fields */}
+          {eventType === "cashflow" && (
             <div className="space-y-3 rounded-lg border border-border/30 p-3">
               <div className="flex gap-2">
                 <button
@@ -381,79 +496,117 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
                   onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
               </div>
+              {!item && recurrence === "none" && (
+                <div>
+                  <Label className="text-sm">Parcelas</Label>
+                  <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} />
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-sm">Carteira</Label>
+                  <Select value={accountId} onValueChange={setAccountId}>
+                    <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((a: any) => (
+                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm">Forma Pgto</Label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid-central" />
+                <label htmlFor="is-paid-central" className="text-xs cursor-pointer">Marcar como pago</label>
+              </div>
             </div>
           )}
 
           {/* Investment amount */}
           {eventType === "investment" && (
-            <div>
-              <Label className="text-sm">Valor (R$)</Label>
-              <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
-                onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <div>
+                <Label className="text-sm">Valor (R$)</Label>
+                <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
+                  onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
+              </div>
             </div>
           )}
 
           {/* Task priority */}
           {eventType === "task" && (
-            <div>
-              <Label className="text-sm flex items-center gap-1.5"><Tag className="h-3.5 w-3.5" /> Prioridade</Label>
-              <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">🟢 Baixa</SelectItem>
-                  <SelectItem value="medium">🟡 Média</SelectItem>
-                  <SelectItem value="high">🔴 Alta</SelectItem>
-                  <SelectItem value="urgent">🔥 Urgente</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <div>
+                <Label className="text-sm flex items-center gap-1.5"><Tag className="h-3.5 w-3.5" /> Prioridade</Label>
+                <Select value={priority} onValueChange={setPriority}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">🟢 Baixa</SelectItem>
+                    <SelectItem value="medium">🟡 Média</SelectItem>
+                    <SelectItem value="high">🔴 Alta</SelectItem>
+                    <SelectItem value="urgent">🔥 Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
 
-          {/* ─── Extra fields ─── */}
-          <div>
-            <Label className="text-sm flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Lembrete</Label>
-            <Select value={reminder} onValueChange={setReminder}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {REMINDER_OPTIONS.map((r) => (
-                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* ─── Extra fields: Lembrete + Recorrência ─── */}
+          <div className="space-y-3 rounded-lg border border-border/30 p-3">
+            <div>
+              <Label className="text-sm flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Lembrete</Label>
+              <Select value={reminder} onValueChange={setReminder}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {REMINDER_OPTIONS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div>
-            <Label className="text-sm">Recorrência</Label>
-            <Select value={recurrence} onValueChange={setRecurrence}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {RECURRENCE_OPTIONS.map((r) => (
-                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            <div>
+              <Label className="text-sm flex items-center gap-1.5"><Repeat className="h-3.5 w-3.5" /> Recorrência</Label>
+              <Select value={recurrence} onValueChange={setRecurrence}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {RECURRENCE_OPTIONS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {recurrence !== "none" && !item && (
-            <>
-              <div>
-                <Label className="text-sm flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Quantidade de ocorrências</Label>
-                <Input type="number" min="1" max="365" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} />
-              </div>
-              {recurrence === "FREQ=MONTHLY" && (
+            {recurrence !== "none" && !item && (
+              <>
                 <div>
-                  <Label className="text-sm">Repetir na:</Label>
-                  <Select value={recurrenceDateMode} onValueChange={(v) => setRecurrenceDateMode(v as RecurrenceDateMode)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="same_date">Mesma data</SelectItem>
-                      <SelectItem value="first_business_day">Primeiro dia útil do mês</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-sm flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Quantidade de ocorrências</Label>
+                  <Input type="number" min="1" max="365" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} />
                 </div>
-              )}
-            </>
-          )}
+                {(recurrence === "FREQ=MONTHLY" || recurrence === "FREQ=QUARTERLY" || recurrence === "FREQ=SEMIANNUAL") && (
+                  <div>
+                    <Label className="text-sm">Repetir na:</Label>
+                    <Select value={recurrenceDateMode} onValueChange={(v) => setRecurrenceDateMode(v as RecurrenceDateMode)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="same_date">Mesma data</SelectItem>
+                        <SelectItem value="first_business_day">Primeiro dia útil do mês</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 pt-4 border-t border-border/20">
@@ -472,8 +625,4 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       </DialogContent>
     </Dialog>
   );
-}
-
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(" ");
 }

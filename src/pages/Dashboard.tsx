@@ -6,16 +6,21 @@ import FinancesView from "@/components/FinancesView";
 import ProfileView from "@/components/ProfileView";
 import PreferencesView from "@/components/PreferencesView";
 import DashboardView from "@/components/DashboardView";
+import ProgramsProjectsView from "@/components/ProgramsProjectsView";
+import EventEditDialog from "@/components/calendar/EventEditDialog";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [activeModule, setActiveModule] = useState<ModuleKey>("calendar");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [centralOpen, setCentralOpen] = useState(false);
 
   const showUnifiedSidebar = activeModule === "calendar";
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      <NavSidebar activeModule={activeModule} onModuleChange={setActiveModule} />
+      <NavSidebar activeModule={activeModule} onModuleChange={setActiveModule} onOpenCentral={() => setCentralOpen(true)} />
 
       <main className="flex flex-1 flex-col overflow-hidden">
         <header className="flex items-center gap-3 border-b border-border px-4 py-2">
@@ -26,6 +31,7 @@ export default function Dashboard() {
             {activeModule === "dashboard" && "Dashboard"}
             {activeModule === "profile" && "Perfil"}
             {activeModule === "preferences" && "Preferências"}
+            {activeModule === "programs" && "Programas e Projetos"}
           </span>
         </header>
 
@@ -34,6 +40,7 @@ export default function Dashboard() {
             {activeModule === "dashboard" && <DashboardView />}
             {activeModule === "calendar" && <CalendarView />}
             {activeModule === "finances" && <FinancesView />}
+            {activeModule === "programs" && <ProgramsProjectsView />}
             {activeModule === "profile" && <ProfileView />}
             {activeModule === "preferences" && <PreferencesView />}
           </div>
@@ -43,6 +50,16 @@ export default function Dashboard() {
           )}
         </div>
       </main>
+
+      {/* Central de Lançamentos */}
+      <EventEditDialog
+        open={centralOpen}
+        onOpenChange={setCentralOpen}
+        item={null}
+        defaultDate={new Date()}
+        userId={user?.id || ""}
+        onSaved={() => {}}
+      />
     </div>
   );
 }
