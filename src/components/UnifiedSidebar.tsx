@@ -13,8 +13,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import {
   Search, Plus, ChevronDown, Star, GripVertical, PanelLeftClose, PanelLeft,
-  Filter, CheckCircle2, X, FolderOpen, Trash2, Save, User, Users, Check,
-  Printer, ArrowUpDown, SquareCheckBig,
+  Filter, CheckCircle2, X, FolderOpen, FolderClosed, Trash2, Save, User, Users, Check,
+  Printer, ArrowUpDown, SquareCheckBig, ChevronsUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -26,16 +26,12 @@ interface UnifiedSidebarProps {
   onToggle: () => void;
 }
 
-type SidebarTab = "projects";
 type SortField = "title" | "status" | "priority" | "date" | "assignee";
 type SortDir = "asc" | "desc";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-const STATUS_LABELS: Record<string, string> = {
-  active: "Ativo", paused: "Pausado", completed: "Concluído",
-};
 
 function getPriorityFromDesc(desc: string | null): string {
   if (!desc) return "medium";
@@ -50,9 +46,17 @@ function getPriorityBadge(p: string) {
   return <span className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground">🟢</span>;
 }
 
+function getEventTypeFromTask(task: Tables<"tasks">): string {
+  const desc = task.description || "";
+  if (desc.includes("[tipo:birthday]")) return "birthday";
+  if (desc.includes("[tipo:cashflow]")) return "cashflow";
+  if (desc.includes("[tipo:investment]")) return "investment";
+  if (desc.includes("[tipo:project]")) return "project";
+  return "task";
+}
+
 export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarProps) {
   const { user } = useAuth();
-  // removed tab state - single view now
   const [sortField, setSortField] = useState<SortField>("title");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -67,9 +71,9 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
   // UI state
   const [search, setSearch] = useState("");
   const [newTask, setNewTask] = useState("");
-  const [showCompleted, setShowCompleted] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [showCompletedProjects, setShowCompletedProjects] = useState(false);
+  const [expandLevel, setExpandLevel] = useState(3); // 1=categories only, 2=+projects, 3=+tasks
 
   // Project dialog
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
@@ -81,11 +85,13 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
   const [projStatus, setProjStatus] = useState("active");
   const [projCategoryId, setProjCategoryId] = useState("");
   const [projResponsible, setProjResponsible] = useState("");
+  const [projStartDate, setProjStartDate] = useState("");
+  const [projEndDate, setProjEndDate] = useState("");
   const [projDialogTab, setProjDialogTab] = useState("details");
   const [resName, setResName] = useState("");
   const [resRole, setResRole] = useState("");
 
-  // Task edit
+  // Task edit via EventEditDialog
   const [taskEditDialogOpen, setTaskEditDialogOpen] = useState(false);
   const [editingTaskItem, setEditingTaskItem] = useState<CalendarItem | null>(null);
   const [taskEditDefaultDate, setTaskEditDefaultDate] = useState<Date>(new Date());
@@ -149,6 +155,14 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
 
   const toggleTaskComplete = async (task: Tables<"tasks">) => {
     await supabase.from("tasks").update({ is_completed: !task.is_completed }).eq("id", task.id);
+    // Check if project is now 100% complete
+    if (task.project_id && !task.is_completed) {
+      const allProjectTasks = [...tasks, ...completedTasks].filter(t => t.project_id === task.project_id);
+      const remainingIncomplete = allProjectTasks.filter(t => !t.is_completed && t.id !== task.id);
+      if (remainingIncomplete.length === 0) {
+        await supabase.from("projects").update({ status: "completed" }).eq("id", task.project_id);
+      }
+    }
     fetchData();
   };
 
@@ -172,13 +186,7 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
 
   // ─── Project actions ───
   const sortedCategories = useMemo(() => {
-    return [...categories].sort((a, b) => {
-      const aO = a.name.toLowerCase().includes("outro");
-      const bO = b.name.toLowerCase().includes("outro");
-      if (aO && !bO) return 1;
-      if (!aO && bO) return -1;
-      return a.name.localeCompare(b.name, "pt-BR");
-    });
+    return [...categories].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [categories]);
 
   const projectCategories = sortedCategories.filter(c => c.is_project);
@@ -193,7 +201,8 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
 
   const resetProjectForm = () => {
     setProjName(""); setProjDescription(""); setProjBudget(""); setProjStatus("active");
-    setProjCategoryId(""); setProjResponsible(""); setEditingProject(null); setProjDialogTab("details");
+    setProjCategoryId(""); setProjResponsible(""); setProjStartDate(""); setProjEndDate("");
+    setEditingProject(null); setProjDialogTab("details");
   };
 
   const openEditProject = (p: Tables<"projects">) => {
@@ -272,18 +281,32 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
     return sortTasks(list);
   }, [tasks, search, sortTasks]);
 
-  // Tasks grouped by category
-  const tasksByCategory = useMemo(() => {
-    const map: Record<string, Tables<"tasks">[]> = {};
-    sortedCategories.forEach(c => { map[c.id] = []; });
-    map["uncategorized"] = [];
-    allActiveTasks.forEach(t => {
-      const key = t.category_id || "uncategorized";
-      if (!map[key]) map[key] = [];
-      map[key].push(t);
-    });
-    return map;
-  }, [allActiveTasks, sortedCategories]);
+  // Expand/collapse cycle
+  const cycleExpand = () => {
+    setExpandLevel(prev => prev === 3 ? 1 : prev + 1);
+  };
+
+  const expandLabel = expandLevel === 1 ? "Categorias" : expandLevel === 2 ? "Projetos" : "Tudo";
+
+  // Task double-click opens EventEditDialog with correct type
+  const handleTaskDoubleClick = (task: Tables<"tasks">) => {
+    const now = Date.now();
+    if (lastTaskClickRef.current?.id === task.id && now - lastTaskClickRef.current.time < 400) {
+      const calItem: CalendarItem = {
+        id: `task-${task.id}`, title: task.title,
+        start_time: task.scheduled_date ? new Date(`${task.scheduled_date}T00:00:00`).toISOString() : new Date().toISOString(),
+        all_day: true, color: "#f97316", description: task.description,
+        task_id: task.id, user_id: task.user_id, is_task: true, is_completed: task.is_completed,
+        is_favorite: task.is_favorite || false,
+      };
+      setEditingTaskItem(calItem);
+      setTaskEditDefaultDate(task.scheduled_date ? new Date(task.scheduled_date) : new Date());
+      setTaskEditDialogOpen(true);
+      lastTaskClickRef.current = null;
+    } else {
+      lastTaskClickRef.current = { id: task.id, time: now };
+    }
+  };
 
   if (collapsed) {
     return (
@@ -291,6 +314,14 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onToggle}>
           <PanelLeft className="h-4 w-4" />
         </Button>
+        <div className="flex-1 flex items-center justify-center">
+          <span
+            className="text-sm font-bold text-muted-foreground tracking-widest"
+            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", letterSpacing: "0.15em" }}
+          >
+            Projetos e Tarefas
+          </span>
+        </div>
       </div>
     );
   }
@@ -313,33 +344,16 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
         </button>
       ))}
       <div className="ml-auto flex gap-0.5">
+        <button onClick={cycleExpand} className="p-0.5 rounded hover:bg-accent/50 flex items-center gap-0.5" title={`Nível: ${expandLabel}`}>
+          <ChevronsUpDown className="h-3 w-3" />
+          <span className="text-[9px]">{expandLevel}</span>
+        </button>
         <button onClick={printTasks} className="p-0.5 rounded hover:bg-accent/50" title="Imprimir">
           <Printer className="h-3 w-3" />
         </button>
       </div>
     </div>
   );
-
-
-
-  const handleTaskDoubleClick = (task: Tables<"tasks">) => {
-    const now = Date.now();
-    if (lastTaskClickRef.current?.id === task.id && now - lastTaskClickRef.current.time < 400) {
-      // Open edit dialog via EventEditDialog
-      const calItem: CalendarItem = {
-        id: `task-${task.id}`, title: task.title,
-        start_time: task.scheduled_date ? new Date(`${task.scheduled_date}T00:00:00`).toISOString() : new Date().toISOString(),
-        all_day: true, color: "#f97316", description: task.description,
-        task_id: task.id, user_id: task.user_id, is_task: true, is_completed: task.is_completed,
-      };
-      setEditingTaskItem(null); // Use null so EventEditDialog creates fresh
-      setTaskEditDefaultDate(task.scheduled_date ? new Date(task.scheduled_date) : new Date());
-      setTaskEditDialogOpen(true);
-      lastTaskClickRef.current = null;
-    } else {
-      lastTaskClickRef.current = { id: task.id, time: now };
-    }
-  };
 
   const TaskRow = ({ task }: { task: Tables<"tasks"> }) => {
     const priority = getPriorityFromDesc(task.description);
@@ -352,7 +366,7 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
       >
         <Checkbox
           checked={!!task.is_completed}
-          onCheckedChange={(e) => { e; toggleTaskComplete(task); }}
+          onCheckedChange={() => toggleTaskComplete(task)}
           onClick={(e) => e.stopPropagation()}
           className="h-3.5 w-3.5 shrink-0"
         />
@@ -367,6 +381,62 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
         <button onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive">
           <Trash2 className="h-3 w-3 text-muted-foreground" />
         </button>
+      </div>
+    );
+  };
+
+  const ProjectBlock = ({ p }: { p: Tables<"projects"> }) => {
+    const pTasks = [...tasks, ...completedTasks].filter(t => t.project_id === p.id);
+    const pDone = pTasks.filter(t => t.is_completed).length;
+    const costs = getProjectCosts(p.id);
+    const isSelected = selectedProject === p.id;
+    const FolderIcon = isSelected ? FolderOpen : FolderClosed;
+
+    return (
+      <div>
+        <div onClick={() => handleProjectClick(p)}
+          className={cn("group flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer transition-colors",
+            isSelected ? "bg-primary/10 text-primary" : "hover:bg-accent/50"
+          )}>
+          <FolderIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium truncate">{p.name}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {pDone}/{pTasks.length} tarefas
+              {costs.totalCost > 0 && ` • ${brl(costs.totalCost)}`}
+            </p>
+          </div>
+          <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform", !isSelected && "-rotate-90")} />
+        </div>
+        {isSelected && expandLevel >= 3 && (
+          <div className="ml-4 mt-1 mb-2 space-y-0.5 border-l-2 border-primary/20 pl-2">
+            <div className="mb-2">
+              <Progress value={pTasks.length > 0 ? (pDone / pTasks.length) * 100 : 0} className="h-1.5" />
+              <p className="text-[10px] text-muted-foreground mt-0.5">{pTasks.length > 0 ? Math.round((pDone / pTasks.length) * 100) : 0}% concluído</p>
+            </div>
+            {sortTasks(pTasks.filter(t => !t.is_completed)).map((task) => (
+              <TaskRow key={task.id} task={task} />
+            ))}
+            {pTasks.filter(t => t.is_completed).length > 0 && (
+              <p className="text-[10px] text-muted-foreground/50 px-2 pt-1">+{pTasks.filter(t => t.is_completed).length} concluída(s)</p>
+            )}
+            <div className="flex gap-1 mt-1">
+              <Input placeholder="Nova tarefa..." value={newTask} onChange={(e) => setNewTask(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter" && newTask.trim() && user) {
+                    await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
+                    setNewTask(""); fetchData();
+                  }
+                }} className="h-6 text-[10px]" />
+              <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={async () => {
+                if (newTask.trim() && user) {
+                  await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
+                  setNewTask(""); fetchData();
+                }
+              }}><Plus className="h-3 w-3" /></Button>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -401,7 +471,7 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
               const catOrphanTasks = allActiveTasks.filter(t => t.category_id === cat.id && !t.project_id);
               if (catProjects.length === 0 && catOrphanTasks.length === 0) return null;
               return (
-                <Collapsible key={cat.id} defaultOpen className="mb-1">
+                <Collapsible key={cat.id} open={expandLevel >= 1} className="mb-1">
                   <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent">
                     <ChevronDown className="h-3 w-3" />
                     {cat.color && <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />}
@@ -409,61 +479,8 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
                     <span className="ml-auto text-[10px]">{catProjects.length}P / {catOrphanTasks.length}T</span>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="pl-3 pt-0.5 space-y-0.5">
-                    {catProjects.map((p) => {
-                      const pTasks = [...tasks, ...completedTasks].filter(t => t.project_id === p.id);
-                      const pDone = pTasks.filter(t => t.is_completed).length;
-                      const costs = getProjectCosts(p.id);
-                      const isSelected = selectedProject === p.id;
-                      return (
-                        <div key={p.id}>
-                          <div onClick={() => handleProjectClick(p)}
-                            className={cn("group flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer transition-colors",
-                              isSelected ? "bg-primary/10 text-primary" : "hover:bg-accent/50"
-                            )}>
-                            <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium truncate">{p.name}</p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {pDone}/{pTasks.length} tarefas
-                                {costs.totalCost > 0 && ` • ${brl(costs.totalCost)}`}
-                              </p>
-                            </div>
-                            <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform", !isSelected && "-rotate-90")} />
-                          </div>
-                          {isSelected && (
-                            <div className="ml-4 mt-1 mb-2 space-y-0.5 border-l-2 border-primary/20 pl-2">
-                              <div className="mb-2">
-                                <Progress value={pTasks.length > 0 ? (pDone / pTasks.length) * 100 : 0} className="h-1.5" />
-                                <p className="text-[10px] text-muted-foreground mt-0.5">{pTasks.length > 0 ? Math.round((pDone / pTasks.length) * 100) : 0}% concluído</p>
-                              </div>
-                              {sortTasks(pTasks.filter(t => !t.is_completed)).map((task) => (
-                                <TaskRow key={task.id} task={task} />
-                              ))}
-                              <div className="flex gap-1 mt-1">
-                                <Input placeholder="Nova tarefa..." value={newTask} onChange={(e) => setNewTask(e.target.value)}
-                                  onKeyDown={async (e) => {
-                                    if (e.key === "Enter" && newTask.trim() && user) {
-                                      await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
-                                      setNewTask(""); fetchData();
-                                    }
-                                  }} className="h-6 text-[10px]" />
-                                <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={async () => {
-                                  if (newTask.trim() && user) {
-                                    await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
-                                    setNewTask(""); fetchData();
-                                  }
-                                }}><Plus className="h-3 w-3" /></Button>
-                              </div>
-                              {pTasks.filter(t => t.is_completed).length > 0 && (
-                                <p className="text-[10px] text-muted-foreground/50 px-2 pt-1">+{pTasks.filter(t => t.is_completed).length} concluída(s)</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {/* Orphan tasks in this category */}
-                    {catOrphanTasks.map(task => <TaskRow key={task.id} task={task} />)}
+                    {expandLevel >= 2 && catProjects.map((p) => <ProjectBlock key={p.id} p={p} />)}
+                    {expandLevel >= 3 && catOrphanTasks.map(task => <TaskRow key={task.id} task={task} />)}
                   </CollapsibleContent>
                 </Collapsible>
               );
@@ -475,62 +492,15 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
               const uncatTasks = allActiveTasks.filter(t => !t.category_id && !t.project_id);
               if (uncatProjects.length === 0 && uncatTasks.length === 0) return null;
               return (
-                <Collapsible defaultOpen className="mb-1">
+                <Collapsible open={expandLevel >= 1} className="mb-1">
                   <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent">
                     <ChevronDown className="h-3 w-3" />
                     <span>Sem Categoria</span>
                     <span className="ml-auto text-[10px]">{uncatProjects.length}P / {uncatTasks.length}T</span>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="pl-3 pt-0.5 space-y-0.5">
-                    {uncatProjects.map((p) => {
-                      const pTasks = [...tasks, ...completedTasks].filter(t => t.project_id === p.id);
-                      const pDone = pTasks.filter(t => t.is_completed).length;
-                      const costs = getProjectCosts(p.id);
-                      const isSelected = selectedProject === p.id;
-                      return (
-                        <div key={p.id}>
-                          <div onClick={() => handleProjectClick(p)}
-                            className={cn("group flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer transition-colors",
-                              isSelected ? "bg-primary/10 text-primary" : "hover:bg-accent/50"
-                            )}>
-                            <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium truncate">{p.name}</p>
-                              <p className="text-[10px] text-muted-foreground">{pDone}/{pTasks.length} tarefas{costs.totalCost > 0 && ` • ${brl(costs.totalCost)}`}</p>
-                            </div>
-                            <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform", !isSelected && "-rotate-90")} />
-                          </div>
-                          {isSelected && (
-                            <div className="ml-4 mt-1 mb-2 space-y-0.5 border-l-2 border-primary/20 pl-2">
-                              <div className="mb-2">
-                                <Progress value={pTasks.length > 0 ? (pDone / pTasks.length) * 100 : 0} className="h-1.5" />
-                                <p className="text-[10px] text-muted-foreground mt-0.5">{pTasks.length > 0 ? Math.round((pDone / pTasks.length) * 100) : 0}% concluído</p>
-                              </div>
-                              {sortTasks(pTasks.filter(t => !t.is_completed)).map((task) => <TaskRow key={task.id} task={task} />)}
-                              <div className="flex gap-1 mt-1">
-                                <Input placeholder="Nova tarefa..." value={newTask} onChange={(e) => setNewTask(e.target.value)}
-                                  onKeyDown={async (e) => {
-                                    if (e.key === "Enter" && newTask.trim() && user) {
-                                      await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
-                                      setNewTask(""); fetchData();
-                                    }
-                                  }} className="h-6 text-[10px]" />
-                                <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={async () => {
-                                  if (newTask.trim() && user) {
-                                    await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
-                                    setNewTask(""); fetchData();
-                                  }
-                                }}><Plus className="h-3 w-3" /></Button>
-                              </div>
-                              {pTasks.filter(t => t.is_completed).length > 0 && (
-                                <p className="text-[10px] text-muted-foreground/50 px-2 pt-1">+{pTasks.filter(t => t.is_completed).length} concluída(s)</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {uncatTasks.map(task => <TaskRow key={task.id} task={task} />)}
+                    {expandLevel >= 2 && uncatProjects.map((p) => <ProjectBlock key={p.id} p={p} />)}
+                    {expandLevel >= 3 && uncatTasks.map(task => <TaskRow key={task.id} task={task} />)}
                   </CollapsibleContent>
                 </Collapsible>
               );
@@ -540,7 +510,7 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
               <p className="py-6 text-center text-xs text-muted-foreground">Nenhum projeto ou tarefa</p>
             )}
 
-            {/* Completed projects */}
+            {/* Completed projects + their tasks */}
             {completedProjectsList.length > 0 && (
               <Collapsible open={showCompletedProjects} onOpenChange={setShowCompletedProjects} className="mt-3">
                 <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground w-full px-2 py-1.5">
@@ -552,28 +522,8 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
                   {completedProjectsList.map((p) => (
                     <div key={p.id} onClick={() => openEditProject(p)}
                       className="flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-accent/50 opacity-50">
-                      <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <FolderClosed className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <p className="text-xs truncate line-through">{p.name}</p>
-                    </div>
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-
-            {/* Completed tasks (hidden section) */}
-            {completedTasks.length > 0 && (
-              <Collapsible open={showCompleted} onOpenChange={setShowCompleted} className="mt-2">
-                <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent">
-                  <ChevronDown className={cn("h-3 w-3 transition-transform", !showCompleted && "-rotate-90")} />
-                  <CheckCircle2 className="h-3 w-3" />
-                  <span>Tarefas Concluídas</span>
-                  <span className="ml-auto text-[10px]">{completedTasks.length}</span>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-0.5 pl-2 pt-1">
-                  {completedTasks.map((task) => (
-                    <div key={task.id} className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground/60 line-through">
-                      <CheckCircle2 className="h-3 w-3 text-muted-foreground/40 shrink-0" />
-                      <span className="flex-1 truncate">{task.title}</span>
                     </div>
                   ))}
                 </CollapsibleContent>
@@ -601,7 +551,7 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
       <Dialog open={projectDialogOpen} onOpenChange={(o) => { setProjectDialogOpen(o); if (!o) resetProjectForm(); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-base">{editingProject ? "Editar Projeto" : "Novo Projeto"}</DialogTitle>
+            <DialogTitle className="text-base">{editingProject ? "Editar projeto" : "Novo projeto"}</DialogTitle>
           </DialogHeader>
           <Tabs value={projDialogTab} onValueChange={setProjDialogTab}>
             <TabsList className="w-full">
@@ -618,6 +568,16 @@ export default function UnifiedSidebar({ collapsed, onToggle }: UnifiedSidebarPr
                   <div>
                     <Label className="text-sm">Descrição</Label>
                     <Textarea value={projDescription} onChange={(e) => setProjDescription(e.target.value)} className="mt-1" placeholder="Opcional" rows={3} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-sm">Data Início</Label>
+                      <Input type="date" value={projStartDate} onChange={(e) => setProjStartDate(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Data Término</Label>
+                      <Input type="date" value={projEndDate} onChange={(e) => setProjEndDate(e.target.value)} className="mt-1" />
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>

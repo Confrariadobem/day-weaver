@@ -16,12 +16,12 @@ import {
   startOfYear, endOfYear, differenceInDays,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, MoreVertical, Search, CalendarDays, Calculator, Timer, Star, Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, MoreVertical, Search, CalendarDays, Calculator, Timer, Star } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
 
 type ViewMode = "today" | "3days" | "weekly" | "monthly" | "yearly";
-type CalendarFilter = "all" | "birthdays" | "events" | "favorites" | "holidays" | "cashflow" | "investments" | "projects" | "tasks";
+type CalendarFilter = "all" | "birthdays" | "events" | "holidays" | "cashflow" | "investments" | "projects" | "tasks";
 
 // Brazilian official holidays (fixed + calculated)
 function getBrazilianHolidays(year: number): { date: Date; name: string }[] {
@@ -84,6 +84,7 @@ export default function CalendarView() {
   const [countdownOpen, setCountdownOpen] = useState(false);
   const [countdownName, setCountdownName] = useState("");
   const [countdownDate, setCountdownDate] = useState("");
+  const [favoriteFilter, setFavoriteFilter] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -115,7 +116,7 @@ export default function CalendarView() {
       const isProject = desc.includes("[tipo:project]");
       const isCashflow = desc.includes("[tipo:bill]") || desc.includes("[tipo:receivable]") || desc.includes("[tipo:cashflow]");
       const isInvestment = desc.includes("[tipo:investment]");
-      const isFavorite = desc.includes("[tipo:favorite]");
+      const isFavorite = desc.includes("[favorito:true]");
       return {
         ...e, is_task: !!e.task_id, is_completed: false,
         is_project: isProject, is_finance: isCashflow, is_cashflow: isCashflow,
@@ -174,12 +175,15 @@ export default function CalendarView() {
   };
 
   const filteredItems = useMemo(() => {
-    const nonCompleted = calendarItems.filter(it => !it.is_completed);
-    if (activeFilters.includes("all")) return nonCompleted;
-    return nonCompleted.filter(it => {
+    let result = calendarItems.filter(it => !it.is_completed);
+    // Favorite filter
+    if (favoriteFilter) {
+      result = result.filter(it => it.is_favorite);
+    }
+    if (activeFilters.includes("all")) return result;
+    return result.filter(it => {
       if (activeFilters.includes("birthdays") && it.is_birthday) return true;
-      if (activeFilters.includes("events") && !it.is_task && !it.is_holiday && !it.is_birthday && !it.is_cashflow && !it.is_investment && !it.is_project && !it.is_favorite) return true;
-      if (activeFilters.includes("favorites") && it.is_favorite) return true;
+      if (activeFilters.includes("events") && !it.is_task && !it.is_holiday && !it.is_birthday && !it.is_cashflow && !it.is_investment && !it.is_project) return true;
       if (activeFilters.includes("holidays") && it.is_holiday) return true;
       if (activeFilters.includes("cashflow") && it.is_cashflow) return true;
       if (activeFilters.includes("investments") && it.is_investment) return true;
@@ -187,18 +191,7 @@ export default function CalendarView() {
       if (activeFilters.includes("tasks") && it.is_task) return true;
       return false;
     });
-  }, [calendarItems, activeFilters]);
-
-  const hiddenCompletedByDate = useMemo(() => {
-    const map: Record<string, number> = {};
-    calendarItems.forEach(it => {
-      if (it.is_completed) {
-        const key = it.start_time.slice(0, 10);
-        map[key] = (map[key] || 0) + 1;
-      }
-    });
-    return map;
-  }, [calendarItems]);
+  }, [calendarItems, activeFilters, favoriteFilter]);
 
   const getFinancialSummary = useCallback((startDate: Date, endDate: Date) => {
     const rev = entries.filter((e) => {
@@ -298,19 +291,10 @@ export default function CalendarView() {
     return getFinancialSummary(start, end);
   }, [currentDate, viewMode, getFinancialSummary]);
 
-  const brlFmt = (v: number) => {
-    const abs = Math.abs(v);
-    const formatted = abs.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    if (v < 0) return `- R$ ${formatted}`;
-    if (v > 0) return `+ R$ ${formatted}`;
-    return `R$ ${formatted}`;
-  };
-
   const FILTER_OPTIONS: { key: CalendarFilter; label: string; color: string; icon: string }[] = [
     { key: "all", label: "Todos", color: "hsl(var(--primary))", icon: "" },
     { key: "birthdays", label: "Aniversários", color: "#ec4899", icon: "🎂" },
     { key: "events", label: "Eventos", color: "#3b82f6", icon: "📅" },
-    { key: "favorites", label: "Favoritos", color: "#eab308", icon: "⭐" },
     { key: "holidays", label: "Feriados", color: "#6b7280", icon: "🏳️" },
     { key: "cashflow", label: "Fluxo de caixa", color: "#22c55e", icon: "💵" },
     { key: "investments", label: "Investimentos", color: "#d4a017", icon: "📈" },
@@ -329,18 +313,28 @@ export default function CalendarView() {
     return differenceInDays(new Date(calcTo), new Date(calcFrom));
   }, [calcFrom, calcTo]);
 
+  // Mini finance bars for calendar header
+  const maxFinVal = Math.max(viewFinSummary.rev, viewFinSummary.exp, 1);
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-        <div className="text-sm text-muted-foreground mr-2">
-          Recurso previsto: <span className="text-[hsl(var(--success))]">{brlFmt(viewFinSummary.rev)}</span>
-          {" – "}
-          <span className="text-destructive">{brlFmt(viewFinSummary.exp)}</span>
-          {" = "}
-          <span className={cn("font-semibold", viewFinSummary.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
-            {brlFmt(viewFinSummary.balance)}
-          </span>
+        {/* Mini finance bars */}
+        <div className="flex items-center gap-2 mr-2">
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-1">
+              <div className="h-2 rounded-full bg-[hsl(var(--success))]" style={{ width: `${Math.max(4, (viewFinSummary.rev / maxFinVal) * 60)}px` }} />
+              <span className="text-[9px] text-[hsl(var(--success))]">{viewFinSummary.rev > 0 ? `+${(viewFinSummary.rev / 1000).toFixed(0)}k` : "0"}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="h-2 rounded-full bg-destructive" style={{ width: `${Math.max(4, (viewFinSummary.exp / maxFinVal) * 60)}px` }} />
+              <span className="text-[9px] text-destructive">{viewFinSummary.exp > 0 ? `-${(viewFinSummary.exp / 1000).toFixed(0)}k` : "0"}</span>
+            </div>
+          </div>
+          <div className={cn("text-[10px] font-semibold", viewFinSummary.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+            {viewFinSummary.balance >= 0 ? "+" : "-"}R${Math.abs(viewFinSummary.balance).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </div>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
@@ -379,11 +373,11 @@ export default function CalendarView() {
           <Button
             variant="ghost"
             size="icon"
-            className={cn("h-8 w-8", activeFilters.includes("favorites") ? "text-warning" : "text-muted-foreground")}
-            onClick={() => toggleFilter("favorites")}
+            className={cn("h-8 w-8", favoriteFilter ? "text-warning" : "text-muted-foreground")}
+            onClick={() => setFavoriteFilter(!favoriteFilter)}
             title="Filtrar favoritos"
           >
-            <Star className={cn("h-4 w-4", activeFilters.includes("favorites") && "fill-warning")} />
+            <Star className={cn("h-4 w-4", favoriteFilter && "fill-warning")} />
           </Button>
 
           <DropdownMenu>
@@ -428,10 +422,10 @@ export default function CalendarView() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {viewMode === "today" && <HourlyDayView days={[currentDate]} items={filteredItems} hiddenCounts={hiddenCompletedByDate} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
-        {viewMode === "3days" && <HourlyDayView days={[currentDate, addDays(currentDate, 1), addDays(currentDate, 2)]} items={filteredItems} hiddenCounts={hiddenCompletedByDate} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
-        {viewMode === "weekly" && <HourlyWeekView date={currentDate} items={filteredItems} hiddenCounts={hiddenCompletedByDate} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
-        {viewMode === "monthly" && <MonthlyGrid date={currentDate} items={filteredItems} hiddenCounts={hiddenCompletedByDate} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
+        {viewMode === "today" && <HourlyDayView days={[currentDate]} items={filteredItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
+        {viewMode === "3days" && <HourlyDayView days={[currentDate, addDays(currentDate, 1), addDays(currentDate, 2)]} items={filteredItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
+        {viewMode === "weekly" && <HourlyWeekView date={currentDate} items={filteredItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
+        {viewMode === "monthly" && <MonthlyGrid date={currentDate} items={filteredItems} onDrop={handleDrop} onToggle={toggleComplete} onClick={openEdit} onNewEvent={openNew} />}
         {viewMode === "yearly" && <YearlyView date={currentDate} items={filteredItems} entries={entries} tasks={tasks} getFinSummary={getFinancialSummary} onMonthClick={(d) => { setCurrentDate(d); setViewMode("monthly"); }} onEditItem={openEdit} />}
       </div>
 
@@ -517,7 +511,6 @@ export default function CalendarView() {
 
 interface HourlyViewProps {
   items: CalendarItem[];
-  hiddenCounts?: Record<string, number>;
   onDrop: (e: React.DragEvent, d: Date) => void;
   onToggle: (item: CalendarItem) => void;
   onClick: (item: CalendarItem) => void;
@@ -544,6 +537,7 @@ function EventChip({ item, onToggle, onClick, compact }: { item: CalendarItem; o
       )}
       {!item.is_task && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color || "#3b82f6" }} />}
       <span className="truncate">{item.title}</span>
+      {item.is_favorite && <Star className="h-2.5 w-2.5 shrink-0 fill-warning text-warning" />}
       {!item.all_day && <span className="ml-auto shrink-0 opacity-70 text-xs">{format(new Date(item.start_time), "HH:mm")}</span>}
     </div>
   );
@@ -551,7 +545,7 @@ function EventChip({ item, onToggle, onClick, compact }: { item: CalendarItem; o
 
 /* ─── Hourly Day View ─── */
 
-function HourlyDayView({ days, items, hiddenCounts, onDrop, onToggle, onClick, onNewEvent }: HourlyViewProps & { days: Date[] }) {
+function HourlyDayView({ days, items, onDrop, onToggle, onClick, onNewEvent }: HourlyViewProps & { days: Date[] }) {
   return (
     <div className="flex h-full flex-col">
       <div className={cn("grid border-b border-border/20", days.length === 1 ? "grid-cols-[50px_1fr]" : `grid-cols-[50px_repeat(${days.length},1fr)]`)}>
@@ -581,25 +575,6 @@ function HourlyDayView({ days, items, hiddenCounts, onDrop, onToggle, onClick, o
             return (
               <div key={day.toISOString()} className="px-1 py-1 space-y-0.5">
                 {allDayItems.map((it) => <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />)}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Hidden completed indicator */}
-      {hiddenCounts && days.some(day => (hiddenCounts[format(day, "yyyy-MM-dd")] || 0) > 0) && (
-        <div className={cn("grid border-b border-border/10", days.length === 1 ? "grid-cols-[50px_1fr]" : `grid-cols-[50px_repeat(${days.length},1fr)]`)}>
-          <div />
-          {days.map((day) => {
-            const count = hiddenCounts[format(day, "yyyy-MM-dd")] || 0;
-            return (
-              <div key={`hidden-${day.toISOString()}`} className="px-2 py-0.5">
-                {count > 0 && (
-                  <span className="text-[10px] text-muted-foreground/40 flex items-center gap-1">
-                    <Eye className="h-2.5 w-2.5" /> {count} oculta(s)
-                  </span>
-                )}
               </div>
             );
           })}
@@ -641,7 +616,7 @@ function HourlyDayView({ days, items, hiddenCounts, onDrop, onToggle, onClick, o
 
 /* ─── Hourly Weekly View ─── */
 
-function HourlyWeekView({ date, items, hiddenCounts, onDrop, onToggle, onClick, onNewEvent }: HourlyViewProps & { date: Date }) {
+function HourlyWeekView({ date, items, onDrop, onToggle, onClick, onNewEvent }: HourlyViewProps & { date: Date }) {
   const weekStart = startOfWeek(date, { locale: ptBR });
   const days = eachDayOfInterval({ start: weekStart, end: addDays(weekStart, 6) });
   const weekNum = getISOWeek(date);
@@ -713,7 +688,7 @@ function HourlyWeekView({ date, items, hiddenCounts, onDrop, onToggle, onClick, 
 
 /* ─── Monthly Grid ──────────────────────────────────── */
 
-function MonthlyGrid({ date, items, hiddenCounts, onDrop, onToggle, onClick, onNewEvent }: HourlyViewProps & { date: Date }) {
+function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent }: HourlyViewProps & { date: Date }) {
   const monthStart = startOfMonth(date);
   const monthEnd = endOfMonth(date);
   const calStart = startOfWeek(monthStart, { locale: ptBR });
@@ -741,7 +716,6 @@ function MonthlyGrid({ date, items, hiddenCounts, onDrop, onToggle, onClick, onN
               </div>
               {week.map((day) => {
                 const dayItems = items.filter((it) => isSameDay(new Date(it.start_time), day));
-                const hiddenCount = hiddenCounts?.[format(day, "yyyy-MM-dd")] || 0;
                 return (
                   <div
                     key={day.toISOString()}
@@ -772,11 +746,6 @@ function MonthlyGrid({ date, items, hiddenCounts, onDrop, onToggle, onClick, onN
                     <div className="mt-0.5 space-y-[1px]">
                       {dayItems.slice(0, 3).map((it) => <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />)}
                       {dayItems.length > 3 && <span className="block text-center text-xs text-muted-foreground">+{dayItems.length - 3}</span>}
-                      {hiddenCount > 0 && (
-                        <span className="flex items-center justify-center gap-0.5 text-[10px] text-muted-foreground/40">
-                          <Eye className="h-2.5 w-2.5" /> {hiddenCount}
-                        </span>
-                      )}
                     </div>
                   </div>
                 );

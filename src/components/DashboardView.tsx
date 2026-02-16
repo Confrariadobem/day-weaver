@@ -104,29 +104,11 @@ export default function DashboardView() {
   const activeProjects = projects.filter((p) => p.status === "active").length;
   const pendingTasks = totalTasks - completedTasks;
 
-  const yearOptions = [2024, 2025, 2026, 2027];
-
   return (
     <div className="h-full overflow-auto p-4">
-      {/* Header with year buttons */}
-      <div className="mb-4 flex items-center justify-between">
+      {/* Header */}
+      <div className="mb-4">
         <h1 className="text-xl font-bold">Dashboard</h1>
-        <div className="flex gap-1">
-          {yearOptions.map((y) => (
-            <button
-              key={y}
-              onClick={() => setYear(y)}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                year === y
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              )}
-            >
-              {y}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* KPI Cards */}
@@ -154,7 +136,7 @@ export default function DashboardView() {
             <Wallet className="h-5 w-5 text-primary" />
             <div>
               <p className="text-[10px] text-muted-foreground">Saldo</p>
-              <p className={cn("text-sm font-bold", totalBalance >= 0 ? "text-primary" : "text-destructive")}>
+              <p className={cn("text-sm font-bold", totalBalance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
                 R$ {totalBalance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </p>
             </div>

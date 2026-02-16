@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash } from "lucide-react";
+import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash, Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
@@ -45,8 +45,8 @@ type EventType = "birthday" | "event" | "cashflow" | "investment" | "project" | 
 
 const EVENT_TYPES: { value: EventType; label: string; icon: string; color: string }[] = [
   { value: "birthday", label: "Aniversário", icon: "🎂", color: "#ec4899" },
-  { value: "event", label: "Evento", icon: "📅", color: "#3b82f6" },
   { value: "cashflow", label: "Fluxo de caixa", icon: "💵", color: "#22c55e" },
+  { value: "event", label: "Evento", icon: "📅", color: "#3b82f6" },
   { value: "investment", label: "Investimento", icon: "📈", color: "#d4a017" },
   { value: "project", label: "Projeto", icon: "📁", color: "#eab308" },
   { value: "task", label: "Tarefa", icon: "☑️", color: "#f97316" },
@@ -74,20 +74,16 @@ const REMINDER_OPTIONS = [
   { value: "10080", label: "1 semana antes" },
 ];
 
-const COLORS = [
-  "#3b82f6", "#22c55e", "#ef4444", "#f59e0b", "#8b5cf6",
-  "#ec4899", "#06b6d4", "#f97316", "#d4a017", "#6b7280",
-];
-
 export default function EventEditDialog({ open, onOpenChange, item, defaultDate, userId, onSaved }: EventEditDialogProps) {
   const [eventType, setEventType] = useState<EventType>("event");
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [isFavorite, setIsFavorite] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
   const [allDay, setAllDay] = useState(true);
-  const [description, setDescription] = useState("");
   const [color, setColor] = useState("#3b82f6");
   const [recurrence, setRecurrence] = useState("none");
   const [recurrenceCount, setRecurrenceCount] = useState("12");
@@ -112,10 +108,11 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setDescription(item.description || "");
       setColor(item.color || "#3b82f6");
       setRecurrence(item.recurrence_rule || "none");
-      // Detect type from description
+      // Detect favorite
       const desc = item.description || "";
+      setIsFavorite(desc.includes("[favorito:true]") || !!item.is_favorite);
+      // Detect type from description
       if (desc.includes("[tipo:birthday]")) setEventType("birthday");
-      else if (desc.includes("[tipo:favorite]")) setEventType("event");
       else if (desc.includes("[tipo:cashflow]") || desc.includes("[tipo:bill]") || desc.includes("[tipo:receivable]")) setEventType("cashflow");
       else if (desc.includes("[tipo:investment]")) setEventType("investment");
       else if (desc.includes("[tipo:project]")) setEventType("project");
@@ -125,13 +122,14 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
     } else {
       const d = defaultDate || new Date();
       setTitle("");
+      setDescription("");
+      setIsFavorite(false);
       setStartDate(format(d, "yyyy-MM-dd"));
       setEndDate(format(d, "yyyy-MM-dd"));
       const h = d.getHours();
       setStartTime(h > 0 ? `${String(h).padStart(2, "0")}:00` : "09:00");
       setEndTime(h > 0 ? `${String(h + 1).padStart(2, "0")}:00` : "10:00");
       setAllDay(h === 0);
-      setDescription("");
       setColor("#3b82f6");
       setRecurrence("none");
       setRecurrenceCount("12");
@@ -144,6 +142,13 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
     }
   }, [item, defaultDate, open]);
 
+  // Clean description of meta tags for display
+  const cleanDescription = (desc: string) => {
+    return desc.replace(/\[tipo:\w+\]/g, "").replace(/\[lembrete:\w+\]/g, "").replace(/\[prioridade:\w+\]/g, "").replace(/\[valor:[\d.,]+\]/g, "").replace(/\[direcao:\w+\]/g, "").replace(/\[favorito:\w+\]/g, "").trim();
+  };
+
+  const displayDescription = item ? cleanDescription(description) : description;
+
   const handleSave = async () => {
     if (!title.trim()) return;
     const startDt = allDay
@@ -151,9 +156,12 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       : new Date(`${startDate}T${startTime}:00`);
     const endDt = allDay ? null : new Date(`${endDate || startDate}T${endTime}:00`);
 
+    const typeColor = EVENT_TYPES.find(t => t.value === eventType)?.color || "#3b82f6";
+
     const descWithMeta = [
-      description,
+      displayDescription,
       eventType !== "event" ? `[tipo:${eventType}]` : "",
+      isFavorite ? "[favorito:true]" : "",
       reminder !== "none" ? `[lembrete:${reminder}min]` : "",
       eventType === "task" ? `[prioridade:${priority}]` : "",
       (eventType === "cashflow" || eventType === "investment") && billAmount ? `[valor:${billAmount}]` : "",
@@ -164,19 +172,19 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       await supabase.from("calendar_events").update({
         title, start_time: startDt.toISOString(),
         end_time: endDt?.toISOString() || null,
-        all_day: allDay, description: descWithMeta, color,
+        all_day: allDay, description: descWithMeta, color: typeColor,
         recurrence_rule: recurrence === "none" ? null : recurrence,
       }).eq("id", item.id);
 
       if (item.task_id) {
-        await supabase.from("tasks").update({ title }).eq("id", item.task_id);
+        await supabase.from("tasks").update({ title, is_favorite: isFavorite }).eq("id", item.task_id);
       }
     } else {
       let taskId: string | null = null;
       if (eventType === "task") {
         const { data } = await supabase.from("tasks").insert({
-          user_id: userId, title, description,
-          scheduled_date: startDate, is_completed: false,
+          user_id: userId, title, description: displayDescription,
+          scheduled_date: startDate, is_completed: false, is_favorite: isFavorite,
         }).select("id").single();
         if (data) taskId = data.id;
       }
@@ -219,7 +227,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             title: `${title} (${i + 1}/${count})`,
             start_time: d.toISOString(),
             end_time: endDt ? (() => { const ed = new Date(d); ed.setHours(endDt.getHours(), endDt.getMinutes()); return ed.toISOString(); })() : null,
-            all_day: allDay, description: descWithMeta, color,
+            all_day: allDay, description: descWithMeta, color: typeColor,
             recurrence_rule: recurrence,
             task_id: i === 0 ? taskId : null,
           };
@@ -230,7 +238,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           user_id: userId, title,
           start_time: startDt.toISOString(),
           end_time: endDt?.toISOString() || null,
-          all_day: allDay, description: descWithMeta, color,
+          all_day: allDay, description: descWithMeta, color: typeColor,
           recurrence_rule: null, task_id: taskId,
         });
       }
@@ -254,29 +262,48 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
     if (t === "project") { setAllDay(true); }
   };
 
+  const getDialogTitle = () => {
+    const typeLabel = EVENT_TYPES.find(t => t.value === eventType)?.label || "item";
+    return item ? `Editar ${typeLabel.toLowerCase()}` : "Novo lançamento";
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base">
-            {item
-              ? `Editar ${EVENT_TYPES.find(t => t.value === eventType)?.label || "item"}`
-              : "Novo lançamento"}
-          </DialogTitle>
+          <DialogTitle className="text-base">{getDialogTitle()}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* ─── Common fields ─── */}
+          {/* ─── Title + Favorite star ─── */}
           <div>
             <Label className="text-sm">Título</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={
-              eventType === "birthday" ? "Nome do aniversariante" :
-              eventType === "cashflow" ? "Descrição do lançamento" :
-              eventType === "investment" ? "Nome do investimento" :
-              "Nome do evento ou tarefa"
-            } />
+            <div className="flex gap-2 items-center">
+              <Input className="flex-1" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={
+                eventType === "birthday" ? "Nome do aniversariante" :
+                eventType === "cashflow" ? "Descrição do lançamento" :
+                eventType === "investment" ? "Nome do investimento" :
+                "Nome do evento ou tarefa"
+              } />
+              <button
+                type="button"
+                onClick={() => setIsFavorite(!isFavorite)}
+                className="shrink-0 p-1 rounded hover:bg-accent/50 transition-colors"
+                title="Favoritar"
+              >
+                <Star className={cn("h-5 w-5", isFavorite ? "fill-warning text-warning" : "text-muted-foreground")} />
+              </button>
+            </div>
           </div>
 
+          {/* ─── Description right after title ─── */}
+          <div>
+            <Label className="text-sm">Descrição</Label>
+            <Textarea value={displayDescription} onChange={(e) => setDescription(e.target.value)}
+              placeholder="Opcional" rows={2} className="resize-none" />
+          </div>
+
+          {/* ─── Dates ─── */}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary-foreground" /> Data início</Label>
@@ -329,13 +356,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
               </div>
             </>
           )}
-
-          {/* ─── Description (moved here, below title) ─── */}
-          <div>
-            <Label className="text-sm">Descrição</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)}
-              placeholder="Opcional" rows={2} className="resize-none" />
-          </div>
 
           {/* ─── Type-specific fields ─── */}
 
