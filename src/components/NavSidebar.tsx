@@ -9,9 +9,11 @@ import {
   Settings,
   LogOut,
   Sparkles,
+  PlusCircle,
+  FolderKanban,
 } from "lucide-react";
 
-export type ModuleKey = "calendar" | "finances" | "dashboard" | "profile" | "preferences";
+export type ModuleKey = "calendar" | "finances" | "dashboard" | "profile" | "preferences" | "programs";
 
 interface NavItem {
   key: ModuleKey;
@@ -23,14 +25,16 @@ const topNavItems: NavItem[] = [
   { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
   { key: "calendar", label: "Calendário", icon: <CalendarDays className="h-5 w-5" /> },
   { key: "finances", label: "Finanças", icon: <Wallet className="h-5 w-5" /> },
+  { key: "programs", label: "Programas e Projetos", icon: <FolderKanban className="h-5 w-5" /> },
 ];
 
 interface NavSidebarProps {
   activeModule: ModuleKey;
   onModuleChange: (key: ModuleKey) => void;
+  onOpenCentral: () => void;
 }
 
-export default function NavSidebar({ activeModule, onModuleChange }: NavSidebarProps) {
+export default function NavSidebar({ activeModule, onModuleChange, onOpenCentral }: NavSidebarProps) {
   const { signOut } = useAuth();
 
   return (
@@ -62,6 +66,22 @@ export default function NavSidebar({ activeModule, onModuleChange }: NavSidebarP
             </TooltipContent>
           </Tooltip>
         ))}
+
+        {/* Central de Lançamentos button */}
+        <div className="my-2 h-px w-8 bg-border/40" />
+        <Tooltip delayDuration={200}>
+          <TooltipTrigger asChild>
+            <button
+              onClick={onOpenCentral}
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] transition-all duration-200 hover:bg-[hsl(var(--success))]/25 hover:shadow-md"
+            >
+              <PlusCircle className="h-5 w-5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8}>
+            Central de Lançamentos
+          </TooltipContent>
+        </Tooltip>
       </nav>
 
       {/* Bottom actions */}

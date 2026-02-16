@@ -350,10 +350,9 @@ export default function PreferencesView() {
                     { icon: "📅", label: "Evento", color: "#3b82f6", desc: "Compromissos e eventos gerais" },
                     { icon: "💵", label: "Fluxo de Caixa", color: "#22c55e", desc: "Contas a pagar e receber" },
                     { icon: "📈", label: "Investimento", color: "#d4a017", desc: "Aportes e resgates de investimentos" },
-                    { icon: "📁", label: "Projeto", color: "#eab308", desc: "Marcos e entregas de projetos" },
+                    { icon: "📁", label: "Projetos e Tarefas", color: "#eab308", desc: "Marcos e entregas de projetos" },
                     { icon: "☑️", label: "Tarefa", color: "#f97316", desc: "Tarefas com prazo e prioridade" },
                     { icon: "🏳️", label: "Feriado", color: "#6b7280", desc: "Feriados nacionais (automático)" },
-                    { icon: "⭐", label: "Favorito", color: "#eab308", desc: "Filtro para itens marcados como favoritos" },
                   ].map((type) => (
                     <div key={type.label} className="flex items-center gap-3 rounded-lg border border-border p-3">
                       <span className="text-lg shrink-0">{type.icon}</span>
@@ -376,27 +375,42 @@ export default function PreferencesView() {
                 <CardTitle className="flex items-center gap-2 text-base text-destructive">
                   <Trash2 className="h-4 w-4" /> Limpar Dados
                 </CardTitle>
-                <CardDescription>Apague todos os dados cadastrados e reinicie o sistema para novos testes.</CardDescription>
+                <CardDescription>Selecione os módulos que deseja limpar. Esta ação é irreversível.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <Button variant="destructive" onClick={async () => {
-                  if (!user) return;
-                  const confirmed = window.confirm("ATENÇÃO: Todos os seus dados (tarefas, eventos, projetos, finanças, categorias) serão apagados permanentemente. Deseja continuar?");
-                  if (!confirmed) return;
-                  await Promise.all([
-                    supabase.from("calendar_events").delete().eq("user_id", user.id),
-                    supabase.from("financial_entries").delete().eq("user_id", user.id),
-                    supabase.from("project_resources").delete().eq("user_id", user.id),
-                  ]);
-                  await supabase.from("tasks").delete().eq("user_id", user.id);
-                  await supabase.from("projects").delete().eq("user_id", user.id);
-                  await supabase.from("categories").delete().eq("user_id", user.id);
-                  await supabase.from("financial_accounts").delete().eq("user_id", user.id);
-                  toast({ title: "Dados apagados com sucesso!", description: "O sistema foi resetado." });
-                  fetchCategories();
-                }} className="gap-2">
-                  <Trash2 className="h-4 w-4" /> Limpar todos os dados
-                </Button>
+              <CardContent className="space-y-3">
+                {[
+                  { key: "calendar_events", label: "Calendário (Eventos)", icon: "📅" },
+                  { key: "categories", label: "Categorias", icon: "🏷️" },
+                  { key: "financial_accounts", label: "Carteira", icon: "💳" },
+                  { key: "financial_entries", label: "Fluxo de Caixa", icon: "💵" },
+                  { key: "projects", label: "Programas e Projetos", icon: "📁" },
+                  { key: "tasks", label: "Tarefas", icon: "☑️" },
+                ].sort((a, b) => a.label.localeCompare(b.label, "pt-BR")).map(mod => (
+                  <div key={mod.key} className="flex items-center justify-between rounded-lg border border-border p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{mod.icon}</span>
+                      <span className="text-sm font-medium">{mod.label}</span>
+                    </div>
+                    <Button variant="destructive" size="sm" className="h-7 text-xs gap-1" onClick={async () => {
+                      if (!user) return;
+                      const confirmed = window.confirm(`Tem certeza que deseja apagar todos os dados de "${mod.label}"? Esta ação não pode ser desfeita.`);
+                      if (!confirmed) return;
+                      if (mod.key === "projects") {
+                        await supabase.from("project_resources").delete().eq("user_id", user.id);
+                        await supabase.from("tasks").delete().eq("user_id", user.id).not("project_id", "is", null);
+                        await supabase.from("projects").delete().eq("user_id", user.id);
+                      } else if (mod.key === "tasks") {
+                        await supabase.from("tasks").delete().eq("user_id", user.id);
+                      } else {
+                        await supabase.from(mod.key as any).delete().eq("user_id", user.id);
+                      }
+                      toast({ title: `${mod.label} limpos com sucesso!` });
+                      fetchCategories();
+                    }}>
+                      <Trash2 className="h-3 w-3" /> Limpar
+                    </Button>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           </TabsContent>

@@ -366,8 +366,8 @@ export default function CalendarView() {
             ))}
           </div>
 
-          <Button variant="outline" size="sm" className="h-8 text-sm" onClick={() => openNew(currentDate)}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> Novo
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleToday} title="Hoje">
+            <CalendarDays className="h-4 w-4" />
           </Button>
 
           <Button

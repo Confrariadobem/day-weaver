@@ -33,7 +33,7 @@ import type { Tables as DBTables } from "@/integrations/supabase/types";
 type PeriodFilter = "daily" | "3days" | "weekly" | "monthly" | "yearly" | "custom";
 type SortField = "title" | "amount" | "entry_date" | "type" | "category" | "is_paid" | "balance";
 type SortDir = "asc" | "desc";
-type RecurrenceType = "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
+type RecurrenceType = "none" | "daily" | "weekly" | "biweekly" | "monthly" | "quarterly" | "semiannual" | "yearly";
 type RecurrenceDateMode = "same_date" | "first_business_day";
 type ViewTab = "indicadores" | "previsao" | "doar" | "contas";
 type AccountType = "bank_account" | "credit_card" | "investment" | "wallet" | "cash" | "crypto";
@@ -194,6 +194,8 @@ export default function FinancesView() {
       case "weekly": d = addWeeks(base, i); break;
       case "biweekly": d = addWeeks(base, i * 2); break;
       case "monthly": d = addMonths(base, i); break;
+      case "quarterly": d = addMonths(base, i * 3); break;
+      case "semiannual": d = addMonths(base, i * 6); break;
       case "yearly": d = addMonths(base, i * 12); break;
       default: d = new Date(base); break;
     }
@@ -733,6 +735,8 @@ export default function FinancesView() {
                   <SelectItem value="weekly">Semanal</SelectItem>
                   <SelectItem value="biweekly">Quinzenal</SelectItem>
                   <SelectItem value="monthly">Mensal</SelectItem>
+                  <SelectItem value="quarterly">Trimestral</SelectItem>
+                  <SelectItem value="semiannual">Semestral</SelectItem>
                   <SelectItem value="yearly">Anual</SelectItem>
                 </SelectContent>
               </Select>
@@ -945,9 +949,6 @@ export default function FinancesView() {
                   </>
                 )}
                 <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="h-7 text-xs rounded-full px-3"><Plus className="mr-1 h-3.5 w-3.5" /> Lançamento</Button>
-                  </DialogTrigger>
                   {renderEntryDialog()}
                 </Dialog>
               </div>
