@@ -173,11 +173,10 @@ export default function CalendarView() {
       const amount = Number(fe.amount || 0);
       const amountLabel = amount > 0 ? ` R$ ${amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "";
       const color = isInvestment ? "#a855f7" : isExpense ? "#ef4444" : "#22c55e";
-      const icon = isInvestment ? "📈" : isExpense ? "💸" : "💰";
-      const recIcon = fe.recurrence_type ? " 🔄" : "";
+      const recLabel = fe.recurrence_type ? " ↻" : "";
       items.push({
         id: `fin-${fe.id}`,
-        title: `${icon} ${fe.title}${amountLabel}${recIcon}`,
+        title: `${fe.title}${amountLabel}${recLabel}`,
         start_time: new Date(`${fe.entry_date}T00:00:00`).toISOString(),
         all_day: true,
         color,
@@ -200,7 +199,7 @@ export default function CalendarView() {
         while (nextDate <= endDate && idx < 60) {
           items.push({
             id: `fin-rec-${fe.id}-${idx}`,
-            title: `${icon} 🔄 ${fe.title}${amountLabel}`,
+            title: `↻ ${fe.title}${amountLabel}`,
             start_time: nextDate.toISOString(),
             all_day: true,
             color,
@@ -226,7 +225,7 @@ export default function CalendarView() {
         const amountLabel = amount > 0 ? ` R$ ${amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "";
         items.push({
           id: `inv-buy-${inv.id}`,
-          title: `📈 Aporte: ${inv.name}${inv.ticker ? ` (${inv.ticker})` : ""}${amountLabel}`,
+          title: `Aporte: ${inv.name}${inv.ticker ? ` (${inv.ticker})` : ""}${amountLabel}`,
           start_time: new Date(`${inv.purchase_date}T00:00:00`).toISOString(),
           all_day: true,
           color: "#a855f7",
@@ -241,7 +240,7 @@ export default function CalendarView() {
         const divLabel = ` R$ ${Number(inv.dividend_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
         items.push({
           id: `inv-div-${inv.id}`,
-          title: `💎 Dividendos ${inv.ticker || inv.name}${divLabel}`,
+          title: `Dividendos ${inv.ticker || inv.name}${divLabel}`,
           start_time: new Date(`${inv.next_dividend_date}T00:00:00`).toISOString(),
           all_day: true,
           color: "#a855f7",
@@ -262,7 +261,7 @@ export default function CalendarView() {
     yearsToCheck.forEach(yr => {
       getBrazilianHolidays(yr).forEach(h => {
         items.push({
-          id: `holiday-${h.name}-${yr}`, title: `🇧🇷 ${h.name}`,
+          id: `holiday-${h.name}-${yr}`, title: h.name,
           start_time: h.date.toISOString(),
           all_day: true, color: "#6b7280", description: "Feriado oficial do Brasil",
           user_id: user?.id || "", is_task: false, is_holiday: true,
@@ -960,21 +959,21 @@ function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick, 
                 <div className="flex gap-1.5 text-xs">
                   {holidayCount > 0 && (
                     <span
-                      className="text-muted-foreground cursor-pointer hover:underline"
+                      className="text-muted-foreground cursor-pointer hover:underline flex items-center gap-0.5"
                       onClick={(e) => { e.stopPropagation(); setListDialog({ open: true, title: `Feriados - ${format(month, "MMMM", { locale: ptBR })}`, items: monthItems.filter(it => it.is_holiday) }); }}
-                    >{holidayCount}🏳️</span>
+                    >{holidayCount}<Flag className="h-3 w-3" /></span>
                   )}
                   {eventCount > 0 && (
                     <span
-                      className="text-primary cursor-pointer hover:underline"
+                      className="text-primary cursor-pointer hover:underline flex items-center gap-0.5"
                       onClick={(e) => { e.stopPropagation(); setListDialog({ open: true, title: `Eventos - ${format(month, "MMMM", { locale: ptBR })}`, items: monthItems.filter(it => !it.is_task && !it.is_holiday) }); }}
-                    >{eventCount}📅</span>
+                    >{eventCount}<CalendarDays className="h-3 w-3" /></span>
                   )}
                   {taskCount > 0 && (
                     <span
-                      className="text-orange-500 cursor-pointer hover:underline"
+                      className="text-orange-500 cursor-pointer hover:underline flex items-center gap-0.5"
                       onClick={(e) => { e.stopPropagation(); setListDialog({ open: true, title: `Tarefas - ${format(month, "MMMM", { locale: ptBR })}`, items: monthItems.filter(it => it.is_task) }); }}
-                    >{taskCount}☑️</span>
+                    >{taskCount}<CheckSquare className="h-3 w-3" /></span>
                   )}
                 </div>
               </div>

@@ -61,6 +61,13 @@ export default function InvestmentsView() {
   const [investmentEntries, setInvestmentEntries] = useState<any[]>([]);
   const [showPaidEntries, setShowPaidEntries] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
+  const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
+  const [entrySortField, setEntrySortField] = useState<string>("entry_date");
+
+  const handleEntryEdit = (entry: any) => {
+    // Open aporte dialog for editing - placeholder for future
+    setAporteDialogOpen(true);
+  };
 
   // Form state
   const [formStep, setFormStep] = useState(0);
@@ -367,9 +374,14 @@ export default function InvestmentsView() {
         <div className="p-4 space-y-4">
           {/* ── Financial entries list (like Finanças module) ── */}
           <div>
-            <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-              <BadgeDollarSign className="h-4 w-4 text-primary" /> Lançamentos de Investimentos
-            </p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold flex items-center gap-1.5">
+                <BadgeDollarSign className="h-4 w-4 text-primary" /> Lançamentos de Investimentos
+              </p>
+              <span className="text-[10px] text-muted-foreground">
+                {filteredEntries.length} lançamento{filteredEntries.length !== 1 ? "s" : ""}
+              </span>
+            </div>
             {pendingEntries.length === 0 && paidEntries.length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">
                 <BadgeDollarSign className="h-8 w-8 mx-auto mb-2 opacity-20" />
@@ -377,12 +389,13 @@ export default function InvestmentsView() {
                 <p className="text-[10px] mt-1">Use a Central de Lançamentos para registrar aportes.</p>
               </div>
             ) : (
-              <div className="rounded-lg overflow-hidden">
+              <div className="rounded-lg overflow-hidden border border-border/20">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
+                    <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20 bg-muted/30">
                       <th className="text-left py-2 px-2">Data</th>
                       <th className="text-left py-2 px-2">Título</th>
+                      <th className="text-left py-2 px-2">Tipo</th>
                       <th className="text-left py-2 px-2">Categoria</th>
                       <th className="text-right py-2 px-2">Valor</th>
                       <th className="text-center py-2 px-2">Status</th>
@@ -404,6 +417,9 @@ export default function InvestmentsView() {
                           <td className="py-2 px-2 text-xs font-medium truncate max-w-[200px]">
                             {e.title}
                             {inv && <span className="text-[10px] text-muted-foreground ml-1">({inv.ticker || inv.name})</span>}
+                          </td>
+                          <td className="py-2 px-2 text-xs text-muted-foreground">
+                            {e.type === "investment" ? "Aporte" : e.type === "revenue" ? "Receita" : "Despesa"}
                           </td>
                           <td className="py-2 px-2 text-xs text-muted-foreground">{cat?.name || "—"}</td>
                           <td className={cn("py-2 px-2 text-xs text-right font-medium",
@@ -445,6 +461,9 @@ export default function InvestmentsView() {
                                 <td className="py-2 px-2 text-xs font-medium truncate max-w-[200px]">
                                   {e.title}
                                   {inv && <span className="text-[10px] text-muted-foreground ml-1">({inv.ticker || inv.name})</span>}
+                                </td>
+                                <td className="py-2 px-2 text-xs text-muted-foreground">
+                                  {e.type === "investment" ? "Aporte" : e.type === "revenue" ? "Receita" : "Despesa"}
                                 </td>
                                 <td className="py-2 px-2 text-xs text-muted-foreground">{cat?.name || "—"}</td>
                                 <td className={cn("py-2 px-2 text-xs text-right font-medium",

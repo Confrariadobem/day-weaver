@@ -100,11 +100,15 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const [color, setColor] = useState("#3b82f6");
   const [recurrence, setRecurrence] = useState("none");
   const [recurrenceCount, setRecurrenceCount] = useState("12");
+  const [recurrenceIndeterminate, setRecurrenceIndeterminate] = useState(true);
   const [recurrenceDateMode, setRecurrenceDateMode] = useState<RecurrenceDateMode>("same_date");
   const [reminder, setReminder] = useState("none");
   const [priority, setPriority] = useState("medium");
   const [billAmount, setBillAmount] = useState("");
   const [cashflowDirection, setCashflowDirection] = useState<"expense" | "revenue">("expense");
+
+  // Delete recurring confirmation
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // Primary group fields
   const [categoryId, setCategoryId] = useState("");
@@ -293,9 +297,10 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         if (amount > 0) {
           const numInst = Math.max(1, parseInt(installments) || 1);
           const instGroup = numInst > 1 ? crypto.randomUUID() : null;
+          const effectiveCount = recurrence !== "none" ? (recurrenceIndeterminate ? 120 : Math.max(1, parseInt(recurrenceCount) || 12)) : numInst;
 
           if (recurrence !== "none") {
-            const count = Math.max(1, parseInt(recurrenceCount) || 12);
+            const count = effectiveCount;
             const group = crypto.randomUUID();
             const entriesToInsert = Array.from({ length: count }, (_, i) => {
               const d = new Date(startDt);
@@ -341,9 +346,46 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         }
       }
 
+      // For investment, create a financial entry with type "investment"
+      if (eventType === "investment" && billAmount) {
+        const amount = parseFloat(billAmount.replace(/\./g, "").replace(",", ".")) || 0;
+        if (amount > 0) {
+          const effectiveCount = recurrence !== "none" ? (recurrenceIndeterminate ? 120 : Math.max(1, parseInt(recurrenceCount) || 12)) : 1;
+
+          if (recurrence !== "none") {
+            const group = crypto.randomUUID();
+            const entriesToInsert = Array.from({ length: effectiveCount }, (_, i) => {
+              const d = new Date(startDt);
+              if (recurrence === "FREQ=DAILY") d.setDate(d.getDate() + i);
+              else if (recurrence === "FREQ=WEEKLY") d.setDate(d.getDate() + i * 7);
+              else if (recurrence === "FREQ=BIWEEKLY") d.setDate(d.getDate() + i * 14);
+              else if (recurrence === "FREQ=MONTHLY") d.setMonth(d.getMonth() + i);
+              else if (recurrence === "FREQ=QUARTERLY") d.setMonth(d.getMonth() + i * 3);
+              else if (recurrence === "FREQ=SEMIANNUAL") d.setMonth(d.getMonth() + i * 6);
+              else if (recurrence === "FREQ=YEARLY") d.setFullYear(d.getFullYear() + i);
+              return {
+                user_id: userId, title: `${title} (${i + 1}/${effectiveCount})`,
+                amount, type: "investment" as const,
+                category_id: categoryId || null, project_id: projectId || null,
+                entry_date: format(d, "yyyy-MM-dd"),
+                installment_group: group, installment_number: i + 1, total_installments: effectiveCount,
+                is_paid: false,
+              };
+            });
+            await supabase.from("financial_entries").insert(entriesToInsert);
+          } else {
+            await supabase.from("financial_entries").insert({
+              user_id: userId, title, amount, type: "investment",
+              category_id: categoryId || null, project_id: projectId || null,
+              entry_date: format(startDt, "yyyy-MM-dd"), is_paid: false,
+            });
+          }
+        }
+      }
+
       // Create calendar events
       if (recurrence !== "none") {
-        const count = Math.max(1, parseInt(recurrenceCount) || 12);
+        const count = recurrenceIndeterminate ? 120 : Math.max(1, parseInt(recurrenceCount) || 12);
         const events = Array.from({ length: count }, (_, i) => {
           const d = new Date(startDt);
           if (recurrence === "FREQ=DAILY") d.setDate(d.getDate() + i);
@@ -397,7 +439,44 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
   const handleDelete = async () => {
     if (!item) return;
+    // If it's a recurring event, show confirmation dialog
+    if (item.recurrence_rule) {
+      setDeleteConfirmOpen(true);
+      return;
+    }
     await supabase.from("calendar_events").delete().eq("id", item.id);
+    onSaved();
+    onOpenChange(false);
+  };
+
+  const handleDeleteSingle = async () => {
+    if (!item) return;
+    await supabase.from("calendar_events").delete().eq("id", item.id);
+    setDeleteConfirmOpen(false);
+    onSaved();
+    onOpenChange(false);
+  };
+
+  const handleDeleteAll = async () => {
+    if (!item) return;
+    // Delete all events with the same recurrence_rule and base title
+    const baseTitle = item.title.replace(/\s*\(\d+\/\d+\)$/, "").trim();
+    const { data: allEvents } = await supabase.from("calendar_events")
+      .select("id, title, recurrence_rule")
+      .eq("user_id", item.user_id)
+      .eq("recurrence_rule", item.recurrence_rule!);
+    if (allEvents) {
+      const matching = allEvents.filter(e => e.title.replace(/\s*\(\d+\/\d+\)$/, "").trim() === baseTitle);
+      const ids = matching.map(e => e.id);
+      if (ids.length > 0) {
+        await supabase.from("calendar_events").delete().in("id", ids);
+      }
+    }
+    // Also delete related financial entries
+    await supabase.from("financial_entries").delete()
+      .eq("user_id", item.user_id)
+      .like("title", `${baseTitle}%`);
+    setDeleteConfirmOpen(false);
     onSaved();
     onOpenChange(false);
   };
@@ -416,6 +495,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -656,10 +736,20 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
                 {recurrence !== "none" && !item && (
                   <>
-                    <div>
-                      <Label className="text-sm flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Quantidade de ocorrências</Label>
-                      <Input type="number" min="1" max="365" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} />
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={recurrenceIndeterminate}
+                        onCheckedChange={(c) => setRecurrenceIndeterminate(!!c)}
+                        id="rec-indeterminate"
+                      />
+                      <Label htmlFor="rec-indeterminate" className="text-sm">Indeterminada</Label>
                     </div>
+                    {!recurrenceIndeterminate && (
+                      <div>
+                        <Label className="text-sm flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Qtde. parcelas</Label>
+                        <Input type="number" min="1" max="365" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} />
+                      </div>
+                    )}
                     {(recurrence === "FREQ=MONTHLY" || recurrence === "FREQ=QUARTERLY" || recurrence === "FREQ=SEMIANNUAL") && (
                       <div>
                         <Label className="text-sm">Repetir na:</Label>
@@ -709,5 +799,29 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Delete recurring event confirmation */}
+    <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Excluir evento recorrente</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Este evento faz parte de uma série recorrente. O que deseja excluir?
+        </p>
+        <div className="flex flex-col gap-2 pt-3 border-t border-border/20">
+          <Button variant="outline" size="sm" onClick={handleDeleteSingle}>
+            Apenas este evento
+          </Button>
+          <Button variant="destructive" size="sm" onClick={handleDeleteAll}>
+            Todos os eventos da série (passados e futuros)
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(false)}>
+            Cancelar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
