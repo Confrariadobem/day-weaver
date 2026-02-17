@@ -184,6 +184,29 @@ export default function InvestmentsView() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      {/* Type filter buttons - Patrimônio pattern */}
+      <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/30 overflow-x-auto">
+        <Button size="sm"
+          variant={filterType === "all" ? "default" : "ghost"}
+          className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterType !== "all" && "text-muted-foreground")}
+          onClick={() => setFilterType("all")}
+        >Todos</Button>
+        {INVESTMENT_TYPES.map(t => (
+          <Button key={t.value} size="sm"
+            variant={filterType === t.value ? "default" : "ghost"}
+            className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterType !== t.value && "text-muted-foreground")}
+            onClick={() => setFilterType(t.value)}
+          >
+            {t.icon} {t.label}
+          </Button>
+        ))}
+        <div className="ml-auto relative">
+          <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+          <Input placeholder="Buscar ativo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-7 pl-8 text-xs w-40" />
+        </div>
+      </div>
+
       {/* KPI Cards - Patrimônio pattern */}
       <div className="p-4 border-b border-border/30 space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -296,22 +319,6 @@ export default function InvestmentsView() {
             </CardContent>
           </Card>
         </div>
-      </div>
-
-      {/* Search + Filters + Add */}
-      <div className="flex items-center gap-2 p-3 border-b border-border/30">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input placeholder="Buscar ativo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8 pl-8 text-xs" />
-        </div>
-        <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {INVESTMENT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Investment Cards Grid */}

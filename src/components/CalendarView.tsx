@@ -16,7 +16,7 @@ import {
   startOfYear, endOfYear, differenceInDays,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, MoreVertical, Search, CalendarDays, Calculator, Timer, Star } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, MoreVertical, Search, CalendarDays, Calculator, Timer, Star, Cake, Flag, CircleDollarSign, TrendingUp, FolderKanban, CheckSquare } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
 
@@ -126,7 +126,9 @@ export default function CalendarView() {
       .on("postgres_changes", { event: "*", schema: "public", table: "investments", filter: `user_id=eq.${user.id}` }, fetchData)
       .on("postgres_changes", { event: "*", schema: "public", table: "financial_entries", filter: `user_id=eq.${user.id}` }, fetchData)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    const handleDataChanged = () => fetchData();
+    window.addEventListener("lovable:data-changed", handleDataChanged);
+    return () => { supabase.removeChannel(ch); window.removeEventListener("lovable:data-changed", handleDataChanged); };
   }, [user, fetchData]);
 
   const calendarItems = useMemo(() => {
@@ -403,14 +405,14 @@ export default function CalendarView() {
     return getFinancialSummary(start, end);
   }, [currentDate, viewMode, getFinancialSummary]);
 
-  const FILTER_OPTIONS: { key: CalendarFilter; label: string; color: string; icon: string }[] = [
-    { key: "birthdays", label: "Aniversários", color: "#ec4899", icon: "🎂" },
-    { key: "events", label: "Eventos", color: "#3b82f6", icon: "📅" },
-    { key: "holidays", label: "Feriados", color: "#6b7280", icon: "🏳️" },
-    { key: "cashflow", label: "Fluxo de caixa", color: "#22c55e", icon: "💵" },
-    { key: "investments", label: "Investimentos", color: "#d4a017", icon: "📈" },
-    { key: "projects", label: "Projetos", color: "#eab308", icon: "📁" },
-    { key: "tasks", label: "Tarefas", color: "#f97316", icon: "☑️" },
+  const FILTER_OPTIONS: { key: CalendarFilter; label: string; color: string; icon: React.ReactNode }[] = [
+    { key: "birthdays", label: "Aniversários", color: "#ec4899", icon: <Cake className="h-3 w-3" /> },
+    { key: "events", label: "Eventos", color: "#3b82f6", icon: <CalendarDays className="h-3 w-3" /> },
+    { key: "holidays", label: "Feriados", color: "#6b7280", icon: <Flag className="h-3 w-3" /> },
+    { key: "cashflow", label: "Fluxo de caixa", color: "#22c55e", icon: <CircleDollarSign className="h-3 w-3" /> },
+    { key: "investments", label: "Investimentos", color: "#d4a017", icon: <TrendingUp className="h-3 w-3" /> },
+    { key: "projects", label: "Projetos", color: "#eab308", icon: <FolderKanban className="h-3 w-3" /> },
+    { key: "tasks", label: "Tarefas", color: "#f97316", icon: <CheckSquare className="h-3 w-3" /> },
   ];
 
   const searchResults = useMemo(() => {
@@ -526,7 +528,7 @@ export default function CalendarView() {
               className="h-3.5 w-3.5"
               style={{ borderColor: f.color, ...(activeFilters.includes(f.key) ? { backgroundColor: f.color } : {}) }}
             />
-            <span className="text-muted-foreground whitespace-nowrap">{f.icon && <span className="mr-0.5">{f.icon}</span>}{f.label}</span>
+            <span className="text-muted-foreground whitespace-nowrap flex items-center gap-1">{f.icon}{f.label}</span>
           </label>
         ))}
       </div>

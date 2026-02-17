@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Moon, Sun, Save, Globe, CalendarDays, Tag, Plus, Edit2, Trash2 } from "lucide-react";
+import { Moon, Sun, Save, Globe, CalendarDays, Tag, Plus, Edit2, Trash2, Cake, CircleDollarSign, TrendingUp, FolderKanban, Flag, CheckSquare, Briefcase, Home, Car, Utensils, Pill, BookOpen, Gamepad2, Plane, Gift, PiggyBank, BarChart3, ShoppingCart, Target, Zap, Wrench, Smartphone, Music, Dumbbell, Clapperboard, Shirt, Dog, Sprout, Coffee, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const LANGUAGES = [
@@ -75,6 +75,24 @@ const CATEGORY_ICONS = [
   "💰", "📊", "🛒", "🎯", "⚡", "🔧", "📱", "🎵", "🏋️",
   "🎬", "👕", "🐶", "🌱", "☕", "🎁",
 ];
+
+const LAUNCH_TYPE_ICONS: Record<string, React.ReactNode> = {
+  "Aniversário": <Cake className="h-4 w-4" />,
+  "Evento": <CalendarDays className="h-4 w-4" />,
+  "Fluxo de Caixa": <CircleDollarSign className="h-4 w-4" />,
+  "Investimento": <TrendingUp className="h-4 w-4" />,
+  "Projetos": <FolderKanban className="h-4 w-4" />,
+  "Feriado": <Flag className="h-4 w-4" />,
+};
+
+const DATA_MODULE_ICONS: Record<string, React.ReactNode> = {
+  "calendar_events": <CalendarDays className="h-4 w-4" />,
+  "categories": <Tag className="h-4 w-4" />,
+  "financial_accounts": <PiggyBank className="h-4 w-4" />,
+  "financial_entries": <CircleDollarSign className="h-4 w-4" />,
+  "projects": <FolderKanban className="h-4 w-4" />,
+  "tasks": <CheckSquare className="h-4 w-4" />,
+};
 
 export default function PreferencesView() {
   const { user } = useAuth();
@@ -345,17 +363,16 @@ export default function PreferencesView() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {[
-                    { icon: "🎂", label: "Aniversário", color: "#ec4899", desc: "Datas de aniversário com recorrência anual" },
-                    { icon: "📅", label: "Evento", color: "#3b82f6", desc: "Compromissos e eventos gerais" },
-                    { icon: "💵", label: "Fluxo de Caixa", color: "#22c55e", desc: "Contas a pagar e receber" },
-                    { icon: "📈", label: "Investimento", color: "#d4a017", desc: "Aportes e resgates de investimentos" },
-                    { icon: "📁", label: "Projetos e Tarefas", color: "#eab308", desc: "Marcos e entregas de projetos" },
-                    { icon: "☑️", label: "Tarefa", color: "#f97316", desc: "Tarefas com prazo e prioridade" },
-                    { icon: "🏳️", label: "Feriado", color: "#6b7280", desc: "Feriados nacionais (automático)" },
+                {[
+                    { label: "Aniversário", color: "#ec4899", desc: "Datas de aniversário com recorrência anual" },
+                    { label: "Evento", color: "#3b82f6", desc: "Compromissos e eventos gerais" },
+                    { label: "Fluxo de Caixa", color: "#22c55e", desc: "Contas a pagar e receber" },
+                    { label: "Investimento", color: "#d4a017", desc: "Aportes e resgates de investimentos" },
+                    { label: "Projetos", color: "#eab308", desc: "Marcos e entregas de projetos" },
+                    { label: "Feriado", color: "#6b7280", desc: "Feriados nacionais (automático)" },
                   ].map((type) => (
                     <div key={type.label} className="flex items-center gap-3 rounded-lg border border-border p-3">
-                      <span className="text-lg shrink-0">{type.icon}</span>
+                      <span className="text-primary shrink-0">{LAUNCH_TYPE_ICONS[type.label]}</span>
                       <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: type.color }} />
                       <div className="flex-1 min-w-0">
                         <span className="font-medium">{type.label}</span>
@@ -379,16 +396,16 @@ export default function PreferencesView() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
-                  { key: "calendar_events", label: "Calendário (Eventos)", icon: "📅" },
-                  { key: "categories", label: "Categorias", icon: "🏷️" },
-                  { key: "financial_accounts", label: "Carteira", icon: "💳" },
-                  { key: "financial_entries", label: "Fluxo de Caixa", icon: "💵" },
-                  { key: "projects", label: "Programas e Projetos", icon: "📁" },
-                  { key: "tasks", label: "Tarefas", icon: "☑️" },
+                  { key: "calendar_events", label: "Calendário (Eventos)" },
+                  { key: "categories", label: "Categorias" },
+                  { key: "financial_accounts", label: "Carteira" },
+                  { key: "financial_entries", label: "Fluxo de Caixa" },
+                  { key: "projects", label: "Projetos" },
+                  { key: "tasks", label: "Tarefas" },
                 ].sort((a, b) => a.label.localeCompare(b.label, "pt-BR")).map(mod => (
                   <div key={mod.key} className="flex items-center justify-between rounded-lg border border-border p-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{mod.icon}</span>
+                      <span className="text-primary">{DATA_MODULE_ICONS[mod.key]}</span>
                       <span className="text-sm font-medium">{mod.label}</span>
                     </div>
                     <Button variant="destructive" size="sm" className="h-7 text-xs gap-1" onClick={async () => {

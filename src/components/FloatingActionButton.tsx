@@ -24,8 +24,16 @@ interface FloatingActionButtonProps {
 export default function FloatingActionButton({ activeModule }: FloatingActionButtonProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const defaultEventType = activeModule ? MODULE_TO_EVENT_TYPE[activeModule] : undefined;
+
+  const handleSaved = () => {
+    // Force a page-level re-render by dispatching a custom event
+    // that all views can listen to, or use window reload as fallback
+    window.dispatchEvent(new CustomEvent("lovable:data-changed"));
+    setRefreshKey(k => k + 1);
+  };
 
   return (
     <>
@@ -51,12 +59,13 @@ export default function FloatingActionButton({ activeModule }: FloatingActionBut
       </Tooltip>
 
       <EventEditDialog
+        key={refreshKey}
         open={open}
         onOpenChange={setOpen}
         item={null}
         defaultDate={new Date()}
         userId={user?.id || ""}
-        onSaved={() => {}}
+        onSaved={handleSaved}
         defaultEventType={defaultEventType}
       />
     </>
