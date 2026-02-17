@@ -25,7 +25,7 @@ interface NavItem {
 const topNavItems: NavItem[] = [
   { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
   { key: "calendar", label: "Calendário", icon: <CalendarDays className="h-5 w-5" /> },
-  { key: "finances", label: "Finanças", icon: <CircleDollarSign className="h-5 w-5" /> },
+  { key: "finances", label: "Finanças", icon: <CircleDollarSign className="h-6 w-6" /> },
   { key: "programs", label: "Projetos", icon: <FolderKanban className="h-5 w-5" /> },
   { key: "investments", label: "Investimentos", icon: <TrendingUp className="h-5 w-5" /> },
   { key: "patrimonio", label: "Patrimônio", icon: <Building2 className="h-5 w-5" /> },

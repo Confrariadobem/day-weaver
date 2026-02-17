@@ -316,16 +316,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         }).select("id").single();
         if (data) taskId = data.id;
 
-        // Also create the project if projectId is empty (new project from central)
-        if (!projectId && title.trim()) {
-          const { data: projData } = await supabase.from("projects").insert({
-            user_id: userId, name: title.trim(), description: displayDescription || null,
-            status: "active", category_id: categoryId || null,
-          }).select("id").single();
-          if (projData && taskId) {
-            await supabase.from("tasks").update({ project_id: projData.id }).eq("id", taskId);
-          }
-        }
+        // Project association is handled via the projectId field selection
       }
 
       // For cashflow, create a financial entry with all fields
@@ -334,7 +325,9 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         if (amount > 0) {
           const numInst = Math.max(1, parseInt(installments) || 1);
           const instGroup = numInst > 1 ? crypto.randomUUID() : null;
-          const effectiveCount = recurrence !== "none" ? (recurrenceIndeterminate ? 120 : Math.max(1, parseInt(recurrenceCount) || 12)) : numInst;
+          // Limit indeterminate recurrence to Dec 31 of current year
+          const maxDateLimit = new Date(startDt.getFullYear(), 11, 31);
+          const effectiveCount = recurrence !== "none" ? (recurrenceIndeterminate ? 999 : Math.max(1, parseInt(recurrenceCount) || 12)) : numInst;
 
           if (recurrence !== "none") {
             const count = effectiveCount;
@@ -352,17 +345,20 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 d.setDate(1);
                 while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
               }
+              // Stop if past Dec 31 for indeterminate recurrence
+              if (recurrenceIndeterminate && d > maxDateLimit) return null;
               return {
-                user_id: userId, title: `${title} (${i + 1}/${count})`,
+                user_id: userId, title: recurrenceIndeterminate ? title : `${title} (${i + 1}/${count})`,
                 amount, type: cashflowDirection,
                 category_id: categoryId || null, project_id: projectId || null,
                 entry_date: format(d, "yyyy-MM-dd"),
-                installment_group: group, installment_number: i + 1, total_installments: count,
+                installment_group: group, installment_number: i + 1, total_installments: recurrenceIndeterminate ? 0 : count,
                 account_id: accountId || null, payment_method: paymentMethod || null,
                 is_paid: i === 0 ? isPaid : false,
+                recurrence_type: recurrence.replace("FREQ=", "").toLowerCase(),
               };
-            });
-            await supabase.from("financial_entries").insert(entriesToInsert);
+            }).filter(Boolean);
+            await supabase.from("financial_entries").insert(entriesToInsert as any[]);
           } else {
             const entriesToInsert = Array.from({ length: numInst }, (_, i) => {
               const d = new Date(startDt);
@@ -387,7 +383,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       if (eventType === "investment" && billAmount) {
         const amount = parseFloat(billAmount.replace(/\./g, "").replace(",", ".")) || 0;
         if (amount > 0) {
-          const effectiveCount = recurrence !== "none" ? (recurrenceIndeterminate ? 120 : Math.max(1, parseInt(recurrenceCount) || 12)) : 1;
+          const maxDateLimitInv = new Date(startDt.getFullYear(), 11, 31);
+          const effectiveCount = recurrence !== "none" ? (recurrenceIndeterminate ? 999 : Math.max(1, parseInt(recurrenceCount) || 12)) : 1;
 
           if (recurrence !== "none") {
             const group = crypto.randomUUID();
@@ -400,16 +397,17 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
               else if (recurrence === "FREQ=QUARTERLY") d.setMonth(d.getMonth() + i * 3);
               else if (recurrence === "FREQ=SEMIANNUAL") d.setMonth(d.getMonth() + i * 6);
               else if (recurrence === "FREQ=YEARLY") d.setFullYear(d.getFullYear() + i);
+              if (recurrenceIndeterminate && d > maxDateLimitInv) return null;
               return {
-                user_id: userId, title: `${title} (${i + 1}/${effectiveCount})`,
+                user_id: userId, title: recurrenceIndeterminate ? title : `${title} (${i + 1}/${effectiveCount})`,
                 amount, type: "investment" as const,
                 category_id: categoryId || null, project_id: projectId || null,
                 entry_date: format(d, "yyyy-MM-dd"),
-                installment_group: group, installment_number: i + 1, total_installments: effectiveCount,
+                installment_group: group, installment_number: i + 1, total_installments: recurrenceIndeterminate ? 0 : effectiveCount,
                 is_paid: false,
               };
-            });
-            await supabase.from("financial_entries").insert(entriesToInsert);
+            }).filter(Boolean);
+            await supabase.from("financial_entries").insert(entriesToInsert as any[]);
           } else {
             await supabase.from("financial_entries").insert({
               user_id: userId, title, amount, type: "investment",
@@ -422,7 +420,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
       // Create calendar events
       if (recurrence !== "none") {
-        const count = recurrenceIndeterminate ? 120 : Math.max(1, parseInt(recurrenceCount) || 12);
+        const calMaxDate = new Date(startDt.getFullYear(), 11, 31);
+        const count = recurrenceIndeterminate ? 999 : Math.max(1, parseInt(recurrenceCount) || 12);
         const events = Array.from({ length: count }, (_, i) => {
           const d = new Date(startDt);
           if (recurrence === "FREQ=DAILY") d.setDate(d.getDate() + i);
@@ -436,17 +435,18 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             d.setDate(1);
             while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
           }
+          if (recurrenceIndeterminate && d > calMaxDate) return null;
           return {
             user_id: userId,
-            title: `${title} (${i + 1}/${count})`,
+            title: recurrenceIndeterminate ? title : `${title} (${i + 1}/${count})`,
             start_time: d.toISOString(),
             end_time: endDt ? (() => { const ed = new Date(d); ed.setHours(endDt.getHours(), endDt.getMinutes()); return ed.toISOString(); })() : null,
             all_day: allDay, description: descWithMeta, color: typeColor,
             recurrence_rule: recurrence,
             task_id: i === 0 ? taskId : null,
           };
-        });
-        await supabase.from("calendar_events").insert(events);
+        }).filter(Boolean);
+        await supabase.from("calendar_events").insert(events as any[]);
       } else {
         await supabase.from("calendar_events").insert({
           user_id: userId, title,
@@ -679,7 +679,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           )}
 
           {/* ─── TERTIARY GROUP: Type-specific fields ─── */}
-          {(item || eventType !== "event" || title.trim()) && (
+          {(item || true) && (
             <>
               {/* Cashflow: direction + amount + payment fields */}
               {eventType === "cashflow" && (
