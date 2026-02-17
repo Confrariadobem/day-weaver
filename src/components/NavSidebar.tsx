@@ -11,9 +11,10 @@ import {
   Sparkles,
   FolderKanban,
   TrendingUp,
+  Building2,
 } from "lucide-react";
 
-export type ModuleKey = "calendar" | "finances" | "dashboard" | "profile" | "preferences" | "programs" | "investments";
+export type ModuleKey = "calendar" | "finances" | "dashboard" | "profile" | "preferences" | "programs" | "investments" | "patrimonio";
 
 interface NavItem {
   key: ModuleKey;
@@ -27,6 +28,7 @@ const topNavItems: NavItem[] = [
   { key: "finances", label: "Finanças", icon: <Wallet className="h-5 w-5" /> },
   { key: "programs", label: "Projetos", icon: <FolderKanban className="h-5 w-5" /> },
   { key: "investments", label: "Investimentos", icon: <TrendingUp className="h-5 w-5" /> },
+  { key: "patrimonio", label: "Patrimônio", icon: <Building2 className="h-5 w-5" /> },
 ];
 
 interface NavSidebarProps {

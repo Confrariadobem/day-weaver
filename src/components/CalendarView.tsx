@@ -21,7 +21,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
 
 type ViewMode = "today" | "3days" | "weekly" | "monthly" | "yearly";
-type CalendarFilter = "all" | "birthdays" | "events" | "holidays" | "cashflow" | "investments" | "projects" | "tasks";
+type CalendarFilter = "birthdays" | "events" | "holidays" | "cashflow" | "investments" | "projects" | "tasks";
 
 // Brazilian official holidays (fixed + calculated)
 function getBrazilianHolidays(year: number): { date: Date; name: string }[] {
@@ -96,7 +96,7 @@ export default function CalendarView() {
   const [calcDateOpen, setCalcDateOpen] = useState(false);
   const [calcFrom, setCalcFrom] = useState(format(new Date(), "yyyy-MM-dd"));
   const [calcTo, setCalcTo] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [activeFilters, setActiveFilters] = useState<CalendarFilter[]>(["all"]);
+  const [activeFilters, setActiveFilters] = useState<CalendarFilter[]>(["birthdays", "events", "holidays", "cashflow", "investments", "projects", "tasks"]);
   const [countdownOpen, setCountdownOpen] = useState(false);
   const [countdownName, setCountdownName] = useState("");
   const [countdownDate, setCountdownDate] = useState("");
@@ -280,25 +280,19 @@ export default function CalendarView() {
   }, [events, tasks, entries, investments, currentDate, user]);
 
   const toggleFilter = (f: CalendarFilter) => {
-    if (f === "all") {
-      setActiveFilters(["all"]);
-    } else {
-      setActiveFilters(prev => {
-        const without = prev.filter(x => x !== "all");
-        const has = without.includes(f);
-        const next = has ? without.filter(x => x !== f) : [...without, f];
-        return next.length === 0 ? ["all"] : next;
-      });
-    }
+    setActiveFilters(prev => {
+      const has = prev.includes(f);
+      const next = has ? prev.filter(x => x !== f) : [...prev, f];
+      return next;
+    });
   };
 
   const filteredItems = useMemo(() => {
     let result = calendarItems.filter(it => !it.is_completed);
-    // Favorite filter
     if (favoriteFilter) {
       result = result.filter(it => it.is_favorite);
     }
-    if (activeFilters.includes("all")) return result;
+    if (activeFilters.length === 0) return result;
     return result.filter(it => {
       if (activeFilters.includes("birthdays") && it.is_birthday) return true;
       if (activeFilters.includes("events") && !it.is_task && !it.is_holiday && !it.is_birthday && !it.is_cashflow && !it.is_investment && !it.is_project) return true;
@@ -410,7 +404,6 @@ export default function CalendarView() {
   }, [currentDate, viewMode, getFinancialSummary]);
 
   const FILTER_OPTIONS: { key: CalendarFilter; label: string; color: string; icon: string }[] = [
-    { key: "all", label: "Todos", color: "hsl(var(--primary))", icon: "" },
     { key: "birthdays", label: "Aniversários", color: "#ec4899", icon: "🎂" },
     { key: "events", label: "Eventos", color: "#3b82f6", icon: "📅" },
     { key: "holidays", label: "Feriados", color: "#6b7280", icon: "🏳️" },
