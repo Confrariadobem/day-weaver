@@ -272,6 +272,41 @@ export type Database = {
         }
         Relationships: []
       }
+      project_phases: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+          sort_order: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          project_id: string
+          sort_order?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: string
+          sort_order?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_phases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_resources: {
         Row: {
           created_at: string
@@ -363,6 +398,7 @@ export type Database = {
           id: string
           is_completed: boolean | null
           is_favorite: boolean | null
+          phase_id: string | null
           project_id: string | null
           scheduled_date: string | null
           sort_order: number | null
@@ -378,6 +414,7 @@ export type Database = {
           id?: string
           is_completed?: boolean | null
           is_favorite?: boolean | null
+          phase_id?: string | null
           project_id?: string | null
           scheduled_date?: string | null
           sort_order?: number | null
@@ -393,6 +430,7 @@ export type Database = {
           id?: string
           is_completed?: boolean | null
           is_favorite?: boolean | null
+          phase_id?: string | null
           project_id?: string | null
           scheduled_date?: string | null
           sort_order?: number | null
@@ -406,6 +444,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "project_phases"
             referencedColumns: ["id"]
           },
           {
