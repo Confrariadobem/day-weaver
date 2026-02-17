@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -813,49 +814,46 @@ export default function FinancesView() {
   );
 
   return (
-    <div className="flex h-full flex-col overflow-hidden p-4">
-      {/* Summary cards */}
-      <div className="mb-4 grid grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <TrendingUp className="h-5 w-5 text-success" />
-            <div>
-              <p className="text-xs text-muted-foreground">Receitas</p>
-              <p className="text-base font-bold text-success">{brl(totalRevenue)}</p>
-            </div>
+    <ScrollArea className="h-full">
+      <div className="p-4 space-y-4">
+      {/* KPI Cards - Patrimônio pattern */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="bg-card">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              <TrendingUp className="h-3 w-3" /> Receitas
+            </p>
+            <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(totalRevenue)}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <TrendingDown className="h-5 w-5 text-destructive" />
-            <div>
-              <p className="text-xs text-muted-foreground">Despesas</p>
-              <p className="text-base font-bold text-destructive">{brl(totalExpense)}</p>
-            </div>
+        <Card className="bg-card">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              <TrendingDown className="h-3 w-3" /> Despesas
+            </p>
+            <p className="text-lg font-bold text-destructive">{brl(totalExpense)}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <Wallet className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-xs text-muted-foreground">Saldo</p>
-              <p className={cn("text-base font-bold", balance >= 0 ? "text-success" : "text-destructive")}>{brl(balance)}</p>
-            </div>
+        <Card className="bg-card">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              <Wallet className="h-3 w-3" /> Saldo
+            </p>
+            <p className={cn("text-lg font-bold", balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(balance)}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <Landmark className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-xs text-muted-foreground">Caixa Disponível</p>
-              <p className={cn("text-base font-bold", totalAvailable >= 0 ? "text-success" : "text-destructive")}>{brl(totalAvailable)}</p>
-            </div>
+        <Card className="bg-card">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              <Landmark className="h-3 w-3" /> Caixa Disponível
+            </p>
+            <p className={cn("text-lg font-bold", totalAvailable >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(totalAvailable)}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Tabs - Indicadores repositioned to left of Fluxo de Caixa */}
-      <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
+      {/* Tabs */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as ViewTab)}>
           <TabsList className="h-9">
             <TabsTrigger value="indicadores" className="text-sm">Indicadores</TabsTrigger>
@@ -866,7 +864,7 @@ export default function FinancesView() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div>
 
         {/* ============ FLUXO DE CAIXA ============ */}
         {viewTab === "previsao" && (
@@ -1529,6 +1527,7 @@ export default function FinancesView() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </ScrollArea>
   );
 }

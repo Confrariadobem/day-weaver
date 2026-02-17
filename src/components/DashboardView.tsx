@@ -1,27 +1,23 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Line, Legend, ComposedChart,
+  PieChart, Pie, Cell, Line, Legend, ComposedChart, AreaChart, Area,
 } from "recharts";
 import { format, startOfYear, endOfYear, eachMonthOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { TrendingUp, TrendingDown, Wallet, CheckCircle2, FolderKanban, ListTodo } from "lucide-react";
+import {
+  TrendingUp, TrendingDown, Wallet, CheckCircle2, FolderKanban,
+  BarChart3, PiggyBank, ArrowUpRight, ArrowDownRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
 
-const COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
-
-const tooltipStyle = {
-  background: "hsl(0 0% 10%)",
-  border: "1px solid hsl(0 0% 20%)",
-  borderRadius: 8,
-  fontSize: 12,
-};
-
-const brlFormatter = (value: number) => `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
 
 export default function DashboardView() {
   const { user } = useAuth();
@@ -29,31 +25,33 @@ export default function DashboardView() {
   const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
   const [projects, setProjects] = useState<Tables<"projects">[]>([]);
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [investments, setInvestments] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const year = new Date().getFullYear();
 
   useEffect(() => {
     if (!user) return;
     const fetch = async () => {
-      const [eRes, tRes, pRes, cRes] = await Promise.all([
+      const [eRes, tRes, pRes, cRes, iRes, aRes] = await Promise.all([
         supabase.from("financial_entries").select("*").eq("user_id", user.id),
         supabase.from("tasks").select("*").eq("user_id", user.id),
         supabase.from("projects").select("*").eq("user_id", user.id),
         supabase.from("categories").select("*").eq("user_id", user.id),
+        supabase.from("investments").select("*").eq("user_id", user.id).eq("is_active", true),
+        supabase.from("financial_accounts").select("*").eq("user_id", user.id).eq("is_active", true),
       ]);
       if (eRes.data) setEntries(eRes.data);
       if (tRes.data) setTasks(tRes.data);
       if (pRes.data) setProjects(pRes.data);
       if (cRes.data) setCategories(cRes.data);
+      if (iRes.data) setInvestments(iRes.data);
+      if (aRes.data) setAccounts(aRes.data);
     };
     fetch();
   }, [user]);
 
-  // Monthly financial data
   const monthlyData = useMemo(() => {
-    const months = eachMonthOfInterval({
-      start: startOfYear(new Date(year, 0)),
-      end: endOfYear(new Date(year, 0)),
-    });
+    const months = eachMonthOfInterval({ start: startOfYear(new Date(year, 0)), end: endOfYear(new Date(year, 0)) });
     let accumulated = 0;
     return months.map((month) => {
       const monthEntries = entries.filter((e) => {
@@ -62,19 +60,11 @@ export default function DashboardView() {
       });
       const revenue = monthEntries.filter((e) => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
       const expense = monthEntries.filter((e) => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
-      const balance = revenue - expense;
-      accumulated += balance;
-      return {
-        month: format(month, "MMM", { locale: ptBR }).toUpperCase(),
-        receita: revenue,
-        despesa: expense,
-        saldo: balance,
-        acumulado: accumulated,
-      };
+      accumulated += revenue - expense;
+      return { month: format(month, "MMM", { locale: ptBR }).toUpperCase(), receita: revenue, despesa: expense, saldo: revenue - expense, acumulado: accumulated };
     });
   }, [entries, year]);
 
-  // Category breakdown for pie chart
   const categoryBreakdown = useMemo(() => {
     const yearEntries = entries.filter((e) => new Date(e.entry_date).getFullYear() === year && e.type === "expense");
     const map = new Map<string, number>();
@@ -86,158 +76,186 @@ export default function DashboardView() {
     return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   }, [entries, categories, year]);
 
-  // Task stats by project
-  const projectStats = useMemo(() => {
-    return projects.map((p) => {
-      const pTasks = tasks.filter((t) => t.project_id === p.id);
-      const done = pTasks.filter((t) => t.is_completed).length;
-      return { name: p.name.length > 12 ? p.name.slice(0, 12) + "…" : p.name, total: pTasks.length, done, pending: pTasks.length - done };
-    }).filter((p) => p.total > 0);
-  }, [projects, tasks]);
+  const COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
-  // Summary stats
   const totalRevenue = monthlyData.reduce((s, m) => s + m.receita, 0);
   const totalExpense = monthlyData.reduce((s, m) => s + m.despesa, 0);
   const totalBalance = totalRevenue - totalExpense;
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.is_completed).length;
   const activeProjects = projects.filter((p) => p.status === "active").length;
-  const pendingTasks = totalTasks - completedTasks;
+  const totalCash = accounts.reduce((s: number, a: any) => s + Number(a.current_balance || 0), 0);
+  const totalInvestments = investments.reduce((s: number, i: any) => s + (Number(i.current_price) || 0) * (Number(i.quantity) || 0), 0);
+  const totalPatrimony = totalCash + totalInvestments;
 
   return (
-    <div className="h-full overflow-auto p-4">
-      {/* Header */}
-      <div className="mb-4">
-        <h1 className="text-xl font-bold">Dashboard</h1>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <TrendingUp className="h-5 w-5 text-success" />
-            <div>
-              <p className="text-[10px] text-muted-foreground">Receita Total</p>
-              <p className="text-sm font-bold text-success">R$ {totalRevenue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <TrendingDown className="h-5 w-5 text-destructive" />
-            <div>
-              <p className="text-[10px] text-muted-foreground">Despesa Total</p>
-              <p className="text-sm font-bold text-destructive">R$ {totalExpense.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <Wallet className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-[10px] text-muted-foreground">Saldo</p>
-              <p className={cn("text-sm font-bold", totalBalance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
-                R$ {totalBalance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+    <ScrollArea className="h-full">
+      <div className="p-4 space-y-4">
+        {/* KPI Cards - Patrimônio pattern */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <Wallet className="h-3 w-3" /> Patrimônio
               </p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <CheckCircle2 className="h-5 w-5 text-success" />
-            <div>
-              <p className="text-[10px] text-muted-foreground">Tarefas</p>
-              <p className="text-sm font-bold">{completedTasks}/{totalTasks}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <FolderKanban className="h-5 w-5 text-warning" />
-            <div>
-              <p className="text-[10px] text-muted-foreground">Projetos Ativos</p>
-              <p className="text-sm font-bold">{activeProjects}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <p className="text-lg font-bold text-foreground">{brl(totalPatrimony)}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" /> Receitas {year}
+              </p>
+              <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(totalRevenue)}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <TrendingDown className="h-3 w-3" /> Despesas {year}
+              </p>
+              <p className="text-lg font-bold text-destructive">{brl(totalExpense)}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Saldo do Ano</p>
+              <p className={cn("text-lg font-bold", totalBalance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                {brl(totalBalance)}
+              </p>
+              <div className={cn("flex items-center gap-1 text-[10px]", totalBalance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                {totalBalance >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                {totalRevenue > 0 ? ((totalBalance / totalRevenue) * 100).toFixed(1) : "0"}% margem
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Charts */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Stacked Bar + Trend Line (inspired by reference image) */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Análise de Saldo — Receita × Despesa + Saldo Acumulado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+        {/* Secondary KPIs */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <FolderKanban className="h-3 w-3" /> Projetos Ativos
+              </p>
+              <p className="text-lg font-bold text-foreground">{activeProjects}</p>
+              <p className="text-[10px] text-muted-foreground">{projects.length} total</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" /> Tarefas
+              </p>
+              <p className="text-lg font-bold text-foreground">{completedTasks}/{totalTasks}</p>
+              <p className="text-[10px] text-muted-foreground">{totalTasks - completedTasks} pendentes</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <PiggyBank className="h-3 w-3" /> Investimentos
+              </p>
+              <p className="text-lg font-bold text-foreground">{brl(totalInvestments)}</p>
+              <p className="text-[10px] text-muted-foreground">{investments.length} ativo(s)</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <Wallet className="h-3 w-3" /> Caixa
+              </p>
+              <p className={cn("text-lg font-bold", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                {brl(totalCash)}
+              </p>
+              <p className="text-[10px] text-muted-foreground">{accounts.length} conta(s)</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Revenue vs Expense */}
+          <Card className="bg-card md:col-span-2">
+            <CardContent className="p-3">
+              <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
+                <BarChart3 className="h-3.5 w-3.5 text-primary" /> Receita × Despesa — {year}
+              </p>
+              <ResponsiveContainer width="100%" height={220}>
                 <ComposedChart data={monthlyData} barGap={0}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <RechartsTooltip contentStyle={tooltipStyle} formatter={brlFormatter} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="receita" name="Receita" stackId="a" fill="#22c55e" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="despesa" name="Despesa" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                  <Line type="monotone" dataKey="acumulado" name="Saldo Acumulado" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 4, fill: "#f59e0b" }} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
+                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
+                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Bar dataKey="receita" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="despesa" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <Line type="monotone" dataKey="acumulado" name="Acumulado" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6" }} />
                 </ComposedChart>
               </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Category Pie Chart */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Despesas por Categoria</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[240px]">
+          {/* Saldo evolution */}
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5 text-primary" /> Saldo Mensal
+              </p>
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={monthlyData}>
+                  <defs>
+                    <linearGradient id="saldoGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
+                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                  <Area type="monotone" dataKey="saldo" stroke="hsl(217, 91%, 60%)" fill="url(#saldoGrad)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Category pie */}
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
+                <PiggyBank className="h-3.5 w-3.5 text-primary" /> Despesas por Categoria
+              </p>
               {categoryBreakdown.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={categoryBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
-                      {categoryBreakdown.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip contentStyle={tooltipStyle} formatter={brlFormatter} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="flex items-center gap-4">
+                  <ResponsiveContainer width={140} height={140}>
+                    <PieChart>
+                      <Pie data={categoryBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} innerRadius={30} strokeWidth={1}>
+                        {categoryBreakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Pie>
+                      <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-1.5 flex-1">
+                    {categoryBreakdown.slice(0, 6).map((c, i) => {
+                      const pct = totalExpense > 0 ? ((c.value / totalExpense) * 100).toFixed(1) : "0";
+                      return (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                          <span className="text-muted-foreground flex-1 truncate">{c.name}</span>
+                          <span className="font-medium text-foreground">{pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+                <p className="text-xs text-muted-foreground text-center py-8">Sem dados</p>
               )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tasks by Project - horizontal bar */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Tarefas por Projeto</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[240px]">
-              {projectStats.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={projectStats} layout="vertical" barSize={16}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
-                    <XAxis type="number" tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
-                    <RechartsTooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="done" name="Concluídas" stackId="a" fill="#22c55e" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="pending" name="Pendentes" stackId="a" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Sem projetos com tarefas</div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
+    </ScrollArea>
   );
 }

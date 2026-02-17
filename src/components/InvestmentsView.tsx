@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Plus, TrendingUp, TrendingDown, ArrowLeft, Trash2, Save, Search,
   PieChart as PieChartIcon, Wallet, Calendar, BarChart3, AlertTriangle,
-  Edit,
+  Edit, PiggyBank,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -27,12 +27,12 @@ import EventEditDialog from "@/components/calendar/EventEditDialog";
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 const INVESTMENT_TYPES = [
-  { value: "stock", label: "Ações", icon: "📈" },
-  { value: "fii", label: "FIIs", icon: "🏢" },
-  { value: "crypto", label: "Criptoativos", icon: "₿" },
-  { value: "fixed_income", label: "Renda Fixa", icon: "🏦" },
-  { value: "etf", label: "ETFs", icon: "📊" },
-  { value: "other", label: "Outros", icon: "💼" },
+  { value: "stock", label: "Ações", icon: <TrendingUp className="h-4 w-4" /> },
+  { value: "fii", label: "FIIs", icon: <Wallet className="h-4 w-4" /> },
+  { value: "crypto", label: "Criptoativos", icon: <BarChart3 className="h-4 w-4" /> },
+  { value: "fixed_income", label: "Renda Fixa", icon: <PiggyBank className="h-4 w-4" /> },
+  { value: "etf", label: "ETFs", icon: <PieChartIcon className="h-4 w-4" /> },
+  { value: "other", label: "Outros", icon: <Wallet className="h-4 w-4" /> },
 ];
 
 const TYPE_COLORS: Record<string, string> = {
@@ -41,7 +41,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 const getTypeLabel = (type: string) => INVESTMENT_TYPES.find(t => t.value === type)?.label || type;
-const getTypeIcon = (type: string) => INVESTMENT_TYPES.find(t => t.value === type)?.icon || "💼";
+const getTypeIcon = (type: string) => INVESTMENT_TYPES.find(t => t.value === type)?.icon || <Wallet className="h-4 w-4" />;
 
 export default function InvestmentsView() {
   const { user } = useAuth();
@@ -184,12 +184,14 @@ export default function InvestmentsView() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Dashboard Cards */}
+      {/* KPI Cards - Patrimônio pattern */}
       <div className="p-4 border-b border-border/30 space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card className="bg-card">
             <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Patrimônio Total</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" /> Patrimônio Total
+              </p>
               <p className="text-lg font-bold text-foreground">{brl(metrics.totalCurrent)}</p>
             </CardContent>
           </Card>
@@ -215,12 +217,13 @@ export default function InvestmentsView() {
           </Card>
         </div>
 
-        {/* Allocation pie + Top 3 + Alerts */}
+        {/* Secondary row: Allocation + Top 3 + Alerts */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Allocation */}
           <Card className="bg-card">
             <CardContent className="p-3">
-              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><PieChartIcon className="h-3.5 w-3.5 text-primary" /> Alocação</p>
+              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+                <PieChartIcon className="h-3.5 w-3.5 text-primary" /> Alocação
+              </p>
               {metrics.allocation.length > 0 ? (
                 <div className="flex items-center gap-3">
                   <ResponsiveContainer width={80} height={80}>
@@ -243,14 +246,13 @@ export default function InvestmentsView() {
               ) : <p className="text-xs text-muted-foreground">Nenhum ativo</p>}
             </CardContent>
           </Card>
-
-          {/* Top 3 */}
           <Card className="bg-card">
             <CardContent className="p-3">
-              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><BarChart3 className="h-3.5 w-3.5 text-primary" /> Top 3 Ativos</p>
+              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+                <BarChart3 className="h-3.5 w-3.5 text-primary" /> Top 3 Ativos
+              </p>
               <div className="space-y-2">
                 {metrics.top3.map((inv, i) => {
-                  const value = (Number(inv.current_price) || 0) * (Number(inv.quantity) || 0);
                   const profit = Number(inv.purchase_price) > 0
                     ? ((Number(inv.current_price) - Number(inv.purchase_price)) / Number(inv.purchase_price)) * 100
                     : 0;
@@ -268,22 +270,22 @@ export default function InvestmentsView() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Alerts */}
           <Card className="bg-card">
             <CardContent className="p-3">
-              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-warning" /> Alertas</p>
+              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-warning" /> Alertas
+              </p>
               <div className="space-y-1.5">
                 {metrics.upcomingDividends.map(inv => (
                   <div key={`div-${inv.id}`} className="text-[10px] text-[hsl(var(--success))] flex items-center gap-1">
-                    💎 Dividendo: {inv.ticker || inv.name} - {brl(Number(inv.dividend_amount))}
+                    <TrendingUp className="h-2.5 w-2.5" /> Dividendo: {inv.ticker || inv.name} - {brl(Number(inv.dividend_amount))}
                   </div>
                 ))}
                 {metrics.alerts.map(inv => {
                   const drop = ((Number(inv.current_price) - Number(inv.purchase_price)) / Number(inv.purchase_price)) * 100;
                   return (
                     <div key={`alert-${inv.id}`} className="text-[10px] text-destructive flex items-center gap-1">
-                      📉 {inv.ticker || inv.name} caiu {Math.abs(drop).toFixed(1)}%
+                      <TrendingDown className="h-2.5 w-2.5" /> {inv.ticker || inv.name} caiu {Math.abs(drop).toFixed(1)}%
                     </div>
                   );
                 })}
@@ -331,7 +333,7 @@ export default function InvestmentsView() {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span>{getTypeIcon(inv.type)}</span>
+                        <span className="text-primary shrink-0">{getTypeIcon(inv.type)}</span>
                         <h4 className="text-sm font-semibold truncate">{inv.name}</h4>
                       </div>
                       {inv.ticker && <p className="text-[10px] text-muted-foreground mt-0.5">{inv.ticker}</p>}
@@ -404,7 +406,7 @@ export default function InvestmentsView() {
                     fType === t.value ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
                   )}
                 >
-                  <span className="text-2xl">{t.icon}</span>
+                  <span className="text-primary">{t.icon}</span>
                   <span className="text-sm font-medium">{t.label}</span>
                 </button>
               ))}
@@ -412,7 +414,7 @@ export default function InvestmentsView() {
           ) : (
             <div className="space-y-3">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">{getTypeIcon(fType)}</span>
+                <span className="text-primary">{getTypeIcon(fType)}</span>
                 <Badge variant="outline" style={{ borderColor: TYPE_COLORS[fType], color: TYPE_COLORS[fType] }}>
                   {getTypeLabel(fType)}
                 </Badge>
@@ -542,7 +544,7 @@ function InvestmentDetail({ id, onBack, onEdit, onDelete, userId }: {
           </button>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-lg">{getTypeIcon(investment.type)}</span>
+              <span className="text-primary">{getTypeIcon(investment.type)}</span>
               <h2 className="text-lg font-bold truncate">{investment.name}</h2>
               {investment.ticker && <Badge variant="outline" className="text-xs">{investment.ticker}</Badge>}
             </div>
