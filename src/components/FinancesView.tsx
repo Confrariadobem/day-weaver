@@ -12,9 +12,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Save,
-  Printer, FileDown, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
+  Printer, FileDown, FileUp, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
   CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
   Filter, BarChart3,
@@ -318,8 +319,12 @@ export default function FinancesView() {
 
   const deleteEntry = async (id: string) => {
     await supabase.from("financial_entries").delete().eq("id", id);
+    setDeleteEntryConfirm(null);
     fetchData();
   };
+
+  // Helper to parse date-only strings without timezone issues
+  const parseEntryDate = (d: string) => new Date(d + "T12:00:00");
 
   const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
 
@@ -359,15 +364,15 @@ export default function FinancesView() {
       .filter((e) => {
         // Apply custom period filter only if enabled
         if (customPeriodEnabled) {
-          const d = new Date(e.entry_date);
-          const start = new Date(customStart);
-          const end = new Date(customEnd);
+          const d = parseEntryDate(e.entry_date);
+          const start = parseEntryDate(customStart);
+          const end = parseEntryDate(customEnd);
           if (d < start || d > end) return false;
         }
         // Filter by cash flow type (excluding "paid" — paid items go to hidden section)
         if (cashFlowFilter === "payable") return e.type === "expense" && !e.is_paid;
         if (cashFlowFilter === "receivable") return e.type === "revenue" && !e.is_paid;
-        if (cashFlowFilter === "overdue") { const ed = new Date(e.entry_date); ed.setHours(0, 0, 0, 0); return !e.is_paid && ed < today; }
+        if (cashFlowFilter === "overdue") { const ed = parseEntryDate(e.entry_date); return !e.is_paid && ed < today; }
         if (cashFlowFilter === "pending") return !e.is_paid;
         // "all" filter: show unpaid only (paid go to hidden section)
         return !e.is_paid;
@@ -379,8 +384,8 @@ export default function FinancesView() {
       })
       .sort((a, b) => {
         const today = new Date(); today.setHours(0, 0, 0, 0);
-        const aOverdue = !a.is_paid && new Date(a.entry_date) < today;
-        const bOverdue = !b.is_paid && new Date(b.entry_date) < today;
+        const aOverdue = !a.is_paid && parseEntryDate(a.entry_date) < today;
+        const bOverdue = !b.is_paid && parseEntryDate(b.entry_date) < today;
         // Overdue items always at top
         if (aOverdue && !bOverdue) return -1;
         if (!aOverdue && bOverdue) return 1;
@@ -410,9 +415,9 @@ export default function FinancesView() {
       .filter((e) => {
         if (!e.is_paid) return false;
         if (customPeriodEnabled) {
-          const d = new Date(e.entry_date);
-          const start = new Date(customStart);
-          const end = new Date(customEnd);
+          const d = parseEntryDate(e.entry_date);
+          const start = parseEntryDate(customStart);
+          const end = parseEntryDate(customEnd);
           if (d < start || d > end) return false;
         }
         if (!query) return true;
@@ -719,13 +724,8 @@ export default function FinancesView() {
             </SelectContent>
           </Select>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="relative">
-            <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
-          </div>
-          {!editingEntry && recurrence === "none" && (
-            <Input type="number" placeholder="Parcelas" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} />
-          )}
+        <div>
+          <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
         </div>
         {!editingEntry && (
           <div className="rounded-lg border border-border/30 p-3 space-y-2">
@@ -747,9 +747,12 @@ export default function FinancesView() {
                 </SelectContent>
               </Select>
               {recurrence !== "none" && (
-                <Input type="number" placeholder="Qtd. ocorrências" min="1" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} className="text-xs" />
+                <Input type="number" placeholder="Quantidade" min="1" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} className="text-xs" />
               )}
             </div>
+            {recurrence === "none" && (
+              <Input type="number" placeholder="Parcelas" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="text-xs" />
+            )}
             {recurrence === "monthly" && (
               <div className="mt-2">
                 <Label className="text-xs text-muted-foreground mb-1">Repetir na:</Label>
@@ -836,6 +839,63 @@ export default function FinancesView() {
             {tab.icon} {tab.label}
           </Button>
         ))}
+
+        {/* Action buttons - top right */}
+        <div className="flex items-center gap-1 ml-auto">
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file"; input.accept = ".csv";
+                  input.onchange = async (ev: any) => {
+                    const file = ev.target.files?.[0];
+                    if (!file || !user) return;
+                    const text = await file.text();
+                    const lines = text.split("\n").filter(Boolean);
+                    if (lines.length < 2) return;
+                    const rows = lines.slice(1).map(line => {
+                      const cols = line.split(",").map(c => c.replace(/"/g, "").trim());
+                      return {
+                        user_id: user.id, entry_date: cols[0] || format(new Date(), "yyyy-MM-dd"),
+                        title: cols[1] || "Importado", type: cols[2]?.toLowerCase().includes("receita") ? "revenue" as const : "expense" as const,
+                        amount: parseFloat(cols[cols.length - 1]) || 0, is_paid: false,
+                      };
+                    }).filter(r => r.amount > 0);
+                    if (rows.length > 0) {
+                      await supabase.from("financial_entries").insert(rows);
+                      fetchData();
+                    }
+                  };
+                  input.click();
+                }}
+              >
+                <FileDown className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Importar CSV</TooltipContent>
+          </Tooltip>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                onClick={handleExportCSV}
+              >
+                <FileUp className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Exportar CSV</TooltipContent>
+          </Tooltip>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                onClick={handlePrint}
+              >
+                <Printer className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Imprimir</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       {/* KPI Cards - Patrimônio pattern */}
@@ -931,46 +991,15 @@ export default function FinancesView() {
                     <Button size="sm" variant="ghost"
                       className="h-7 px-2.5 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
                       onClick={async () => {
-                        for (const id of selectedIds) {
-                          await supabase.from("financial_entries").delete().eq("id", id);
-                        }
+                        const ids = Array.from(selectedIds);
+                        // Batch delete for speed
+                        await supabase.from("financial_entries").delete().in("id", ids);
                         setSelectedIds(new Set());
                         fetchData();
                       }}
                     ><Trash2 className="h-3 w-3" /> Excluir</Button>
                   </>
                 )}
-                <Button size="sm" variant="ghost"
-                  className="h-7 px-2.5 text-xs gap-1 text-muted-foreground rounded-full"
-                  onClick={handleExportCSV}
-                ><FileDown className="h-3 w-3" /> Exportar</Button>
-                <Button size="sm" variant="ghost"
-                  className="h-7 px-2.5 text-xs gap-1 text-muted-foreground rounded-full"
-                  onClick={() => {
-                    const input = document.createElement("input");
-                    input.type = "file"; input.accept = ".csv";
-                    input.onchange = async (ev: any) => {
-                      const file = ev.target.files?.[0];
-                      if (!file || !user) return;
-                      const text = await file.text();
-                      const lines = text.split("\n").filter(Boolean);
-                      if (lines.length < 2) return;
-                      const rows = lines.slice(1).map(line => {
-                        const cols = line.split(",").map(c => c.replace(/"/g, "").trim());
-                        return {
-                          user_id: user.id, entry_date: cols[0] || format(new Date(), "yyyy-MM-dd"),
-                          title: cols[1] || "Importado", type: cols[2]?.toLowerCase().includes("receita") ? "revenue" as const : "expense" as const,
-                          amount: parseFloat(cols[cols.length - 1]) || 0, is_paid: false,
-                        };
-                      }).filter(r => r.amount > 0);
-                      if (rows.length > 0) {
-                        await supabase.from("financial_entries").insert(rows);
-                        fetchData();
-                      }
-                    };
-                    input.click();
-                  }}
-                ><Plus className="h-3 w-3" /> Importar</Button>
                 <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
                   {renderEntryDialog()}
                 </Dialog>
@@ -1009,7 +1038,7 @@ export default function FinancesView() {
                     const cat = categories.find(c => c.id === e.category_id);
                     const runningBal = runningBalances.balanceMap.get(e.id) ?? 0;
                     const isBreakEven = runningBalances.breakEvenId === e.id;
-                    const isOverdue = !e.is_paid && new Date(e.entry_date) < new Date();
+                    const isOverdue = !e.is_paid && parseEntryDate(e.entry_date) < new Date();
                     const isSelected = selectedIds.has(e.id);
                     return (
                       <tr key={e.id}
@@ -1031,8 +1060,13 @@ export default function FinancesView() {
                             }}
                             onClick={(ev) => ev.stopPropagation()} className="h-3.5 w-3.5" />
                         </td>
-                        <td className="py-2.5 px-2 text-muted-foreground">{format(new Date(e.entry_date), "dd/MM/yy")}</td>
-                        <td className="py-2.5 px-2">{e.title}</td>
+                        <td className="py-2.5 px-2 text-muted-foreground">{format(parseEntryDate(e.entry_date), "dd/MM/yy")}</td>
+                        <td className="py-2.5 px-2">
+                          <span>{e.title}</span>
+                          {e.total_installments === 0 && (
+                            <span className="ml-1.5 text-[10px] text-muted-foreground/60 font-medium">Conta fixa</span>
+                          )}
+                        </td>
                         <td className="py-2.5 px-2 text-muted-foreground/60">{cat?.name || "—"}</td>
                         <td className="py-2.5 px-2">
                           <span className={cn("text-xs font-medium", e.type === "revenue" ? "text-success" : "text-destructive")}>
@@ -1090,7 +1124,7 @@ export default function FinancesView() {
                               onClick={() => handleRowClick(e)}
                             >
                               <td className="py-2 px-2 w-8" />
-                              <td className="py-2 px-2 text-muted-foreground">{format(new Date(e.entry_date), "dd/MM/yy")}</td>
+                              <td className="py-2 px-2 text-muted-foreground">{format(parseEntryDate(e.entry_date), "dd/MM/yy")}</td>
                               <td className="py-2 px-2 line-through text-muted-foreground">{e.title}</td>
                               <td className="py-2 px-2 text-muted-foreground/60">{cat?.name || "—"}</td>
                               <td className="py-2 px-2">
