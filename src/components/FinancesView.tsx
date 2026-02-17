@@ -938,23 +938,39 @@ export default function FinancesView() {
                         fetchData();
                       }}
                     ><Trash2 className="h-3 w-3" /> Excluir</Button>
-                    <Button size="sm" variant="ghost"
-                      className="h-7 px-2.5 text-xs gap-1 text-muted-foreground rounded-full"
-                      onClick={() => {
-                        const selected = filtered.filter(e => selectedIds.has(e.id));
-                        const header = "Data,Título,Tipo,Categoria,Valor,Status\n";
-                        const rows = selected.map(e => {
-                          const cat = categories.find(c => c.id === e.category_id)?.name || "";
-                          return `${e.entry_date},"${e.title}",${e.type === "revenue" ? "Receita" : "Despesa"},"${cat}",${e.amount},${e.is_paid ? "Pago" : "Pendente"}`;
-                        }).join("\n");
-                        const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8" });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a"); a.href = url; a.download = `lancamentos_selecionados.csv`; a.click();
-                        URL.revokeObjectURL(url);
-                      }}
-                    ><Printer className="h-3 w-3" /> Relatório</Button>
                   </>
                 )}
+                <Button size="sm" variant="ghost"
+                  className="h-7 px-2.5 text-xs gap-1 text-muted-foreground rounded-full"
+                  onClick={handleExportCSV}
+                ><FileDown className="h-3 w-3" /> Exportar</Button>
+                <Button size="sm" variant="ghost"
+                  className="h-7 px-2.5 text-xs gap-1 text-muted-foreground rounded-full"
+                  onClick={() => {
+                    const input = document.createElement("input");
+                    input.type = "file"; input.accept = ".csv";
+                    input.onchange = async (ev: any) => {
+                      const file = ev.target.files?.[0];
+                      if (!file || !user) return;
+                      const text = await file.text();
+                      const lines = text.split("\n").filter(Boolean);
+                      if (lines.length < 2) return;
+                      const rows = lines.slice(1).map(line => {
+                        const cols = line.split(",").map(c => c.replace(/"/g, "").trim());
+                        return {
+                          user_id: user.id, entry_date: cols[0] || format(new Date(), "yyyy-MM-dd"),
+                          title: cols[1] || "Importado", type: cols[2]?.toLowerCase().includes("receita") ? "revenue" as const : "expense" as const,
+                          amount: parseFloat(cols[cols.length - 1]) || 0, is_paid: false,
+                        };
+                      }).filter(r => r.amount > 0);
+                      if (rows.length > 0) {
+                        await supabase.from("financial_entries").insert(rows);
+                        fetchData();
+                      }
+                    };
+                    input.click();
+                  }}
+                ><Plus className="h-3 w-3" /> Importar</Button>
                 <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
                   {renderEntryDialog()}
                 </Dialog>
@@ -1112,7 +1128,11 @@ export default function FinancesView() {
           availableYears.sort((a, b) => b - a);
 
           const dQuery = doarSearchQuery.toLowerCase().trim();
-          const filterDoarRow = (row: { name: string }) => !dQuery || row.name.toLowerCase().includes(dQuery);
+          const filterDoarRow = (row: { name: string; months: number[] }) => {
+            const hasData = row.months.some(v => v > 0);
+            if (!hasData) return false;
+            return !dQuery || row.name.toLowerCase().includes(dQuery);
+          };
           const filteredRevRows = dreData.revRows.filter(filterDoarRow);
           const filteredExpRows = dreData.expRows.filter(filterDoarRow);
 
