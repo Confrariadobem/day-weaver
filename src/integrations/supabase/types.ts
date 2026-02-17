@@ -164,10 +164,13 @@ export type Database = {
           id: string
           installment_group: string | null
           installment_number: number | null
+          investment_id: string | null
           is_paid: boolean | null
           payment_date: string | null
           payment_method: string | null
           project_id: string | null
+          recurrence_end_date: string | null
+          recurrence_type: string | null
           title: string
           total_installments: number | null
           type: string
@@ -182,10 +185,13 @@ export type Database = {
           id?: string
           installment_group?: string | null
           installment_number?: number | null
+          investment_id?: string | null
           is_paid?: boolean | null
           payment_date?: string | null
           payment_method?: string | null
           project_id?: string | null
+          recurrence_end_date?: string | null
+          recurrence_type?: string | null
           title: string
           total_installments?: number | null
           type: string
@@ -200,10 +206,13 @@ export type Database = {
           id?: string
           installment_group?: string | null
           installment_number?: number | null
+          investment_id?: string | null
           is_paid?: boolean | null
           payment_date?: string | null
           payment_method?: string | null
           project_id?: string | null
+          recurrence_end_date?: string | null
+          recurrence_type?: string | null
           title?: string
           total_installments?: number | null
           type?: string
@@ -225,6 +234,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "financial_entries_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "investments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "financial_entries_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -232,6 +248,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      investments: {
+        Row: {
+          created_at: string
+          current_price: number | null
+          dividend_amount: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          next_dividend_date: string | null
+          notes: string | null
+          purchase_date: string | null
+          purchase_price: number | null
+          quantity: number | null
+          ticker: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_price?: number | null
+          dividend_amount?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          next_dividend_date?: string | null
+          notes?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          quantity?: number | null
+          ticker?: string | null
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_price?: number | null
+          dividend_amount?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          next_dividend_date?: string | null
+          notes?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          quantity?: number | null
+          ticker?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {

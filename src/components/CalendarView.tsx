@@ -63,6 +63,21 @@ function getBrazilianHolidays(year: number): { date: Date; name: string }[] {
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
+function getNextRecurrence(date: Date, type: string): Date {
+  const d = new Date(date);
+  switch (type) {
+    case "daily": d.setDate(d.getDate() + 1); break;
+    case "weekly": d.setDate(d.getDate() + 7); break;
+    case "biweekly": d.setDate(d.getDate() + 14); break;
+    case "monthly": d.setMonth(d.getMonth() + 1); break;
+    case "quarterly": d.setMonth(d.getMonth() + 3); break;
+    case "semiannual": d.setMonth(d.getMonth() + 6); break;
+    case "annual": d.setFullYear(d.getFullYear() + 1); break;
+    default: d.setMonth(d.getMonth() + 1);
+  }
+  return d;
+}
+
 export default function CalendarView() {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -70,6 +85,7 @@ export default function CalendarView() {
   const [events, setEvents] = useState<Tables<"calendar_events">[]>([]);
   const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
   const [entries, setEntries] = useState<any[]>([]);
+  const [investments, setInvestments] = useState<any[]>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CalendarItem | null>(null);
   const [editDefaultDate, setEditDefaultDate] = useState<Date>(new Date());
@@ -88,14 +104,16 @@ export default function CalendarView() {
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [evRes, taskRes, finRes] = await Promise.all([
+    const [evRes, taskRes, finRes, invRes] = await Promise.all([
       supabase.from("calendar_events").select("*").eq("user_id", user.id).order("start_time"),
       supabase.from("tasks").select("*").eq("user_id", user.id).order("sort_order"),
       supabase.from("financial_entries").select("*").eq("user_id", user.id),
+      supabase.from("investments").select("*").eq("user_id", user.id).eq("is_active", true),
     ]);
     if (evRes.data) setEvents(evRes.data);
     if (taskRes.data) setTasks(taskRes.data);
     if (finRes.data) setEntries(finRes.data);
+    if (invRes.data) setInvestments(invRes.data);
   }, [user]);
 
   useEffect(() => {
@@ -105,6 +123,8 @@ export default function CalendarView() {
       .channel("cal-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "calendar_events", filter: `user_id=eq.${user.id}` }, fetchData)
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` }, fetchData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "investments", filter: `user_id=eq.${user.id}` }, fetchData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "financial_entries", filter: `user_id=eq.${user.id}` }, fetchData)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [user, fetchData]);
@@ -152,9 +172,10 @@ export default function CalendarView() {
       const amountLabel = amount > 0 ? ` R$ ${amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "";
       const color = isInvestment ? "#a855f7" : isExpense ? "#ef4444" : "#22c55e";
       const icon = isInvestment ? "📈" : isExpense ? "💸" : "💰";
+      const recIcon = fe.recurrence_type ? " 🔄" : "";
       items.push({
         id: `fin-${fe.id}`,
-        title: `${icon} ${fe.title}${amountLabel}`,
+        title: `${icon} ${fe.title}${amountLabel}${recIcon}`,
         start_time: new Date(`${fe.entry_date}T00:00:00`).toISOString(),
         all_day: true,
         color,
@@ -166,8 +187,69 @@ export default function CalendarView() {
         is_investment: isInvestment,
         is_project: !!fe.project_id,
         is_favorite: false,
-        
       });
+
+      // Generate recurrent entries
+      if (fe.recurrence_type) {
+        const baseDate = new Date(`${fe.entry_date}T00:00:00`);
+        const endDate = fe.recurrence_end_date ? new Date(`${fe.recurrence_end_date}T00:00:00`) : addMonths(baseDate, 12);
+        let nextDate = getNextRecurrence(baseDate, fe.recurrence_type);
+        let idx = 1;
+        while (nextDate <= endDate && idx < 60) {
+          items.push({
+            id: `fin-rec-${fe.id}-${idx}`,
+            title: `${icon} 🔄 ${fe.title}${amountLabel}`,
+            start_time: nextDate.toISOString(),
+            all_day: true,
+            color,
+            description: `[tipo:cashflow] Recorrente`,
+            user_id: fe.user_id,
+            is_task: false,
+            is_cashflow: true,
+            is_finance: true,
+            is_investment: isInvestment,
+            is_project: !!fe.project_id,
+            is_favorite: false,
+          });
+          nextDate = getNextRecurrence(nextDate, fe.recurrence_type);
+          idx++;
+        }
+      }
+    });
+
+    // Investment events (purchase + next dividend)
+    investments.forEach((inv: any) => {
+      if (inv.purchase_date) {
+        const amount = Number(inv.purchase_price || 0) * Number(inv.quantity || 0);
+        const amountLabel = amount > 0 ? ` R$ ${amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "";
+        items.push({
+          id: `inv-buy-${inv.id}`,
+          title: `📈 Aporte: ${inv.name}${inv.ticker ? ` (${inv.ticker})` : ""}${amountLabel}`,
+          start_time: new Date(`${inv.purchase_date}T00:00:00`).toISOString(),
+          all_day: true,
+          color: "#a855f7",
+          description: `[tipo:investment] Aporte ${inv.type}`,
+          user_id: inv.user_id,
+          is_task: false,
+          is_investment: true,
+          is_favorite: false,
+        });
+      }
+      if (inv.next_dividend_date && Number(inv.dividend_amount || 0) > 0) {
+        const divLabel = ` R$ ${Number(inv.dividend_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+        items.push({
+          id: `inv-div-${inv.id}`,
+          title: `💎 Dividendos ${inv.ticker || inv.name}${divLabel}`,
+          start_time: new Date(`${inv.next_dividend_date}T00:00:00`).toISOString(),
+          all_day: true,
+          color: "#a855f7",
+          description: `[tipo:investment] Dividendo`,
+          user_id: inv.user_id,
+          is_task: false,
+          is_investment: true,
+          is_favorite: false,
+        });
+      }
     });
 
     // Brazilian holidays
@@ -195,7 +277,7 @@ export default function CalendarView() {
       return 0;
     });
     return items;
-  }, [events, tasks, entries, currentDate, user]);
+  }, [events, tasks, entries, investments, currentDate, user]);
 
   const toggleFilter = (f: CalendarFilter) => {
     if (f === "all") {
