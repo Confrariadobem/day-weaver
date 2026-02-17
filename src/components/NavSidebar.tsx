@@ -10,9 +10,10 @@ import {
   LogOut,
   Sparkles,
   FolderKanban,
+  TrendingUp,
 } from "lucide-react";
 
-export type ModuleKey = "calendar" | "finances" | "dashboard" | "profile" | "preferences" | "programs";
+export type ModuleKey = "calendar" | "finances" | "dashboard" | "profile" | "preferences" | "programs" | "investments";
 
 interface NavItem {
   key: ModuleKey;
@@ -24,7 +25,8 @@ const topNavItems: NavItem[] = [
   { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
   { key: "calendar", label: "Calendário", icon: <CalendarDays className="h-5 w-5" /> },
   { key: "finances", label: "Finanças", icon: <Wallet className="h-5 w-5" /> },
-  { key: "programs", label: "Programas e Projetos", icon: <FolderKanban className="h-5 w-5" /> },
+  { key: "programs", label: "Projetos", icon: <FolderKanban className="h-5 w-5" /> },
+  { key: "investments", label: "Investimentos", icon: <TrendingUp className="h-5 w-5" /> },
 ];
 
 interface NavSidebarProps {
