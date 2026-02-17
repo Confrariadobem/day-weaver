@@ -40,7 +40,7 @@ export default function PatrimonioView() {
   const [investments, setInvestments] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [profileFilter, setProfileFilter] = useState<ProfileFilter>("pessoal");
-  const [hasUpgrade] = useState(false); // Placeholder for upgrade logic
+  const [hasUpgrade] = useState(true); // User has full access
 
   const fetchData = useCallback(async () => {
     if (!user) return;

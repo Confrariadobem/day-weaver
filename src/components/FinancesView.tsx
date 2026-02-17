@@ -35,7 +35,7 @@ type SortField = "title" | "amount" | "entry_date" | "type" | "category" | "is_p
 type SortDir = "asc" | "desc";
 type RecurrenceType = "none" | "daily" | "weekly" | "biweekly" | "monthly" | "quarterly" | "semiannual" | "yearly";
 type RecurrenceDateMode = "same_date" | "first_business_day";
-type ViewTab = "indicadores" | "previsao" | "doar" | "contas";
+type ViewTab = "indicadores" | "previsao" | "doar";
 type AccountType = "bank_account" | "credit_card" | "investment" | "wallet" | "cash" | "crypto";
 type CashFlowFilter = "all" | "payable" | "receivable" | "overdue" | "pending";
 
@@ -861,7 +861,6 @@ export default function FinancesView() {
             <TabsTrigger value="indicadores" className="text-sm">Indicadores</TabsTrigger>
             <TabsTrigger value="previsao" className="text-sm">Fluxo de Caixa</TabsTrigger>
             <TabsTrigger value="doar" className="text-sm">DOAR</TabsTrigger>
-            <TabsTrigger value="contas" className="text-sm">Carteira</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -1485,174 +1484,7 @@ export default function FinancesView() {
           </div>
         )}
 
-        {/* ============ CARTEIRA ============ */}
-        {viewTab === "contas" && (() => {
-          const accQuery = searchQuery.toLowerCase().trim();
-          const activeAccounts = accounts.filter(a => a.is_active !== false && (!accQuery || a.name.toLowerCase().includes(accQuery) || (ACCOUNT_TYPE_LABELS[a.type as AccountType]?.label || "").toLowerCase().includes(accQuery)));
-          const inactiveAccounts = accounts.filter(a => a.is_active === false && (!accQuery || a.name.toLowerCase().includes(accQuery)));
-
-          const openAccEdit = (acc: FinancialAccount) => {
-            setEditingAccount(acc);
-            setAccName(acc.name); setAccType(acc.type as AccountType);
-            setAccBalance(String(acc.initial_balance));
-            setAccLimit(acc.credit_limit ? String(acc.credit_limit) : "");
-            setAccClosing(acc.closing_day ? String(acc.closing_day) : "");
-            setAccDue(acc.due_day ? String(acc.due_day) : "");
-            setAccIsActive(acc.is_active !== false);
-            setAccountDialogOpen(true);
-          };
-
-          const handleAccClick = (acc: FinancialAccount) => {
-            const now = Date.now();
-            if (lastAccClickRef.current?.id === acc.id && now - lastAccClickRef.current.time < 400) {
-              openAccEdit(acc);
-              lastAccClickRef.current = null;
-            } else {
-              lastAccClickRef.current = { id: acc.id, time: now };
-            }
-          };
-
-          const renderAccountCard = (acc: FinancialAccount) => {
-            const typeInfo = ACCOUNT_TYPE_LABELS[acc.type as AccountType];
-            const isCredit = acc.type === "credit_card";
-            const usedPercent = isCredit && acc.credit_limit ? ((acc.credit_limit - acc.current_balance) / acc.credit_limit) * 100 : 0;
-            return (
-              <Card key={acc.id}
-                className={cn("cursor-pointer hover:shadow-md transition-all duration-200 select-none", acc.is_active === false && "opacity-50")}
-                onClick={() => handleAccClick(acc)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">{typeInfo?.icon}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold truncate">{acc.name}</p>
-                      <p className="text-xs text-muted-foreground">{typeInfo?.label}</p>
-                    </div>
-                  </div>
-                  <p className={cn("text-lg font-bold", acc.current_balance >= 0 ? "text-success" : "text-destructive")}>
-                    {brl(acc.current_balance)}
-                  </p>
-                  {isCredit && acc.credit_limit && (
-                    <div className="mt-2 space-y-1">
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div className={cn("h-full rounded-full transition-all", usedPercent > 80 ? "bg-destructive" : usedPercent > 50 ? "bg-warning" : "bg-primary")}
-                          style={{ width: `${Math.min(usedPercent, 100)}%` }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Limite: {brl(acc.credit_limit)}</span>
-                        <span>{usedPercent.toFixed(0)}%</span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          };
-
-          return (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-bold shrink-0">Carteira</h2>
-              <Input placeholder="Pesquisar carteiras..." value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 max-w-xs bg-transparent border-0 border-b border-border/30 rounded-none focus-visible:ring-0 focus-visible:border-primary/40 placeholder:text-muted-foreground/40" />
-              <Dialog open={accountDialogOpen} onOpenChange={(o) => { setAccountDialogOpen(o); if (!o) resetAccForm(); }}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="h-9 gap-1.5 shrink-0"><Plus className="h-4 w-4" /> Nova Carteira</Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader><DialogTitle>{editingAccount ? "Editar Carteira" : "Nova Carteira"}</DialogTitle></DialogHeader>
-                  <div className="space-y-3">
-                    <Input placeholder="Nome da carteira" value={accName} onChange={(e) => setAccName(e.target.value)} />
-                    <Select value={accType} onValueChange={(v) => setAccType(v as AccountType)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {(Object.entries(ACCOUNT_TYPE_LABELS) as [AccountType, { label: string }][]).map(([key, { label }]) => (
-                          <SelectItem key={key} value={key}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
-                      <Input type="text" inputMode="decimal" placeholder="0,00" value={accBalance} onChange={(e) => setAccBalance(e.target.value.replace(/[^0-9.,]/g, ""))} className="pl-9" />
-                    </div>
-                    {accType === "credit_card" && (
-                      <>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
-                          <Input type="text" inputMode="decimal" placeholder="Limite" value={accLimit} onChange={(e) => setAccLimit(e.target.value.replace(/[^0-9.,]/g, ""))} className="pl-9" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Input type="number" placeholder="Dia Fechamento" min="1" max="31" value={accClosing} onChange={(e) => setAccClosing(e.target.value)} />
-                          <Input type="number" placeholder="Dia Vencimento" min="1" max="31" value={accDue} onChange={(e) => setAccDue(e.target.value)} />
-                        </div>
-                      </>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <Label>Carteira Ativa</Label>
-                      <Switch checked={accIsActive} onCheckedChange={setAccIsActive} />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 pt-4 border-t border-border/20">
-                    {editingAccount && (
-                      <Button variant="destructive" size="sm" className="gap-1.5"
-                        onClick={() => setDeleteConfirmId(editingAccount.id)}>
-                        <Trash2 className="h-3.5 w-3.5" /> Excluir
-                      </Button>
-                    )}
-                    <div className="flex gap-2 ml-auto">
-                      <Button variant="outline" size="sm" onClick={() => { setAccountDialogOpen(false); resetAccForm(); }}>Cancelar</Button>
-                      <Button size="sm" onClick={saveAccount} className="gap-1.5"><Save className="h-3.5 w-3.5" /> Salvar</Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {activeAccounts.map(renderAccountCard)}
-              {activeAccounts.length === 0 && (
-                <div className="col-span-full text-center py-12">
-                  <Wallet className="h-10 w-10 mx-auto text-muted-foreground/30 mb-2" />
-                  <p className="text-sm text-muted-foreground">Nenhuma carteira ativa cadastrada</p>
-                </div>
-              )}
-            </div>
-
-            {inactiveAccounts.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Carteiras Inativas</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {inactiveAccounts.map(renderAccountCard)}
-                </div>
-              </div>
-            )}
-
-            {/* Delete confirmation dialog */}
-            <Dialog open={!!deleteConfirmId} onOpenChange={(o) => { if (!o) setDeleteConfirmId(null); }}>
-              <DialogContent className="max-w-sm">
-                <DialogHeader>
-                  <DialogTitle>Confirmar exclusão</DialogTitle>
-                  <DialogDescription>Tem certeza que deseja excluir esta carteira? Esta ação não pode ser desfeita.</DialogDescription>
-                </DialogHeader>
-                <div className="flex items-center gap-2 pt-4 border-t border-border/20">
-                  <div className="flex gap-2 ml-auto">
-                    <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(null)}>Cancelar</Button>
-                    <Button variant="destructive" size="sm" onClick={async () => {
-                      if (deleteConfirmId) {
-                        await deleteAccount(deleteConfirmId);
-                        setDeleteConfirmId(null);
-                        setAccountDialogOpen(false);
-                        resetAccForm();
-                      }
-                    }}>Excluir</Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-          );
-        })()}
+        {/* Carteira tab removed - now in Patrimônio module */}
       </div>
 
       {/* Delete entry confirmation */}

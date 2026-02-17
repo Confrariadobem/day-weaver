@@ -310,9 +310,6 @@ export default function InvestmentsView() {
             {INVESTMENT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Button size="sm" className="h-8 gap-1.5" onClick={openNew}>
-          <Plus className="h-3.5 w-3.5" /> Adicionar
-        </Button>
       </div>
 
       {/* Investment Cards Grid */}
@@ -381,10 +378,7 @@ export default function InvestmentsView() {
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <TrendingUp className="h-12 w-12 mb-3 opacity-20" />
             <p className="text-sm font-medium">Nenhum investimento encontrado</p>
-            <p className="text-xs mt-1">Adicione seu primeiro ativo para começar.</p>
-            <Button size="sm" className="mt-4 gap-1.5" onClick={openNew}>
-              <Plus className="h-3.5 w-3.5" /> Adicionar Investimento
-            </Button>
+            <p className="text-xs mt-1">Use o botão + para adicionar seu primeiro ativo.</p>
           </div>
         )}
       </ScrollArea>
