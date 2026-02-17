@@ -17,7 +17,7 @@ import {
   Printer, FileDown, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
   CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
-  Filter,
+  Filter, BarChart3,
 } from "lucide-react";
 import {
   format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
@@ -143,7 +143,12 @@ export default function FinancesView() {
     if (accRes.data) setAccounts(accRes.data as FinancialAccount[]);
   }, [user]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+    const handleDataChanged = () => fetchData();
+    window.addEventListener("lovable:data-changed", handleDataChanged);
+    return () => window.removeEventListener("lovable:data-changed", handleDataChanged);
+  }, [fetchData]);
 
   const resetForm = () => {
     setTitle(""); setAmount(""); setInstallments("1"); setCategoryId(""); setProjectId("");
@@ -816,6 +821,23 @@ export default function FinancesView() {
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
+      {/* Tab buttons - Patrimônio pattern */}
+      <div className="flex items-center gap-2 overflow-x-auto">
+        {([
+          { key: "indicadores" as ViewTab, label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
+          { key: "previsao" as ViewTab, label: "Fluxo de Caixa", icon: <CircleDollarSign className="h-3 w-3" /> },
+          { key: "doar" as ViewTab, label: "DOAR", icon: <Landmark className="h-3 w-3" /> },
+        ]).map(tab => (
+          <Button key={tab.key} size="sm"
+            variant={viewTab === tab.key ? "default" : "ghost"}
+            className={cn("h-7 text-xs px-3 rounded-full gap-1.5", viewTab !== tab.key && "text-muted-foreground")}
+            onClick={() => setViewTab(tab.key)}
+          >
+            {tab.icon} {tab.label}
+          </Button>
+        ))}
+      </div>
+
       {/* KPI Cards - Patrimônio pattern */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="bg-card">
@@ -850,17 +872,6 @@ export default function FinancesView() {
             <p className={cn("text-lg font-bold", totalAvailable >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(totalAvailable)}</p>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as ViewTab)}>
-          <TabsList className="h-9">
-            <TabsTrigger value="indicadores" className="text-sm">Indicadores</TabsTrigger>
-            <TabsTrigger value="previsao" className="text-sm">Fluxo de Caixa</TabsTrigger>
-            <TabsTrigger value="doar" className="text-sm">DOAR</TabsTrigger>
-          </TabsList>
-        </Tabs>
       </div>
 
       {/* Content */}

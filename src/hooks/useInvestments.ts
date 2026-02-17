@@ -29,7 +29,9 @@ export function useInvestments() {
       .channel("investments-list")
       .on("postgres_changes", { event: "*", schema: "public", table: "investments", filter: `user_id=eq.${user.id}` }, fetchInvestments)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    const handleDataChanged = () => fetchInvestments();
+    window.addEventListener("lovable:data-changed", handleDataChanged);
+    return () => { supabase.removeChannel(ch); window.removeEventListener("lovable:data-changed", handleDataChanged); };
   }, [user, fetchInvestments]);
 
   return { investments, loading, refetch: fetchInvestments };

@@ -525,38 +525,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           {/* ─── TERTIARY GROUP: Type-specific fields (only shown after type selection or when editing) ─── */}
           {(item || eventType !== "event" || title.trim()) && (
             <>
-              {/* Dates - common for all */}
-              <div className="space-y-3 rounded-lg border border-border/30 p-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Data início</Label>
-                    <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="text-sm">Data fim</Label>
-                    <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
-                  <Label htmlFor="allday" className="text-sm">Dia inteiro</Label>
-                </div>
-
-                {!allDay && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-sm flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Início</Label>
-                      <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Fim</Label>
-                      <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Cashflow: direction + amount + payment fields */}
               {eventType === "cashflow" && (
                 <div className="space-y-3 rounded-lg border border-border/30 p-3">
@@ -566,13 +534,13 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                       className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
                         cashflowDirection === "expense" ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"
                       )}
-                    >💳 Pagar</button>
+                    ><CircleDollarSign className="h-3.5 w-3.5 inline mr-1" />Pagar</button>
                     <button
                       onClick={() => setCashflowDirection("revenue")}
                       className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
                         cashflowDirection === "revenue" ? "bg-[hsl(var(--success))] text-white" : "bg-muted text-muted-foreground"
                       )}
-                    >💰 Receber</button>
+                    ><TrendingUp className="h-3.5 w-3.5 inline mr-1" />Receber</button>
                   </div>
                   <div>
                     <Label className="text-sm">Valor (R$)</Label>
@@ -643,19 +611,36 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 </div>
               )}
 
-              {/* ─── Extra fields: Lembrete + Recorrência ─── */}
+              {/* ─── Dates group ─── */}
               <div className="space-y-3 rounded-lg border border-border/30 p-3">
-                <div>
-                  <Label className="text-sm flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Lembrete</Label>
-                  <Select value={reminder} onValueChange={setReminder}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {REMINDER_OPTIONS.map((r) => (
-                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Data início</Label>
+                    <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Data fim</Label>
+                    <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                  </div>
                 </div>
+
+                <div className="flex items-center gap-1.5">
+                  <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
+                  <Label htmlFor="allday" className="text-sm">Dia inteiro</Label>
+                </div>
+
+                {!allDay && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-sm flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Início</Label>
+                      <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Fim</Label>
+                      <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <Label className="text-sm flex items-center gap-1.5"><Repeat className="h-3.5 w-3.5" /> Recorrência</Label>
@@ -689,6 +674,21 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                     )}
                   </>
                 )}
+              </div>
+
+              {/* ─── Lembrete ─── */}
+              <div className="space-y-3 rounded-lg border border-border/30 p-3">
+                <div>
+                  <Label className="text-sm flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Lembrete</Label>
+                  <Select value={reminder} onValueChange={setReminder}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {REMINDER_OPTIONS.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </>
           )}

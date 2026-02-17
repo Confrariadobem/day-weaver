@@ -91,7 +91,9 @@ export default function ProgramsProjectsView() {
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` }, fetchData)
       .on("postgres_changes", { event: "*", schema: "public", table: "projects", filter: `user_id=eq.${user.id}` }, fetchData)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const handleDataChanged = () => fetchData();
+    window.addEventListener("lovable:data-changed", handleDataChanged);
+    return () => { supabase.removeChannel(channel); window.removeEventListener("lovable:data-changed", handleDataChanged); };
   }, [user, fetchData]);
 
   const allTasks = useMemo(() => [...tasks, ...completedTasks], [tasks, completedTasks]);
@@ -567,6 +569,27 @@ export default function ProgramsProjectsView() {
     <>
       <ScrollArea className="h-full">
         <div className="p-4 space-y-4">
+          {/* Filter buttons - Patrimônio pattern */}
+          <div className="flex items-center gap-2 overflow-x-auto">
+            {(["all", "active", "completed"] as FilterStatus[]).map(f => (
+              <Button key={f} size="sm"
+                variant={filterStatus === f ? "default" : "ghost"}
+                className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== f && "text-muted-foreground")}
+                onClick={() => setFilterStatus(f)}
+              >
+                {f === "all" && <FolderKanban className="h-3 w-3" />}
+                {f === "active" && <Layers className="h-3 w-3" />}
+                {f === "completed" && <Check className="h-3 w-3" />}
+                {f === "all" ? "Todos" : f === "active" ? "Ativos" : "Concluídos"}
+              </Button>
+            ))}
+            <div className="ml-auto relative">
+              <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Input placeholder="Buscar projeto..." value={search} onChange={(e) => setSearch(e.target.value)}
+                className="h-7 pl-8 text-xs w-40" />
+            </div>
+          </div>
+
           {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <Card className="bg-card">
@@ -613,27 +636,7 @@ export default function ProgramsProjectsView() {
             </Card>
           </div>
 
-          {/* Search + Filters */}
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input placeholder="Buscar projeto..." value={search} onChange={(e) => setSearch(e.target.value)}
-                className="h-8 pl-8 text-xs" />
-            </div>
-            <div className="flex items-center gap-1">
-              {(["all", "active", "completed"] as FilterStatus[]).map(f => (
-                <Button key={f} size="sm"
-                  variant={filterStatus === f ? "default" : "ghost"}
-                  className={cn("h-7 text-xs px-2.5 rounded-full", filterStatus !== f && "text-muted-foreground")}
-                  onClick={() => setFilterStatus(f)}
-                >
-                  {f === "all" ? "Todos" : f === "active" ? "Ativos" : "Concluídos"}
-                </Button>
-              ))}
-            </div>
-          </div>
 
-          {/* Project Cards Grid */}
           <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
             {visibleProjects.map(p => {
               const progress = getProjectProgress(p.id);
