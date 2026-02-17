@@ -43,15 +43,16 @@ interface EventEditDialogProps {
   defaultEventType?: EventType;
 }
 
-type EventType = "birthday" | "event" | "cashflow" | "investment" | "project" | "patrimonio";
+type EventType = "birthday" | "event" | "cashflow" | "investment" | "project" | "patrimonio" | "programa";
 
 const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
   birthday: <Cake className="h-3.5 w-3.5" />,
   event: <CalendarDays className="h-3.5 w-3.5" />,
   cashflow: <CircleDollarSign className="h-3.5 w-3.5" />,
   investment: <TrendingUp className="h-3.5 w-3.5" />,
-  project: <FolderKanban className="h-3.5 w-3.5" />,
   patrimonio: <Building2 className="h-3.5 w-3.5" />,
+  programa: <FolderKanban className="h-3.5 w-3.5" />,
+  project: <FolderKanban className="h-3.5 w-3.5" />,
 };
 
 const EVENT_TYPES: { value: EventType; label: string; color: string }[] = [
@@ -60,6 +61,7 @@ const EVENT_TYPES: { value: EventType; label: string; color: string }[] = [
   { value: "event", label: "Evento", color: "#3b82f6" },
   { value: "investment", label: "Investimento", color: "#d4a017" },
   { value: "patrimonio", label: "Patrimônio", color: "#8b5cf6" },
+  { value: "programa", label: "Programa", color: "#06b6d4" },
   { value: "project", label: "Projeto", color: "#eab308" },
 ];
 
@@ -315,8 +317,13 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           project_id: projectId || null,
         }).select("id").single();
         if (data) taskId = data.id;
+      }
 
-        // Project association is handled via the projectId field selection
+      // For programa, create a program record
+      if (eventType === "programa") {
+        await supabase.from("programs").insert({
+          user_id: userId, name: title, description: displayDescription || null,
+        });
       }
 
       // For cashflow, create a financial entry with all fields
@@ -641,9 +648,9 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
             {(eventType === "project" || eventType === "event" || eventType === "cashflow") && (
               <div>
-                <Label className="text-sm">Projeto</Label>
+                <Label className="text-sm">{eventType === "project" ? "Programa" : "Projeto"}</Label>
                 <Select value={projectId} onValueChange={setProjectId}>
-                  <SelectTrigger><SelectValue placeholder="Selecionar projeto (opcional)" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={eventType === "project" ? "Selecionar programa (opcional)" : "Selecionar projeto (opcional)"} /></SelectTrigger>
                   <SelectContent>
                     {projects.map(p => (
                       <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
