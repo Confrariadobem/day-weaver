@@ -42,15 +42,14 @@ interface EventEditDialogProps {
   onSaved: () => void;
 }
 
-type EventType = "birthday" | "event" | "cashflow" | "investment" | "project" | "task";
+type EventType = "birthday" | "event" | "cashflow" | "investment" | "project";
 
 const EVENT_TYPES: { value: EventType; label: string; icon: string; color: string }[] = [
   { value: "birthday", label: "Aniversário", icon: "🎂", color: "#ec4899" },
   { value: "cashflow", label: "Fluxo de caixa", icon: "💵", color: "#22c55e" },
   { value: "event", label: "Evento", icon: "📅", color: "#3b82f6" },
   { value: "investment", label: "Investimento", icon: "📈", color: "#d4a017" },
-  { value: "project", label: "Projetos e tarefas", icon: "📁", color: "#eab308" },
-  { value: "task", label: "Tarefa", icon: "☑️", color: "#f97316" },
+  { value: "project", label: "Projetos", icon: "📁", color: "#eab308" },
 ];
 
 type RecurrenceDateMode = "same_date" | "first_business_day";
@@ -174,7 +173,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       else if (desc.includes("[tipo:cashflow]") || desc.includes("[tipo:bill]") || desc.includes("[tipo:receivable]")) setEventType("cashflow");
       else if (desc.includes("[tipo:investment]")) setEventType("investment");
       else if (desc.includes("[tipo:project]")) setEventType("project");
-      else if (item.is_task) setEventType("task");
+      else if (item.is_task) setEventType("project");
       else setEventType("event");
       setReminder("none");
     } else {
@@ -187,7 +186,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       const h = d.getHours();
       setStartTime(h > 0 ? `${String(h).padStart(2, "0")}:00` : "09:00");
       setEndTime(h > 0 ? `${String(h + 1).padStart(2, "0")}:00` : "10:00");
-      setAllDay(h === 0);
+      setAllDay(true);
       setColor("#3b82f6");
       setRecurrence("none");
       setRecurrenceCount("12");
@@ -247,7 +246,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       eventType !== "event" ? `[tipo:${eventType}]` : "",
       isFavorite ? "[favorito:true]" : "",
       reminder !== "none" ? `[lembrete:${reminder}min]` : "",
-      eventType === "task" ? `[prioridade:${priority}]` : "",
+      eventType === "project" ? `[prioridade:${priority}]` : "",
       (eventType === "cashflow" || eventType === "investment") && billAmount ? `[valor:${billAmount}]` : "",
       eventType === "cashflow" ? `[direcao:${cashflowDirection}]` : "",
     ].filter(Boolean).join(" ");
@@ -269,7 +268,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       }
     } else {
       let taskId: string | null = null;
-      if (eventType === "task" || eventType === "project") {
+      if (eventType === "project") {
         const { data } = await supabase.from("tasks").insert({
           user_id: userId, title, description: displayDescription,
           scheduled_date: startDate, is_completed: false, is_favorite: isFavorite,
@@ -617,8 +616,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 </div>
               )}
 
-              {/* Task priority */}
-              {eventType === "task" && (
+              {/* Project priority */}
+              {eventType === "project" && (
                 <div className="space-y-3 rounded-lg border border-border/30 p-3">
                   <div>
                     <Label className="text-sm flex items-center gap-1.5"><Tag className="h-3.5 w-3.5" /> Prioridade</Label>

@@ -22,9 +22,8 @@ export default function Dashboard() {
       <NavSidebar activeModule={activeModule} onModuleChange={setActiveModule} />
 
       <main className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex items-center gap-3 border-b border-border px-4 py-2">
-          <h1 className="text-sm font-bold text-primary">Task Calendar</h1>
-          <span className="text-xs text-muted-foreground capitalize">
+        <header className="flex items-center gap-3 border-b border-border/30 px-4 py-2.5">
+          <h1 className="text-sm font-bold text-foreground">
             {activeModule === "calendar" && "Calendário"}
             {activeModule === "finances" && "Finanças"}
             {activeModule === "dashboard" && "Dashboard"}
@@ -33,7 +32,7 @@ export default function Dashboard() {
             {activeModule === "programs" && "Projetos"}
             {activeModule === "investments" && "Investimentos"}
             {activeModule === "patrimonio" && "Patrimônio"}
-          </span>
+          </h1>
         </header>
 
         <div className="flex flex-1 overflow-hidden">
