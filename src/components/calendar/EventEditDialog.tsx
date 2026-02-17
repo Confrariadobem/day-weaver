@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,20 +111,46 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const [installments, setInstallments] = useState("1");
   const [accounts, setAccounts] = useState<any[]>([]);
 
-  // Fetch categories, projects, and accounts
+  // Autocomplete state
+  const [titleSuggestions, setTitleSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const [allTitles, setAllTitles] = useState<{ title: string; count: number }[]>([]);
+
+  // Fetch categories, projects, accounts, and past titles
   useEffect(() => {
     if (!userId || !open) return;
-    const fetch = async () => {
-      const [catRes, projRes, accRes] = await Promise.all([
+    const fetchAll = async () => {
+      const [catRes, projRes, accRes, evtRes, taskRes, finRes] = await Promise.all([
         supabase.from("categories").select("*").eq("user_id", userId).order("name"),
         supabase.from("projects").select("*").eq("user_id", userId).order("name"),
         supabase.from("financial_accounts").select("*").eq("user_id", userId).eq("is_active", true).order("name"),
+        supabase.from("calendar_events").select("title").eq("user_id", userId),
+        supabase.from("tasks").select("title").eq("user_id", userId),
+        supabase.from("financial_entries").select("title").eq("user_id", userId),
       ]);
       if (catRes.data) setCategories(catRes.data);
       if (projRes.data) setProjects(projRes.data);
       if (accRes.data) setAccounts(accRes.data);
+
+      // Build frequency map of all titles
+      const titleMap = new Map<string, number>();
+      const addTitles = (data: { title: string }[] | null) => {
+        data?.forEach(d => {
+          const t = d.title.replace(/\s*\(\d+\/\d+\)$/, "").trim();
+          if (t) titleMap.set(t, (titleMap.get(t) || 0) + 1);
+        });
+      };
+      addTitles(evtRes.data);
+      addTitles(taskRes.data);
+      addTitles(finRes.data);
+      const sorted = Array.from(titleMap.entries())
+        .map(([title, count]) => ({ title, count }))
+        .sort((a, b) => b.count - a.count);
+      setAllTitles(sorted);
     };
-    fetch();
+    fetchAll();
   }, [userId, open]);
 
   useEffect(() => {
@@ -179,6 +205,27 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setInstallments("1");
     }
   }, [item, defaultDate, open]);
+
+  // Compute filtered suggestions
+  const filteredSuggestions = useMemo(() => {
+    if (!title.trim() || title.length < 2) return [];
+    const q = title.toLowerCase();
+    return allTitles
+      .filter(t => t.title.toLowerCase().includes(q) && t.title.toLowerCase() !== q)
+      .slice(0, 6);
+  }, [title, allTitles]);
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
+          titleInputRef.current && !titleInputRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const cleanDescription = (desc: string) => {
     return desc.replace(/\[tipo:\w+\]/g, "").replace(/\[lembrete:\w+\]/g, "").replace(/\[prioridade:\w+\]/g, "").replace(/\[valor:[\d.,]+\]/g, "").replace(/\[direcao:\w+\]/g, "").replace(/\[favorito:\w+\]/g, "").replace(/\[categoria:\w+\]/g, "").replace(/\[projeto:\w+\]/g, "").trim();
@@ -372,8 +419,35 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           <div className="space-y-3 rounded-lg border border-border/30 p-3">
             <div>
               <Label className="text-sm">Título</Label>
-              <div className="flex gap-2 items-center">
-                <Input className="flex-1" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nome do lançamento" />
+              <div className="flex gap-2 items-center relative">
+                <div className="flex-1 relative">
+                  <Input
+                    ref={titleInputRef}
+                    value={title}
+                    onChange={(e) => { setTitle(e.target.value); setShowSuggestions(true); }}
+                    onFocus={() => setShowSuggestions(true)}
+                    placeholder="Nome do lançamento"
+                    autoComplete="off"
+                  />
+                  {showSuggestions && filteredSuggestions.length > 0 && (
+                    <div
+                      ref={suggestionsRef}
+                      className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-md border border-border bg-popover shadow-md"
+                    >
+                      {filteredSuggestions.map((s, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent/50 text-left"
+                          onClick={() => { setTitle(s.title); setShowSuggestions(false); }}
+                        >
+                          <span className="flex-1 truncate">{s.title}</span>
+                          <span className="text-[10px] text-muted-foreground shrink-0">×{s.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsFavorite(!isFavorite)}

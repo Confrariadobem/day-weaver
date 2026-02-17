@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,7 +15,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search, Plus, ChevronDown, Star, FolderOpen, FolderClosed,
   Trash2, Save, User, Users, Check, ArrowUpDown, ChevronsUpDown,
-  Printer, Layers, FolderKanban,
+  Printer, Layers, FolderKanban, AlertTriangle, CalendarDays,
+  TrendingUp, TrendingDown, Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -23,6 +25,8 @@ import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventE
 
 type SortField = "title" | "status" | "priority" | "date" | "assignee";
 type SortDir = "asc" | "desc";
+type ViewMode = "dashboard" | "eap";
+type FilterStatus = "all" | "active" | "delayed" | "completed";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
@@ -41,8 +45,19 @@ function getPriorityBadge(p: string) {
   return <span className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground">🟢</span>;
 }
 
+interface Phase {
+  id: string;
+  project_id: string;
+  user_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+}
+
 export default function ProgramsProjectsView() {
   const { user } = useAuth();
+  const [viewMode, setViewMode] = useState<ViewMode>("eap");
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [sortField, setSortField] = useState<SortField>("title");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -52,9 +67,11 @@ export default function ProgramsProjectsView() {
   const [projects, setProjects] = useState<Tables<"projects">[]>([]);
   const [entries, setEntries] = useState<any[]>([]);
   const [resources, setResources] = useState<any[]>([]);
+  const [phases, setPhases] = useState<Phase[]>([]);
 
   const [search, setSearch] = useState("");
   const [newTask, setNewTask] = useState("");
+  const [newPhaseName, setNewPhaseName] = useState("");
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [showCompletedProjects, setShowCompletedProjects] = useState(false);
   const [expandLevel, setExpandLevel] = useState(3);
@@ -85,13 +102,14 @@ export default function ProgramsProjectsView() {
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [tasksRes, completedRes, catsRes, projRes, entRes, resRes] = await Promise.all([
+    const [tasksRes, completedRes, catsRes, projRes, entRes, resRes, phaseRes] = await Promise.all([
       supabase.from("tasks").select("*").eq("user_id", user.id).eq("is_completed", false).order("sort_order"),
       supabase.from("tasks").select("*").eq("user_id", user.id).eq("is_completed", true).order("updated_at", { ascending: false }).limit(50),
       supabase.from("categories").select("*").eq("user_id", user.id),
       supabase.from("projects").select("*").eq("user_id", user.id).order("name"),
       supabase.from("financial_entries").select("*").eq("user_id", user.id),
       supabase.from("project_resources").select("*"),
+      supabase.from("project_phases").select("*").eq("user_id", user.id).order("sort_order"),
     ]);
     if (tasksRes.data) setTasks(tasksRes.data);
     if (completedRes.data) setCompletedTasks(completedRes.data);
@@ -99,6 +117,7 @@ export default function ProgramsProjectsView() {
     if (projRes.data) setProjects(projRes.data);
     if (entRes.data) setEntries(entRes.data);
     if (resRes.data) setResources(resRes.data);
+    if (phaseRes.data) setPhases(phaseRes.data as Phase[]);
   }, [user]);
 
   useEffect(() => {
@@ -155,14 +174,37 @@ export default function ProgramsProjectsView() {
   }, [categories]);
 
   const projectCategories = sortedCategories.filter(c => c.is_project);
-  const activeProjects = projects.filter(p => p.status !== "completed");
-  const completedProjectsList = projects.filter(p => p.status === "completed");
+
+  const filteredProjects = useMemo(() => {
+    let list = projects;
+    if (filterStatus === "active") list = list.filter(p => p.status === "active");
+    else if (filterStatus === "completed") list = list.filter(p => p.status === "completed");
+    else if (filterStatus === "delayed") {
+      const today = new Date().toISOString().slice(0, 10);
+      list = list.filter(p => p.status !== "completed"); // simplified delay check
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(p => p.name.toLowerCase().includes(q));
+    }
+    return list;
+  }, [projects, filterStatus, search]);
+
+  const activeProjects = filteredProjects.filter(p => p.status !== "completed");
+  const completedProjectsList = filteredProjects.filter(p => p.status === "completed");
 
   const getProjectCosts = useCallback((projectId: string) => {
     const projEntries = entries.filter(e => e.project_id === projectId);
     const totalCost = projEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
-    return { totalCost };
+    const totalRevenue = projEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
+    return { totalCost, totalRevenue };
   }, [entries]);
+
+  const getProjectProgress = useCallback((projectId: string) => {
+    const pTasks = [...tasks, ...completedTasks].filter(t => t.project_id === projectId);
+    if (pTasks.length === 0) return 0;
+    return Math.round((pTasks.filter(t => t.is_completed).length / pTasks.length) * 100);
+  }, [tasks, completedTasks]);
 
   const resetProjectForm = () => {
     setProjName(""); setProjDescription(""); setProjBudget(""); setProjStatus("active");
@@ -235,6 +277,20 @@ export default function ProgramsProjectsView() {
     fetchData();
   };
 
+  const addPhase = async (projectId: string) => {
+    if (!newPhaseName.trim() || !user) return;
+    const maxOrder = phases.filter(p => p.project_id === projectId).reduce((m, p) => Math.max(m, p.sort_order), 0);
+    await supabase.from("project_phases").insert({
+      project_id: projectId, user_id: user.id, name: newPhaseName.trim(), sort_order: maxOrder + 1,
+    });
+    setNewPhaseName(""); fetchData();
+  };
+
+  const deletePhase = async (id: string) => {
+    await supabase.from("project_phases").delete().eq("id", id);
+    fetchData();
+  };
+
   const projectResources = useMemo(() => {
     if (!editingProject) return [];
     return resources.filter((r: any) => r.project_id === editingProject.id);
@@ -245,10 +301,7 @@ export default function ProgramsProjectsView() {
     return sortTasks(list);
   }, [tasks, search, sortTasks]);
 
-  const cycleExpand = () => {
-    setExpandLevel(prev => prev === 3 ? 1 : prev + 1);
-  };
-
+  const cycleExpand = () => setExpandLevel(prev => prev === 3 ? 1 : prev + 1);
   const expandLabel = expandLevel === 1 ? "Categorias" : expandLevel === 2 ? "Projetos" : "Tudo";
 
   const handleTaskDoubleClick = (task: Tables<"tasks">) => {
@@ -270,6 +323,24 @@ export default function ProgramsProjectsView() {
     }
   };
 
+  // Dashboard stats
+  const dashboardStats = useMemo(() => {
+    const active = projects.filter(p => p.status === "active");
+    const completed = projects.filter(p => p.status === "completed");
+    const totalBudget = active.reduce((s, p) => s + Number(p.budget || 0), 0);
+    const totalSpent = active.reduce((s, p) => s + getProjectCosts(p.id).totalCost, 0);
+    const avgProgress = active.length > 0 ? active.reduce((s, p) => s + getProjectProgress(p.id), 0) / active.length : 0;
+    const overBudget = active.filter(p => {
+      const costs = getProjectCosts(p.id);
+      return Number(p.budget || 0) > 0 && costs.totalCost > Number(p.budget);
+    });
+    const upcomingTasks = tasks
+      .filter(t => t.project_id && t.scheduled_date && !t.is_completed)
+      .sort((a, b) => (a.scheduled_date || "").localeCompare(b.scheduled_date || ""))
+      .slice(0, 5);
+    return { active: active.length, completed: completed.length, totalBudget, totalSpent, avgProgress, overBudget, upcomingTasks };
+  }, [projects, tasks, getProjectCosts, getProjectProgress]);
+
   const TaskRow = ({ task }: { task: Tables<"tasks"> }) => {
     const priority = getPriorityFromDesc(task.description);
     return (
@@ -283,7 +354,7 @@ export default function ProgramsProjectsView() {
           onClick={(e) => e.stopPropagation()}
           className="h-3.5 w-3.5 shrink-0"
         />
-        <span className="flex-1 truncate">{task.title}</span>
+        <span className={cn("flex-1 truncate", task.is_completed && "line-through opacity-50")}>{task.title}</span>
         {getPriorityBadge(priority)}
         {task.scheduled_date && (
           <span className="text-[10px] text-muted-foreground shrink-0">{format(new Date(task.scheduled_date), "dd/MM")}</span>
@@ -299,11 +370,13 @@ export default function ProgramsProjectsView() {
   };
 
   const ProjectBlock = ({ p }: { p: Tables<"projects"> }) => {
-    const pTasks = [...tasks, ...completedTasks].filter(t => t.project_id === p.id);
-    const pDone = pTasks.filter(t => t.is_completed).length;
+    const allPTasks = [...tasks, ...completedTasks].filter(t => t.project_id === p.id);
+    const pDone = allPTasks.filter(t => t.is_completed).length;
     const costs = getProjectCosts(p.id);
     const isSelected = selectedProject === p.id;
     const FolderIcon = isSelected ? FolderOpen : FolderClosed;
+    const projectPhases = phases.filter(ph => ph.project_id === p.id).sort((a, b) => a.sort_order - b.sort_order);
+    const isOverBudget = Number(p.budget || 0) > 0 && costs.totalCost > Number(p.budget);
 
     return (
       <div>
@@ -313,46 +386,214 @@ export default function ProgramsProjectsView() {
           )}>
           <FolderIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium truncate">{p.name}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {pDone}/{pTasks.length} atividades
-              {costs.totalCost > 0 && ` • ${brl(costs.totalCost)}`}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-medium truncate">{p.name}</p>
+              {isOverBudget && <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />}
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              <span>{pDone}/{allPTasks.length} atividades</span>
+              {costs.totalCost > 0 && <span>• {brl(costs.totalCost)}{Number(p.budget) > 0 ? ` / ${brl(Number(p.budget))}` : ""}</span>}
+            </div>
+          </div>
+          <div className="w-12 shrink-0">
+            <Progress value={allPTasks.length > 0 ? (pDone / allPTasks.length) * 100 : 0} className="h-1.5" />
           </div>
           <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform", !isSelected && "-rotate-90")} />
         </div>
         {isSelected && expandLevel >= 3 && (
-          <div className="ml-4 mt-1 mb-2 space-y-0.5 border-l-2 border-primary/20 pl-2">
-            <div className="mb-2">
-              <Progress value={pTasks.length > 0 ? (pDone / pTasks.length) * 100 : 0} className="h-1.5" />
-              <p className="text-[10px] text-muted-foreground mt-0.5">{pTasks.length > 0 ? Math.round((pDone / pTasks.length) * 100) : 0}% concluído</p>
-            </div>
-            {sortTasks(pTasks.filter(t => !t.is_completed)).map((task) => (
-              <TaskRow key={task.id} task={task} />
-            ))}
-            {pTasks.filter(t => t.is_completed).length > 0 && (
-              <p className="text-[10px] text-muted-foreground/50 px-2 pt-1">+{pTasks.filter(t => t.is_completed).length} concluída(s)</p>
-            )}
+          <div className="ml-4 mt-1 mb-2 space-y-1 border-l-2 border-primary/20 pl-2">
+            {/* Phases */}
+            {projectPhases.map(phase => {
+              const phaseTasks = allPTasks.filter((t: any) => t.phase_id === phase.id);
+              const phDone = phaseTasks.filter(t => t.is_completed).length;
+              return (
+                <Collapsible key={phase.id} defaultOpen>
+                  <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-accent/30">
+                    <ChevronDown className="h-2.5 w-2.5" />
+                    <span>{phase.name}</span>
+                    <span className="ml-auto text-[9px] font-normal">{phDone}/{phaseTasks.length}</span>
+                    <button onClick={(e) => { e.stopPropagation(); deletePhase(phase.id); }} className="opacity-0 group-hover:opacity-100 hover:text-destructive">
+                      <Trash2 className="h-2.5 w-2.5" />
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pl-3 space-y-0.5">
+                    {sortTasks(phaseTasks.filter(t => !t.is_completed)).map(task => <TaskRow key={task.id} task={task} />)}
+                    {phaseTasks.filter(t => t.is_completed).length > 0 && (
+                      <p className="text-[10px] text-muted-foreground/50 px-2 pt-0.5">+{phaseTasks.filter(t => t.is_completed).length} concluída(s)</p>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
+
+            {/* Unphased tasks */}
+            {(() => {
+              const phaseIds = new Set(projectPhases.map(ph => ph.id));
+              const unphasedTasks = allPTasks.filter((t: any) => !t.phase_id || !phaseIds.has(t.phase_id));
+              const activeTasks = unphasedTasks.filter(t => !t.is_completed);
+              const doneTasks = unphasedTasks.filter(t => t.is_completed);
+              if (activeTasks.length === 0 && doneTasks.length === 0 && projectPhases.length > 0) return null;
+              return (
+                <>
+                  {projectPhases.length > 0 && activeTasks.length > 0 && (
+                    <p className="text-[10px] text-muted-foreground font-medium px-1.5 pt-1">Sem etapa</p>
+                  )}
+                  {sortTasks(activeTasks).map(task => <TaskRow key={task.id} task={task} />)}
+                  {doneTasks.length > 0 && (
+                    <p className="text-[10px] text-muted-foreground/50 px-2 pt-0.5">+{doneTasks.length} concluída(s)</p>
+                  )}
+                </>
+              );
+            })()}
+
+            {/* Add phase */}
             <div className="flex gap-1 mt-1">
+              <Input placeholder="Nova etapa..." value={newPhaseName}
+                onChange={(e) => setNewPhaseName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addPhase(p.id); }}
+                className="h-5 text-[9px]" />
+              <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => addPhase(p.id)}>
+                <Layers className="h-2.5 w-2.5" />
+              </Button>
+            </div>
+
+            {/* Add task */}
+            <div className="flex gap-1">
               <Input placeholder="Nova atividade..." value={newTask} onChange={(e) => setNewTask(e.target.value)}
                 onKeyDown={async (e) => {
                   if (e.key === "Enter" && newTask.trim() && user) {
                     await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
                     setNewTask(""); fetchData();
                   }
-                }} className="h-6 text-[10px]" />
-              <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={async () => {
+                }} className="h-5 text-[9px]" />
+              <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={async () => {
                 if (newTask.trim() && user) {
                   await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
                   setNewTask(""); fetchData();
                 }
-              }}><Plus className="h-3 w-3" /></Button>
+              }}><Plus className="h-2.5 w-2.5" /></Button>
             </div>
           </div>
         )}
       </div>
     );
   };
+
+  // Dashboard view
+  const DashboardPanel = () => (
+    <div className="space-y-4 p-4 overflow-auto h-full">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <FolderKanban className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-[10px] text-muted-foreground">Ativos</p>
+              <p className="text-lg font-bold">{dashboardStats.active}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <Check className="h-5 w-5 text-[hsl(var(--success))]" />
+            <div>
+              <p className="text-[10px] text-muted-foreground">Concluídos</p>
+              <p className="text-lg font-bold">{dashboardStats.completed}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <TrendingDown className="h-5 w-5 text-destructive" />
+            <div>
+              <p className="text-[10px] text-muted-foreground">Gasto Total</p>
+              <p className="text-sm font-bold text-destructive">{brl(dashboardStats.totalSpent)}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <Wallet className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-[10px] text-muted-foreground">Orçado Total</p>
+              <p className="text-sm font-bold">{brl(dashboardStats.totalBudget)}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Progress overview */}
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-sm font-semibold mb-3">Progresso Médio</p>
+          <Progress value={dashboardStats.avgProgress} className="h-3" />
+          <p className="text-xs text-muted-foreground mt-1">{Math.round(dashboardStats.avgProgress)}% concluído</p>
+        </CardContent>
+      </Card>
+
+      {/* Over budget alerts */}
+      {dashboardStats.overBudget.length > 0 && (
+        <Card className="border-destructive/30">
+          <CardContent className="p-4">
+            <p className="text-sm font-semibold text-destructive flex items-center gap-1.5 mb-2">
+              <AlertTriangle className="h-4 w-4" /> Estouro de Orçamento
+            </p>
+            {dashboardStats.overBudget.map(p => (
+              <div key={p.id} className="flex items-center justify-between text-xs py-1">
+                <span>{p.name}</span>
+                <span className="text-destructive font-medium">{brl(getProjectCosts(p.id).totalCost)} / {brl(Number(p.budget))}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Upcoming tasks */}
+      {dashboardStats.upcomingTasks.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+              <CalendarDays className="h-4 w-4 text-primary" /> Próximos Vencimentos
+            </p>
+            {dashboardStats.upcomingTasks.map(t => (
+              <div key={t.id} className="flex items-center justify-between text-xs py-1 border-b border-border/20 last:border-0">
+                <span className="truncate flex-1">{t.title}</span>
+                <span className="text-muted-foreground shrink-0 ml-2">
+                  {t.scheduled_date ? format(new Date(t.scheduled_date), "dd/MM") : "—"}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Top 5 active projects */}
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-sm font-semibold mb-3">Top 5 Projetos Ativos</p>
+          {projects.filter(p => p.status === "active").slice(0, 5).map(p => {
+            const progress = getProjectProgress(p.id);
+            const costs = getProjectCosts(p.id);
+            return (
+              <div key={p.id} className="mb-3 last:mb-0 cursor-pointer hover:bg-accent/30 rounded-lg p-2 -mx-2" onClick={() => { setViewMode("eap"); setSelectedProject(p.id); }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium truncate">{p.name}</span>
+                  <span className="text-[10px] text-muted-foreground">{progress}%</span>
+                </div>
+                <Progress value={progress} className="h-1.5 mb-1" />
+                <div className="flex gap-3 text-[10px] text-muted-foreground">
+                  <span>Gasto: {brl(costs.totalCost)}</span>
+                  {Number(p.budget) > 0 && <span>Orçamento: {brl(Number(p.budget))}</span>}
+                </div>
+              </div>
+            );
+          })}
+          {projects.filter(p => p.status === "active").length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-4">Nenhum projeto ativo</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 
   return (
     <>
@@ -363,124 +604,151 @@ export default function ProgramsProjectsView() {
             <Layers className="h-5 w-5 text-primary" />
             <h2 className="text-base font-bold">Programas e Projetos</h2>
           </div>
-          <Button size="sm" onClick={() => { resetProjectForm(); setProjectDialogOpen(true); }} className="gap-1.5 h-8">
-            <Plus className="h-3.5 w-3.5" /> Novo Projeto
-          </Button>
-        </div>
-
-        {/* Search */}
-        <div className="px-4 pt-3 pb-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input placeholder="Buscar programas, projetos ou atividades..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 pl-8 text-sm" />
-          </div>
-        </div>
-
-        {/* Sort Bar */}
-        <div className="flex items-center gap-0.5 px-4 py-1.5 border-b border-border/20 text-[10px] text-muted-foreground">
-          {([
-            { field: "title" as SortField, label: "Atividade" },
-            { field: "status" as SortField, label: "Status" },
-            { field: "priority" as SortField, label: "Prior." },
-            { field: "date" as SortField, label: "Prazo" },
-            { field: "assignee" as SortField, label: "Resp." },
-          ]).map(s => (
-            <button key={s.field} onClick={() => toggleSort(s.field)}
-              className={cn("px-1.5 py-0.5 rounded hover:bg-accent/50 transition-colors flex items-center gap-0.5",
-                sortField === s.field && "text-primary font-medium"
-              )}>
-              {s.label}
-              {sortField === s.field && <ArrowUpDown className="h-2.5 w-2.5" />}
-            </button>
-          ))}
-          <div className="ml-auto flex gap-0.5">
-            <button onClick={cycleExpand} className="p-0.5 rounded hover:bg-accent/50 flex items-center gap-0.5" title={`Nível: ${expandLabel}`}>
-              <ChevronsUpDown className="h-3 w-3" />
-              <span className="text-[9px]">{expandLevel}</span>
-            </button>
-            <button onClick={() => {
-              const printContent = tasks.map(t => `${t.is_completed ? "✅" : "⬜"} ${t.title}`).join("\n");
-              const w = window.open("", "_blank");
-              if (w) { w.document.write(`<pre style="font-family:sans-serif;font-size:14px;">${printContent}</pre>`); w.print(); }
-            }} className="p-0.5 rounded hover:bg-accent/50" title="Imprimir">
-              <Printer className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
-
-        {/* EAP Content */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-1">
-          {/* Programas = Categories that are projects */}
-          {sortedCategories.filter(c => c.is_project).map((cat) => {
-            const catProjects = activeProjects.filter(p => p.category_id === cat.id);
-            const catOrphanTasks = allActiveTasks.filter(t => t.category_id === cat.id && !t.project_id);
-            if (catProjects.length === 0 && catOrphanTasks.length === 0) return null;
-            return (
-              <Collapsible key={cat.id} open={expandLevel >= 1} className="mb-1">
-                <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold text-foreground hover:bg-accent/50">
-                  <Layers className="h-4 w-4 text-primary" />
-                  {cat.color && <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />}
-                  <span className="truncate">{cat.icon} {cat.name}</span>
-                  <span className="ml-auto text-[10px] text-muted-foreground font-normal">{catProjects.length} projetos • {catOrphanTasks.length} atividades</span>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pl-4 pt-0.5 space-y-0.5">
-                  {expandLevel >= 2 && catProjects.map((p) => <ProjectBlock key={p.id} p={p} />)}
-                  {expandLevel >= 3 && catOrphanTasks.map(task => <TaskRow key={task.id} task={task} />)}
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })}
-
-          {/* Uncategorized */}
-          {(() => {
-            const uncatProjects = activeProjects.filter(p => !p.category_id);
-            const uncatTasks = allActiveTasks.filter(t => !t.category_id && !t.project_id);
-            if (uncatProjects.length === 0 && uncatTasks.length === 0) return null;
-            return (
-              <Collapsible open={expandLevel >= 1} className="mb-1">
-                <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold text-foreground hover:bg-accent/50">
-                  <FolderKanban className="h-4 w-4 text-muted-foreground" />
-                  <span>Sem Programa</span>
-                  <span className="ml-auto text-[10px] text-muted-foreground font-normal">{uncatProjects.length}P / {uncatTasks.length}T</span>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pl-4 pt-0.5 space-y-0.5">
-                  {expandLevel >= 2 && uncatProjects.map((p) => <ProjectBlock key={p.id} p={p} />)}
-                  {expandLevel >= 3 && uncatTasks.map(task => <TaskRow key={task.id} task={task} />)}
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })()}
-
-          {activeProjects.length === 0 && allActiveTasks.filter(t => !t.project_id).length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <Layers className="h-10 w-10 mb-3 opacity-30" />
-              <p className="text-sm font-medium">Nenhum programa ou projeto</p>
-              <p className="text-xs">Crie um novo projeto para começar a organizar suas atividades.</p>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-lg bg-muted p-0.5">
+              <button onClick={() => setViewMode("dashboard")}
+                className={cn("rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                  viewMode === "dashboard" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                )}>Dashboard</button>
+              <button onClick={() => setViewMode("eap")}
+                className={cn("rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                  viewMode === "eap" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                )}>EAP</button>
             </div>
-          )}
-
-          {/* Completed */}
-          {completedProjectsList.length > 0 && (
-            <Collapsible open={showCompletedProjects} onOpenChange={setShowCompletedProjects} className="mt-4">
-              <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground w-full px-2 py-1.5">
-                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !showCompletedProjects && "-rotate-90")} />
-                <Check className="h-3.5 w-3.5" />
-                Concluídos ({completedProjectsList.length})
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-0.5 mt-1">
-                {completedProjectsList.map((p) => (
-                  <div key={p.id} onClick={() => openEditProject(p)}
-                    className="flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-accent/50 opacity-50">
-                    <FolderClosed className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <p className="text-xs truncate line-through">{p.name}</p>
-                  </div>
-                ))}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+            <Button size="sm" onClick={() => { resetProjectForm(); setProjectDialogOpen(true); }} className="gap-1.5 h-8">
+              <Plus className="h-3.5 w-3.5" /> Novo Projeto
+            </Button>
+          </div>
         </div>
+
+        {viewMode === "dashboard" ? (
+          <DashboardPanel />
+        ) : (
+          <>
+            {/* Search & Filters */}
+            <div className="px-4 pt-3 pb-2 flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input placeholder="Buscar programas, projetos ou atividades..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 pl-8 text-sm" />
+              </div>
+              <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as FilterStatus)}>
+                <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="active">Em andamento</SelectItem>
+                  <SelectItem value="delayed">Atrasados</SelectItem>
+                  <SelectItem value="completed">Concluídos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Sort Bar */}
+            <div className="flex items-center gap-0.5 px-4 py-1.5 border-b border-border/20 text-[10px] text-muted-foreground">
+              {([
+                { field: "title" as SortField, label: "Atividade" },
+                { field: "status" as SortField, label: "Status" },
+                { field: "priority" as SortField, label: "Prior." },
+                { field: "date" as SortField, label: "Prazo" },
+                { field: "assignee" as SortField, label: "Resp." },
+              ]).map(s => (
+                <button key={s.field} onClick={() => toggleSort(s.field)}
+                  className={cn("px-1.5 py-0.5 rounded hover:bg-accent/50 transition-colors flex items-center gap-0.5",
+                    sortField === s.field && "text-primary font-medium"
+                  )}>
+                  {s.label}
+                  {sortField === s.field && <ArrowUpDown className="h-2.5 w-2.5" />}
+                </button>
+              ))}
+              <div className="ml-auto flex gap-0.5">
+                <button onClick={cycleExpand} className="p-0.5 rounded hover:bg-accent/50 flex items-center gap-0.5" title={`Nível: ${expandLabel}`}>
+                  <ChevronsUpDown className="h-3 w-3" />
+                  <span className="text-[9px]">{expandLevel}</span>
+                </button>
+                <button onClick={() => {
+                  const printContent = tasks.map(t => `${t.is_completed ? "✅" : "⬜"} ${t.title}`).join("\n");
+                  const w = window.open("", "_blank");
+                  if (w) { w.document.write(`<pre style="font-family:sans-serif;font-size:14px;">${printContent}</pre>`); w.print(); }
+                }} className="p-0.5 rounded hover:bg-accent/50" title="Imprimir">
+                  <Printer className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+
+            {/* EAP Content */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-1">
+              {sortedCategories.filter(c => c.is_project).map((cat) => {
+                const catProjects = activeProjects.filter(p => p.category_id === cat.id);
+                const catOrphanTasks = allActiveTasks.filter(t => t.category_id === cat.id && !t.project_id);
+                if (catProjects.length === 0 && catOrphanTasks.length === 0) return null;
+                return (
+                  <Collapsible key={cat.id} open={expandLevel >= 1} className="mb-1">
+                    <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold text-foreground hover:bg-accent/50">
+                      <Layers className="h-4 w-4 text-primary" />
+                      {cat.color && <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />}
+                      <span className="truncate">{cat.icon} {cat.name}</span>
+                      <span className="ml-auto text-[10px] text-muted-foreground font-normal">{catProjects.length} projetos • {catOrphanTasks.length} atividades</span>
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pl-4 pt-0.5 space-y-0.5">
+                      {expandLevel >= 2 && catProjects.map((p) => <ProjectBlock key={p.id} p={p} />)}
+                      {expandLevel >= 3 && catOrphanTasks.map(task => <TaskRow key={task.id} task={task} />)}
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
+
+              {/* Uncategorized */}
+              {(() => {
+                const uncatProjects = activeProjects.filter(p => !p.category_id);
+                const uncatTasks = allActiveTasks.filter(t => !t.category_id && !t.project_id);
+                if (uncatProjects.length === 0 && uncatTasks.length === 0) return null;
+                return (
+                  <Collapsible open={expandLevel >= 1} className="mb-1">
+                    <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold text-foreground hover:bg-accent/50">
+                      <FolderKanban className="h-4 w-4 text-muted-foreground" />
+                      <span>Sem Programa</span>
+                      <span className="ml-auto text-[10px] text-muted-foreground font-normal">{uncatProjects.length}P / {uncatTasks.length}T</span>
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pl-4 pt-0.5 space-y-0.5">
+                      {expandLevel >= 2 && uncatProjects.map((p) => <ProjectBlock key={p.id} p={p} />)}
+                      {expandLevel >= 3 && uncatTasks.map(task => <TaskRow key={task.id} task={task} />)}
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })()}
+
+              {activeProjects.length === 0 && allActiveTasks.filter(t => !t.project_id).length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Layers className="h-10 w-10 mb-3 opacity-30" />
+                  <p className="text-sm font-medium">Nenhum programa ou projeto</p>
+                  <p className="text-xs">Crie um novo projeto para começar a organizar suas atividades.</p>
+                </div>
+              )}
+
+              {/* Completed */}
+              {completedProjectsList.length > 0 && (
+                <Collapsible open={showCompletedProjects} onOpenChange={setShowCompletedProjects} className="mt-4">
+                  <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground w-full px-2 py-1.5">
+                    <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !showCompletedProjects && "-rotate-90")} />
+                    <Check className="h-3.5 w-3.5" />
+                    Concluídos ({completedProjectsList.length})
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-0.5 mt-1">
+                    {completedProjectsList.map((p) => (
+                      <div key={p.id} onClick={() => openEditProject(p)}
+                        className="flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-accent/50 opacity-50">
+                        <FolderClosed className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <p className="text-xs truncate line-through">{p.name}</p>
+                        <span className="ml-auto text-[10px] text-muted-foreground">{getProjectProgress(p.id)}%</span>
+                      </div>
+                    ))}
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Project Dialog */}
@@ -493,6 +761,7 @@ export default function ProgramsProjectsView() {
             <TabsList className="w-full">
               <TabsTrigger value="details" className="flex-1 text-xs">Detalhes</TabsTrigger>
               {editingProject && <TabsTrigger value="resources" className="flex-1 text-xs">Recursos ({projectResources.length})</TabsTrigger>}
+              {editingProject && <TabsTrigger value="phases" className="flex-1 text-xs">Etapas ({phases.filter(ph => ph.project_id === editingProject.id).length})</TabsTrigger>}
             </TabsList>
             <div className="mt-4">
               {projDialogTab === "details" && (
@@ -571,6 +840,36 @@ export default function ProgramsProjectsView() {
                       </button>
                     </div>
                   ))}
+                </div>
+              )}
+              {projDialogTab === "phases" && editingProject && (
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input placeholder="Nova etapa (ex: Planejamento, Execução, Entrega)" value={newPhaseName}
+                      onChange={(e) => setNewPhaseName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") addPhase(editingProject.id); }}
+                      className="flex-1 text-sm" />
+                    <Button size="sm" onClick={() => addPhase(editingProject.id)} className="shrink-0"><Plus className="h-3.5 w-3.5" /></Button>
+                  </div>
+                  {phases.filter(ph => ph.project_id === editingProject.id).sort((a, b) => a.sort_order - b.sort_order).map(ph => {
+                    const phaseTasks = [...tasks, ...completedTasks].filter((t: any) => t.phase_id === ph.id);
+                    const done = phaseTasks.filter(t => t.is_completed).length;
+                    return (
+                      <div key={ph.id} className="flex items-center gap-3 rounded-lg border border-border/30 p-2.5">
+                        <Layers className="h-4 w-4 text-primary shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">{ph.name}</p>
+                          <p className="text-xs text-muted-foreground">{done}/{phaseTasks.length} atividades</p>
+                        </div>
+                        <button onClick={() => deletePhase(ph.id)} className="rounded p-1 hover:bg-destructive/10">
+                          <Trash2 className="h-3.5 w-3.5 text-destructive/60" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {phases.filter(ph => ph.project_id === editingProject.id).length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">Nenhuma etapa criada. Sugestões: Planejamento, Execução, Entrega</p>
+                  )}
                 </div>
               )}
             </div>
