@@ -5,45 +5,28 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { Card, CardContent } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Search, Plus, ChevronDown, Star, FolderOpen, FolderClosed,
-  Trash2, Save, User, Users, Check, ArrowUpDown, ChevronsUpDown,
-  Printer, Layers, FolderKanban, AlertTriangle, CalendarDays,
-  TrendingUp, TrendingDown, Wallet,
+  Search, Plus, ChevronRight, Star, FolderOpen, FolderClosed,
+  Trash2, Save, User, Users, Check, AlertTriangle, CalendarDays,
+  Layers, FolderKanban, LayoutGrid, ListTodo, Clock,
+  ChevronDown, ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
 import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
 
-type SortField = "title" | "status" | "priority" | "date" | "assignee";
-type SortDir = "asc" | "desc";
-type ViewMode = "dashboard" | "eap";
 type FilterStatus = "all" | "active" | "delayed" | "completed";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-
-const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-
-function getPriorityFromDesc(desc: string | null): string {
-  if (!desc) return "medium";
-  const m = desc.match(/\[prioridade:(\w+)\]/);
-  return m ? m[1] : "medium";
-}
-
-function getPriorityBadge(p: string) {
-  if (p === "urgent") return <span className="text-[10px] px-1 py-0.5 rounded bg-destructive/20 text-destructive">🔥</span>;
-  if (p === "high") return <span className="text-[10px] px-1 py-0.5 rounded bg-destructive/10 text-destructive/80">🔴</span>;
-  if (p === "medium") return <span className="text-[10px] px-1 py-0.5 rounded bg-warning/10 text-warning">🟡</span>;
-  return <span className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground">🟢</span>;
-}
 
 interface Phase {
   id: string;
@@ -56,10 +39,7 @@ interface Phase {
 
 export default function ProgramsProjectsView() {
   const { user } = useAuth();
-  const [viewMode, setViewMode] = useState<ViewMode>("eap");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
-  const [sortField, setSortField] = useState<SortField>("title");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Tables<"tasks">[]>([]);
@@ -72,9 +52,10 @@ export default function ProgramsProjectsView() {
   const [search, setSearch] = useState("");
   const [newTask, setNewTask] = useState("");
   const [newPhaseName, setNewPhaseName] = useState("");
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [showCompletedProjects, setShowCompletedProjects] = useState(false);
-  const [expandLevel, setExpandLevel] = useState(3);
+
+  // Selection state: which program/project is active
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   // Project dialog
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
@@ -97,7 +78,6 @@ export default function ProgramsProjectsView() {
   const [editingTaskItem, setEditingTaskItem] = useState<CalendarItem | null>(null);
   const [taskEditDefaultDate, setTaskEditDefaultDate] = useState<Date>(new Date());
 
-  const lastProjClickRef = useRef<{ id: string; time: number } | null>(null);
   const lastTaskClickRef = useRef<{ id: string; time: number } | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -131,29 +111,65 @@ export default function ProgramsProjectsView() {
     return () => { supabase.removeChannel(channel); };
   }, [user, fetchData]);
 
-  const sortTasks = useCallback((list: Tables<"tasks">[]) => {
-    return [...list].sort((a, b) => {
-      let cmp = 0;
-      if (sortField === "title") cmp = a.title.localeCompare(b.title, "pt-BR");
-      else if (sortField === "priority") cmp = (PRIORITY_ORDER[getPriorityFromDesc(a.description)] || 2) - (PRIORITY_ORDER[getPriorityFromDesc(b.description)] || 2);
-      else if (sortField === "date") cmp = (a.scheduled_date || "9999").localeCompare(b.scheduled_date || "9999");
-      else if (sortField === "assignee") cmp = (a.assignee || "zzz").localeCompare(b.assignee || "zzz", "pt-BR");
-      else if (sortField === "status") cmp = (a.is_completed ? 1 : 0) - (b.is_completed ? 1 : 0);
-      return sortDir === "desc" ? -cmp : cmp;
+  // ─── Derived data ───
+  const sortedCategories = useMemo(() => [...categories].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")), [categories]);
+  const projectCategories = sortedCategories.filter(c => c.is_project);
+
+  const allTasks = useMemo(() => [...tasks, ...completedTasks], [tasks, completedTasks]);
+
+  const getProjectCosts = useCallback((projectId: string) => {
+    const projEntries = entries.filter(e => e.project_id === projectId);
+    const totalCost = projEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
+    const totalRevenue = projEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
+    return { totalCost, totalRevenue };
+  }, [entries]);
+
+  const getProjectProgress = useCallback((projectId: string) => {
+    const pTasks = allTasks.filter(t => t.project_id === projectId);
+    if (pTasks.length === 0) return 0;
+    return Math.round((pTasks.filter(t => t.is_completed).length / pTasks.length) * 100);
+  }, [allTasks]);
+
+  // Programs = project categories
+  const programs = useMemo(() => {
+    return projectCategories.map(cat => {
+      const catProjects = projects.filter(p => p.category_id === cat.id);
+      const activeCount = catProjects.filter(p => p.status !== "completed").length;
+      const completedCount = catProjects.filter(p => p.status === "completed").length;
+      return { ...cat, projectCount: catProjects.length, activeCount, completedCount };
     });
-  }, [sortField, sortDir]);
+  }, [projectCategories, projects]);
 
-  const toggleSort = (field: SortField) => {
-    if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortField(field); setSortDir("asc"); }
-  };
+  // Has uncategorized projects?
+  const uncategorizedProjects = useMemo(() => projects.filter(p => !p.category_id), [projects]);
 
+  // Projects filtered by selected program
+  const visibleProjects = useMemo(() => {
+    let list = selectedProgramId === "__uncategorized"
+      ? uncategorizedProjects
+      : selectedProgramId
+        ? projects.filter(p => p.category_id === selectedProgramId)
+        : projects;
+
+    if (filterStatus === "active") list = list.filter(p => p.status !== "completed");
+    else if (filterStatus === "completed") list = list.filter(p => p.status === "completed");
+
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(p => p.name.toLowerCase().includes(q));
+    }
+    return list;
+  }, [projects, selectedProgramId, uncategorizedProjects, filterStatus, search]);
+
+  const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId) || null, [projects, selectedProjectId]);
+
+  // ─── Actions ───
   const toggleTaskComplete = async (task: Tables<"tasks">) => {
     await supabase.from("tasks").update({ is_completed: !task.is_completed }).eq("id", task.id);
     if (task.project_id && !task.is_completed) {
-      const allProjectTasks = [...tasks, ...completedTasks].filter(t => t.project_id === task.project_id);
-      const remainingIncomplete = allProjectTasks.filter(t => !t.is_completed && t.id !== task.id);
-      if (remainingIncomplete.length === 0) {
+      const projTasks = allTasks.filter(t => t.project_id === task.project_id);
+      const remaining = projTasks.filter(t => !t.is_completed && t.id !== task.id);
+      if (remaining.length === 0) {
         await supabase.from("projects").update({ status: "completed" }).eq("id", task.project_id);
       }
     }
@@ -167,49 +183,19 @@ export default function ProgramsProjectsView() {
 
   const toggleFavorite = async (task: Tables<"tasks">) => {
     await supabase.from("tasks").update({ is_favorite: !task.is_favorite }).eq("id", task.id);
+    fetchData();
   };
-
-  const sortedCategories = useMemo(() => {
-    return [...categories].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [categories]);
-
-  const projectCategories = sortedCategories.filter(c => c.is_project);
-
-  const filteredProjects = useMemo(() => {
-    let list = projects;
-    if (filterStatus === "active") list = list.filter(p => p.status === "active");
-    else if (filterStatus === "completed") list = list.filter(p => p.status === "completed");
-    else if (filterStatus === "delayed") {
-      const today = new Date().toISOString().slice(0, 10);
-      list = list.filter(p => p.status !== "completed"); // simplified delay check
-    }
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(p => p.name.toLowerCase().includes(q));
-    }
-    return list;
-  }, [projects, filterStatus, search]);
-
-  const activeProjects = filteredProjects.filter(p => p.status !== "completed");
-  const completedProjectsList = filteredProjects.filter(p => p.status === "completed");
-
-  const getProjectCosts = useCallback((projectId: string) => {
-    const projEntries = entries.filter(e => e.project_id === projectId);
-    const totalCost = projEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
-    const totalRevenue = projEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
-    return { totalCost, totalRevenue };
-  }, [entries]);
-
-  const getProjectProgress = useCallback((projectId: string) => {
-    const pTasks = [...tasks, ...completedTasks].filter(t => t.project_id === projectId);
-    if (pTasks.length === 0) return 0;
-    return Math.round((pTasks.filter(t => t.is_completed).length / pTasks.length) * 100);
-  }, [tasks, completedTasks]);
 
   const resetProjectForm = () => {
     setProjName(""); setProjDescription(""); setProjBudget(""); setProjStatus("active");
     setProjCategoryId(""); setProjResponsible(""); setProjStartDate(""); setProjEndDate("");
     setEditingProject(null); setProjDialogTab("details");
+  };
+
+  const openNewProject = () => {
+    resetProjectForm();
+    if (selectedProgramId && selectedProgramId !== "__uncategorized") setProjCategoryId(selectedProgramId);
+    setProjectDialogOpen(true);
   };
 
   const openEditProject = (p: Tables<"projects">) => {
@@ -220,24 +206,13 @@ export default function ProgramsProjectsView() {
     setProjDialogTab("details"); setProjectDialogOpen(true);
   };
 
-  const handleProjectClick = (p: Tables<"projects">) => {
-    const now = Date.now();
-    if (lastProjClickRef.current?.id === p.id && now - lastProjClickRef.current.time < 400) {
-      openEditProject(p); lastProjClickRef.current = null;
-    } else {
-      setSelectedProject(selectedProject === p.id ? null : p.id);
-      lastProjClickRef.current = { id: p.id, time: now };
-    }
-  };
-
   const saveProject = async () => {
     if (!projName.trim() || !user) return;
     if (projStatus === "completed" && editingProject) {
-      const allTasks = [...tasks, ...completedTasks];
       const projTasks = allTasks.filter(t => t.project_id === editingProject.id);
-      const incompleteTasks = projTasks.filter(t => !t.is_completed);
-      if (incompleteTasks.length > 0) {
-        alert(`Não é possível concluir. ${incompleteTasks.length} tarefa(s) pendente(s).`);
+      const incomplete = projTasks.filter(t => !t.is_completed);
+      if (incomplete.length > 0) {
+        alert(`Não é possível concluir. ${incomplete.length} tarefa(s) pendente(s).`);
         return;
       }
     }
@@ -253,13 +228,12 @@ export default function ProgramsProjectsView() {
   };
 
   const deleteProject = async (id: string) => {
-    const allTasks = [...tasks, ...completedTasks];
     if (allTasks.filter(t => t.project_id === id).length > 0) {
       alert("Não é possível excluir. Tarefas associadas.");
       setDeleteProjectConfirm(null); return;
     }
     await supabase.from("projects").delete().eq("id", id);
-    if (selectedProject === id) setSelectedProject(null);
+    if (selectedProjectId === id) setSelectedProjectId(null);
     setDeleteProjectConfirm(null); setProjectDialogOpen(false);
     resetProjectForm(); fetchData();
   };
@@ -296,15 +270,7 @@ export default function ProgramsProjectsView() {
     return resources.filter((r: any) => r.project_id === editingProject.id);
   }, [resources, editingProject]);
 
-  const allActiveTasks = useMemo(() => {
-    let list = search ? tasks.filter(t => t.title.toLowerCase().includes(search.toLowerCase())) : tasks;
-    return sortTasks(list);
-  }, [tasks, search, sortTasks]);
-
-  const cycleExpand = () => setExpandLevel(prev => prev === 3 ? 1 : prev + 1);
-  const expandLabel = expandLevel === 1 ? "Categorias" : expandLevel === 2 ? "Projetos" : "Tudo";
-
-  const handleTaskDoubleClick = (task: Tables<"tasks">) => {
+  const handleTaskClick = (task: Tables<"tasks">) => {
     const now = Date.now();
     if (lastTaskClickRef.current?.id === task.id && now - lastTaskClickRef.current.time < 400) {
       const calItem: CalendarItem = {
@@ -323,432 +289,438 @@ export default function ProgramsProjectsView() {
     }
   };
 
-  // Dashboard stats
-  const dashboardStats = useMemo(() => {
-    const active = projects.filter(p => p.status === "active");
-    const completed = projects.filter(p => p.status === "completed");
-    const totalBudget = active.reduce((s, p) => s + Number(p.budget || 0), 0);
-    const totalSpent = active.reduce((s, p) => s + getProjectCosts(p.id).totalCost, 0);
-    const avgProgress = active.length > 0 ? active.reduce((s, p) => s + getProjectProgress(p.id), 0) / active.length : 0;
-    const overBudget = active.filter(p => {
-      const costs = getProjectCosts(p.id);
-      return Number(p.budget || 0) > 0 && costs.totalCost > Number(p.budget);
-    });
-    const upcomingTasks = tasks
-      .filter(t => t.project_id && t.scheduled_date && !t.is_completed)
-      .sort((a, b) => (a.scheduled_date || "").localeCompare(b.scheduled_date || ""))
-      .slice(0, 5);
-    return { active: active.length, completed: completed.length, totalBudget, totalSpent, avgProgress, overBudget, upcomingTasks };
-  }, [projects, tasks, getProjectCosts, getProjectProgress]);
+  // ─── Status helpers ───
+  const statusConfig = {
+    active: { label: "Em andamento", color: "bg-primary/15 text-primary border-primary/30" },
+    paused: { label: "Pausado", color: "bg-warning/15 text-warning border-warning/30" },
+    completed: { label: "Concluído", color: "bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30" },
+  };
 
-  const TaskRow = ({ task }: { task: Tables<"tasks"> }) => {
-    const priority = getPriorityFromDesc(task.description);
+  const getStatusBadge = (status: string | null) => {
+    const cfg = statusConfig[(status || "active") as keyof typeof statusConfig] || statusConfig.active;
+    return <Badge variant="outline" className={cn("text-[10px] font-medium border", cfg.color)}>{cfg.label}</Badge>;
+  };
+
+  // ─── PANEL 1: Programs List ───
+  const ProgramsPanel = () => (
+    <div className="w-64 shrink-0 border-r border-border/40 flex flex-col bg-card/50">
+      <div className="p-4 border-b border-border/30">
+        <div className="flex items-center gap-2 mb-3">
+          <Layers className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground">Programas</h3>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Buscar..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 pl-8 text-xs bg-background"
+          />
+        </div>
+      </div>
+      <ScrollArea className="flex-1">
+        <div className="p-2 space-y-0.5">
+          {/* All projects button */}
+          <button
+            onClick={() => { setSelectedProgramId(null); setSelectedProjectId(null); }}
+            className={cn(
+              "w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all",
+              !selectedProgramId
+                ? "bg-primary/10 text-primary shadow-sm"
+                : "text-foreground hover:bg-accent/60"
+            )}
+          >
+            <LayoutGrid className="h-4 w-4 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium">Todos os Projetos</p>
+              <p className="text-[10px] text-muted-foreground">{projects.length} projetos</p>
+            </div>
+          </button>
+
+          {programs.map(prog => (
+            <button
+              key={prog.id}
+              onClick={() => { setSelectedProgramId(prog.id); setSelectedProjectId(null); }}
+              className={cn(
+                "w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all",
+                selectedProgramId === prog.id
+                  ? "bg-primary/10 text-primary shadow-sm"
+                  : "text-foreground hover:bg-accent/60"
+              )}
+            >
+              <div
+                className="h-3 w-3 rounded-full shrink-0 ring-2 ring-offset-1 ring-offset-card"
+                style={{ backgroundColor: prog.color || "hsl(var(--primary))" }}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium truncate">{prog.icon} {prog.name}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {prog.activeCount} ativo{prog.activeCount !== 1 ? "s" : ""}
+                  {prog.completedCount > 0 && <span> · {prog.completedCount} concluído{prog.completedCount !== 1 ? "s" : ""}</span>}
+                </p>
+              </div>
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            </button>
+          ))}
+
+          {uncategorizedProjects.length > 0 && (
+            <button
+              onClick={() => { setSelectedProgramId("__uncategorized"); setSelectedProjectId(null); }}
+              className={cn(
+                "w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all",
+                selectedProgramId === "__uncategorized"
+                  ? "bg-primary/10 text-primary shadow-sm"
+                  : "text-foreground hover:bg-accent/60"
+              )}
+            >
+              <FolderKanban className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium">Sem Programa</p>
+                <p className="text-[10px] text-muted-foreground">{uncategorizedProjects.length} projetos</p>
+              </div>
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            </button>
+          )}
+
+          {programs.length === 0 && uncategorizedProjects.length === 0 && (
+            <div className="flex flex-col items-center py-8 text-muted-foreground">
+              <Layers className="h-8 w-8 mb-2 opacity-30" />
+              <p className="text-xs">Nenhum programa criado</p>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+
+  // ─── PANEL 2: Projects Grid ───
+  const ProjectsPanel = () => {
+    const programLabel = selectedProgramId === "__uncategorized"
+      ? "Sem Programa"
+      : selectedProgramId
+        ? programs.find(p => p.id === selectedProgramId)?.name || "Programa"
+        : "Todos os Projetos";
+
     return (
+      <div className={cn("flex-1 flex flex-col border-r border-border/40 min-w-0", selectedProjectId && "hidden lg:flex")}>
+        <div className="p-4 border-b border-border/30 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <FolderOpen className="h-4 w-4 text-primary shrink-0" />
+            <h3 className="text-sm font-semibold truncate">{programLabel}</h3>
+            <Badge variant="secondary" className="text-[10px] shrink-0">{visibleProjects.length}</Badge>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as FilterStatus)}>
+              <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="active">Em andamento</SelectItem>
+                <SelectItem value="completed">Concluídos</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" className="h-8 gap-1.5" onClick={openNewProject}>
+              <Plus className="h-3.5 w-3.5" /> Projeto
+            </Button>
+          </div>
+        </div>
+        <ScrollArea className="flex-1">
+          <div className="p-4 grid gap-3 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+            {visibleProjects.map(p => {
+              const progress = getProjectProgress(p.id);
+              const costs = getProjectCosts(p.id);
+              const pTasks = allTasks.filter(t => t.project_id === p.id);
+              const pending = pTasks.filter(t => !t.is_completed).length;
+              const done = pTasks.filter(t => t.is_completed).length;
+              const isOverBudget = Number(p.budget || 0) > 0 && costs.totalCost > Number(p.budget);
+              const isSelected = selectedProjectId === p.id;
+
+              return (
+                <Card
+                  key={p.id}
+                  onClick={() => setSelectedProjectId(p.id)}
+                  className={cn(
+                    "cursor-pointer transition-all hover:shadow-md group relative",
+                    isSelected && "ring-2 ring-primary shadow-md",
+                    isOverBudget && "border-destructive/40"
+                  )}
+                >
+                  {isOverBudget && (
+                    <div className="absolute top-2 right-2">
+                      <AlertTriangle className="h-4 w-4 text-destructive" />
+                    </div>
+                  )}
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0 pr-4">
+                        <h4 className="text-sm font-semibold truncate text-foreground">{p.name}</h4>
+                        {p.description && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{p.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      {getStatusBadge(p.status)}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground">Progresso</span>
+                        <span className="font-medium text-foreground">{progress}%</span>
+                      </div>
+                      <Progress value={progress} className="h-2" />
+                    </div>
+                    <div className="flex items-center gap-4 mt-3 text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <ListTodo className="h-3 w-3" /> {pending} pendente{pending !== 1 ? "s" : ""}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Check className="h-3 w-3 text-[hsl(var(--success))]" /> {done}
+                      </span>
+                    </div>
+                    {(costs.totalCost > 0 || Number(p.budget) > 0) && (
+                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/30 text-[11px]">
+                        <span className={cn("font-medium", isOverBudget ? "text-destructive" : "text-foreground")}>
+                          {brl(costs.totalCost)}
+                        </span>
+                        {Number(p.budget) > 0 && (
+                          <span className="text-muted-foreground">/ {brl(Number(p.budget))}</span>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          {visibleProjects.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <FolderKanban className="h-12 w-12 mb-3 opacity-20" />
+              <p className="text-sm font-medium">Nenhum projeto encontrado</p>
+              <p className="text-xs mt-1">Crie um novo projeto para começar.</p>
+              <Button size="sm" className="mt-4 gap-1.5" onClick={openNewProject}>
+                <Plus className="h-3.5 w-3.5" /> Novo Projeto
+              </Button>
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+    );
+  };
+
+  // ─── PANEL 3: Project Detail (Activities) ───
+  const ActivitiesPanel = () => {
+    if (!selectedProject) {
+      return (
+        <div className="hidden lg:flex flex-col items-center justify-center flex-1 text-muted-foreground bg-card/30 min-w-[320px]">
+          <ListTodo className="h-12 w-12 mb-3 opacity-20" />
+          <p className="text-sm font-medium">Selecione um projeto</p>
+          <p className="text-xs mt-1">As atividades e tarefas aparecerão aqui.</p>
+        </div>
+      );
+    }
+
+    const projectTasks = allTasks.filter(t => t.project_id === selectedProject.id);
+    const activeTasks = projectTasks.filter(t => !t.is_completed);
+    const doneTasks = projectTasks.filter(t => t.is_completed);
+    const projectPhases = phases.filter(ph => ph.project_id === selectedProject.id).sort((a, b) => a.sort_order - b.sort_order);
+    const costs = getProjectCosts(selectedProject.id);
+    const progress = getProjectProgress(selectedProject.id);
+    const isOverBudget = Number(selectedProject.budget || 0) > 0 && costs.totalCost > Number(selectedProject.budget);
+
+    const TaskItem = ({ task }: { task: Tables<"tasks"> }) => (
       <div
-        onClick={() => handleTaskDoubleClick(task)}
-        className="group flex items-center gap-1.5 rounded-md px-2 py-1 text-xs hover:bg-accent/50 cursor-pointer"
+        onClick={() => handleTaskClick(task)}
+        className="group flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-accent/50 cursor-pointer transition-colors"
       >
         <Checkbox
           checked={!!task.is_completed}
           onCheckedChange={() => toggleTaskComplete(task)}
           onClick={(e) => e.stopPropagation()}
-          className="h-3.5 w-3.5 shrink-0"
+          className="h-4 w-4 shrink-0"
         />
-        <span className={cn("flex-1 truncate", task.is_completed && "line-through opacity-50")}>{task.title}</span>
-        {getPriorityBadge(priority)}
+        <div className="flex-1 min-w-0">
+          <p className={cn("text-sm truncate", task.is_completed && "line-through text-muted-foreground")}>{task.title}</p>
+          {task.assignee && (
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+              <User className="h-2.5 w-2.5" /> {task.assignee}
+            </p>
+          )}
+        </div>
         {task.scheduled_date && (
-          <span className="text-[10px] text-muted-foreground shrink-0">{format(new Date(task.scheduled_date), "dd/MM")}</span>
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1 shrink-0">
+            <Clock className="h-3 w-3" /> {format(new Date(task.scheduled_date), "dd/MM")}
+          </span>
         )}
-        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(task); }} className="shrink-0 opacity-0 group-hover:opacity-100">
-          <Star className={cn("h-3 w-3", task.is_favorite ? "fill-warning text-warning" : "text-muted-foreground")} />
+        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(task); }} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Star className={cn("h-3.5 w-3.5", task.is_favorite ? "fill-warning text-warning" : "text-muted-foreground")} />
         </button>
-        <button onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive">
-          <Trash2 className="h-3 w-3 text-muted-foreground" />
+        <button onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive">
+          <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
       </div>
     );
-  };
-
-  const ProjectBlock = ({ p }: { p: Tables<"projects"> }) => {
-    const allPTasks = [...tasks, ...completedTasks].filter(t => t.project_id === p.id);
-    const pDone = allPTasks.filter(t => t.is_completed).length;
-    const costs = getProjectCosts(p.id);
-    const isSelected = selectedProject === p.id;
-    const FolderIcon = isSelected ? FolderOpen : FolderClosed;
-    const projectPhases = phases.filter(ph => ph.project_id === p.id).sort((a, b) => a.sort_order - b.sort_order);
-    const isOverBudget = Number(p.budget || 0) > 0 && costs.totalCost > Number(p.budget);
 
     return (
-      <div>
-        <div onClick={() => handleProjectClick(p)}
-          className={cn("group flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer transition-colors",
-            isSelected ? "bg-primary/10 text-primary" : "hover:bg-accent/50"
-          )}>
-          <FolderIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs font-medium truncate">{p.name}</p>
-              {isOverBudget && <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />}
+      <div className={cn("flex-1 flex flex-col min-w-[320px]", !selectedProjectId && "hidden lg:flex")}>
+        {/* Header */}
+        <div className="p-4 border-b border-border/30">
+          <div className="flex items-center gap-2 mb-3">
+            <button onClick={() => setSelectedProjectId(null)} className="lg:hidden p-1 rounded-md hover:bg-accent">
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-bold truncate text-foreground">{selectedProject.name}</h3>
+              {selectedProject.description && (
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{selectedProject.description}</p>
+              )}
             </div>
-            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-              <span>{pDone}/{allPTasks.length} atividades</span>
-              {costs.totalCost > 0 && <span>• {brl(costs.totalCost)}{Number(p.budget) > 0 ? ` / ${brl(Number(p.budget))}` : ""}</span>}
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => openEditProject(selectedProject)}>
+              Editar
+            </Button>
+          </div>
+
+          {/* Summary row */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-lg bg-primary/5 p-2.5 text-center">
+              <p className="text-lg font-bold text-primary">{progress}%</p>
+              <p className="text-[10px] text-muted-foreground">Progresso</p>
+            </div>
+            <div className="rounded-lg bg-accent p-2.5 text-center">
+              <p className="text-lg font-bold text-foreground">{activeTasks.length}</p>
+              <p className="text-[10px] text-muted-foreground">Pendentes</p>
+            </div>
+            <div className={cn("rounded-lg p-2.5 text-center", isOverBudget ? "bg-destructive/10" : "bg-accent")}>
+              <p className={cn("text-lg font-bold", isOverBudget ? "text-destructive" : "text-foreground")}>{doneTasks.length}</p>
+              <p className="text-[10px] text-muted-foreground">Concluídas</p>
             </div>
           </div>
-          <div className="w-12 shrink-0">
-            <Progress value={allPTasks.length > 0 ? (pDone / allPTasks.length) * 100 : 0} className="h-1.5" />
-          </div>
-          <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform", !isSelected && "-rotate-90")} />
+
+          {(costs.totalCost > 0 || Number(selectedProject.budget) > 0) && (
+            <div className="mt-2 flex items-center justify-between text-xs px-1">
+              <span className={cn("font-medium", isOverBudget && "text-destructive")}>
+                Gasto: {brl(costs.totalCost)}
+              </span>
+              {Number(selectedProject.budget) > 0 && (
+                <span className="text-muted-foreground">Orçamento: {brl(Number(selectedProject.budget))}</span>
+              )}
+            </div>
+          )}
         </div>
-        {isSelected && expandLevel >= 3 && (
-          <div className="ml-4 mt-1 mb-2 space-y-1 border-l-2 border-primary/20 pl-2">
+
+        <ScrollArea className="flex-1">
+          <div className="p-4 space-y-4">
             {/* Phases */}
             {projectPhases.map(phase => {
-              const phaseTasks = allPTasks.filter((t: any) => t.phase_id === phase.id);
-              const phDone = phaseTasks.filter(t => t.is_completed).length;
+              const phaseTasks = projectTasks.filter((t: any) => t.phase_id === phase.id);
+              const phaseActive = phaseTasks.filter(t => !t.is_completed);
+              const phaseDone = phaseTasks.filter(t => t.is_completed);
+              const phaseProgress = phaseTasks.length > 0 ? Math.round((phaseDone.length / phaseTasks.length) * 100) : 0;
               return (
-                <Collapsible key={phase.id} defaultOpen>
-                  <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-accent/30">
-                    <ChevronDown className="h-2.5 w-2.5" />
-                    <span>{phase.name}</span>
-                    <span className="ml-auto text-[9px] font-normal">{phDone}/{phaseTasks.length}</span>
-                    <button onClick={(e) => { e.stopPropagation(); deletePhase(phase.id); }} className="opacity-0 group-hover:opacity-100 hover:text-destructive">
-                      <Trash2 className="h-2.5 w-2.5" />
+                <div key={phase.id} className="rounded-xl border border-border/40 overflow-hidden">
+                  <div className="flex items-center gap-2.5 px-4 py-3 bg-accent/30">
+                    <Layers className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-sm font-semibold text-foreground flex-1">{phase.name}</span>
+                    <span className="text-[10px] text-muted-foreground">{phaseDone.length}/{phaseTasks.length}</span>
+                    <div className="w-16">
+                      <Progress value={phaseProgress} className="h-1.5" />
+                    </div>
+                    <button onClick={() => deletePhase(phase.id)} className="p-1 rounded hover:bg-destructive/10 opacity-50 hover:opacity-100 transition-opacity">
+                      <Trash2 className="h-3 w-3 text-destructive" />
                     </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="pl-3 space-y-0.5">
-                    {sortTasks(phaseTasks.filter(t => !t.is_completed)).map(task => <TaskRow key={task.id} task={task} />)}
-                    {phaseTasks.filter(t => t.is_completed).length > 0 && (
-                      <p className="text-[10px] text-muted-foreground/50 px-2 pt-0.5">+{phaseTasks.filter(t => t.is_completed).length} concluída(s)</p>
+                  </div>
+                  <div className="divide-y divide-border/20">
+                    {phaseActive.map(task => <TaskItem key={task.id} task={task} />)}
+                    {phaseDone.length > 0 && (
+                      <div className="px-4 py-1.5 bg-accent/10">
+                        <p className="text-[10px] text-muted-foreground">{phaseDone.length} concluída{phaseDone.length !== 1 ? "s" : ""}</p>
+                      </div>
                     )}
-                  </CollapsibleContent>
-                </Collapsible>
+                    {phaseTasks.length === 0 && (
+                      <div className="px-4 py-3 text-xs text-muted-foreground text-center">Nenhuma atividade nesta etapa</div>
+                    )}
+                  </div>
+                </div>
               );
             })}
 
             {/* Unphased tasks */}
             {(() => {
               const phaseIds = new Set(projectPhases.map(ph => ph.id));
-              const unphasedTasks = allPTasks.filter((t: any) => !t.phase_id || !phaseIds.has(t.phase_id));
-              const activeTasks = unphasedTasks.filter(t => !t.is_completed);
-              const doneTasks = unphasedTasks.filter(t => t.is_completed);
-              if (activeTasks.length === 0 && doneTasks.length === 0 && projectPhases.length > 0) return null;
+              const unphased = projectTasks.filter((t: any) => !t.phase_id || !phaseIds.has(t.phase_id));
+              const unphasedActive = unphased.filter(t => !t.is_completed);
+              const unphasedDone = unphased.filter(t => t.is_completed);
+              if (unphasedActive.length === 0 && unphasedDone.length === 0 && projectPhases.length > 0) return null;
               return (
-                <>
-                  {projectPhases.length > 0 && activeTasks.length > 0 && (
-                    <p className="text-[10px] text-muted-foreground font-medium px-1.5 pt-1">Sem etapa</p>
-                  )}
-                  {sortTasks(activeTasks).map(task => <TaskRow key={task.id} task={task} />)}
-                  {doneTasks.length > 0 && (
-                    <p className="text-[10px] text-muted-foreground/50 px-2 pt-0.5">+{doneTasks.length} concluída(s)</p>
-                  )}
-                </>
+                <div className="rounded-xl border border-border/40 overflow-hidden">
+                  <div className="flex items-center gap-2.5 px-4 py-3 bg-accent/30">
+                    <ListTodo className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm font-semibold text-foreground flex-1">
+                      {projectPhases.length > 0 ? "Tarefas Rápidas" : "Atividades"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{unphasedDone.length}/{unphased.length}</span>
+                  </div>
+                  <div className="divide-y divide-border/20">
+                    {unphasedActive.map(task => <TaskItem key={task.id} task={task} />)}
+                    {unphasedDone.length > 0 && (
+                      <div className="px-4 py-1.5 bg-accent/10">
+                        <p className="text-[10px] text-muted-foreground">{unphasedDone.length} concluída{unphasedDone.length !== 1 ? "s" : ""}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               );
             })()}
 
-            {/* Add phase */}
-            <div className="flex gap-1 mt-1">
-              <Input placeholder="Nova etapa..." value={newPhaseName}
-                onChange={(e) => setNewPhaseName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") addPhase(p.id); }}
-                className="h-5 text-[9px]" />
-              <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => addPhase(p.id)}>
-                <Layers className="h-2.5 w-2.5" />
-              </Button>
-            </div>
-
-            {/* Add task */}
-            <div className="flex gap-1">
-              <Input placeholder="Nova atividade..." value={newTask} onChange={(e) => setNewTask(e.target.value)}
-                onKeyDown={async (e) => {
-                  if (e.key === "Enter" && newTask.trim() && user) {
-                    await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
+            {/* Add phase / task */}
+            <div className="space-y-2 pt-2">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nova etapa (ex: Planejamento, Execução)..."
+                  value={newPhaseName}
+                  onChange={(e) => setNewPhaseName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") addPhase(selectedProject.id); }}
+                  className="h-9 text-xs flex-1"
+                />
+                <Button size="sm" variant="outline" className="h-9 gap-1.5 shrink-0" onClick={() => addPhase(selectedProject.id)}>
+                  <Layers className="h-3.5 w-3.5" /> Etapa
+                </Button>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nova atividade..."
+                  value={newTask}
+                  onChange={(e) => setNewTask(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === "Enter" && newTask.trim() && user) {
+                      await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: selectedProject.id });
+                      setNewTask(""); fetchData();
+                    }
+                  }}
+                  className="h-9 text-xs flex-1"
+                />
+                <Button size="sm" className="h-9 gap-1.5 shrink-0" onClick={async () => {
+                  if (newTask.trim() && user) {
+                    await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: selectedProject.id });
                     setNewTask(""); fetchData();
                   }
-                }} className="h-5 text-[9px]" />
-              <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={async () => {
-                if (newTask.trim() && user) {
-                  await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: p.id });
-                  setNewTask(""); fetchData();
-                }
-              }}><Plus className="h-2.5 w-2.5" /></Button>
+                }}>
+                  <Plus className="h-3.5 w-3.5" /> Atividade
+                </Button>
+              </div>
             </div>
           </div>
-        )}
+        </ScrollArea>
       </div>
     );
   };
 
-  // Dashboard view
-  const DashboardPanel = () => (
-    <div className="space-y-4 p-4 overflow-auto h-full">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <FolderKanban className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-[10px] text-muted-foreground">Ativos</p>
-              <p className="text-lg font-bold">{dashboardStats.active}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <Check className="h-5 w-5 text-[hsl(var(--success))]" />
-            <div>
-              <p className="text-[10px] text-muted-foreground">Concluídos</p>
-              <p className="text-lg font-bold">{dashboardStats.completed}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <TrendingDown className="h-5 w-5 text-destructive" />
-            <div>
-              <p className="text-[10px] text-muted-foreground">Gasto Total</p>
-              <p className="text-sm font-bold text-destructive">{brl(dashboardStats.totalSpent)}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <Wallet className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-[10px] text-muted-foreground">Orçado Total</p>
-              <p className="text-sm font-bold">{brl(dashboardStats.totalBudget)}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Progress overview */}
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-sm font-semibold mb-3">Progresso Médio</p>
-          <Progress value={dashboardStats.avgProgress} className="h-3" />
-          <p className="text-xs text-muted-foreground mt-1">{Math.round(dashboardStats.avgProgress)}% concluído</p>
-        </CardContent>
-      </Card>
-
-      {/* Over budget alerts */}
-      {dashboardStats.overBudget.length > 0 && (
-        <Card className="border-destructive/30">
-          <CardContent className="p-4">
-            <p className="text-sm font-semibold text-destructive flex items-center gap-1.5 mb-2">
-              <AlertTriangle className="h-4 w-4" /> Estouro de Orçamento
-            </p>
-            {dashboardStats.overBudget.map(p => (
-              <div key={p.id} className="flex items-center justify-between text-xs py-1">
-                <span>{p.name}</span>
-                <span className="text-destructive font-medium">{brl(getProjectCosts(p.id).totalCost)} / {brl(Number(p.budget))}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Upcoming tasks */}
-      {dashboardStats.upcomingTasks.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-              <CalendarDays className="h-4 w-4 text-primary" /> Próximos Vencimentos
-            </p>
-            {dashboardStats.upcomingTasks.map(t => (
-              <div key={t.id} className="flex items-center justify-between text-xs py-1 border-b border-border/20 last:border-0">
-                <span className="truncate flex-1">{t.title}</span>
-                <span className="text-muted-foreground shrink-0 ml-2">
-                  {t.scheduled_date ? format(new Date(t.scheduled_date), "dd/MM") : "—"}
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Top 5 active projects */}
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-sm font-semibold mb-3">Top 5 Projetos Ativos</p>
-          {projects.filter(p => p.status === "active").slice(0, 5).map(p => {
-            const progress = getProjectProgress(p.id);
-            const costs = getProjectCosts(p.id);
-            return (
-              <div key={p.id} className="mb-3 last:mb-0 cursor-pointer hover:bg-accent/30 rounded-lg p-2 -mx-2" onClick={() => { setViewMode("eap"); setSelectedProject(p.id); }}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium truncate">{p.name}</span>
-                  <span className="text-[10px] text-muted-foreground">{progress}%</span>
-                </div>
-                <Progress value={progress} className="h-1.5 mb-1" />
-                <div className="flex gap-3 text-[10px] text-muted-foreground">
-                  <span>Gasto: {brl(costs.totalCost)}</span>
-                  {Number(p.budget) > 0 && <span>Orçamento: {brl(Number(p.budget))}</span>}
-                </div>
-              </div>
-            );
-          })}
-          {projects.filter(p => p.status === "active").length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4">Nenhum projeto ativo</p>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-
+  // ─── Main Layout ───
   return (
     <>
-      <div className="flex h-full flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border/30 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Layers className="h-5 w-5 text-primary" />
-            <h2 className="text-base font-bold">Programas e Projetos</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-lg bg-muted p-0.5">
-              <button onClick={() => setViewMode("dashboard")}
-                className={cn("rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                  viewMode === "dashboard" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-                )}>Dashboard</button>
-              <button onClick={() => setViewMode("eap")}
-                className={cn("rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                  viewMode === "eap" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-                )}>EAP</button>
-            </div>
-            <Button size="sm" onClick={() => { resetProjectForm(); setProjectDialogOpen(true); }} className="gap-1.5 h-8">
-              <Plus className="h-3.5 w-3.5" /> Novo Projeto
-            </Button>
-          </div>
-        </div>
-
-        {viewMode === "dashboard" ? (
-          <DashboardPanel />
-        ) : (
-          <>
-            {/* Search & Filters */}
-            <div className="px-4 pt-3 pb-2 flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input placeholder="Buscar programas, projetos ou atividades..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 pl-8 text-sm" />
-              </div>
-              <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as FilterStatus)}>
-                <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="active">Em andamento</SelectItem>
-                  <SelectItem value="delayed">Atrasados</SelectItem>
-                  <SelectItem value="completed">Concluídos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Sort Bar */}
-            <div className="flex items-center gap-0.5 px-4 py-1.5 border-b border-border/20 text-[10px] text-muted-foreground">
-              {([
-                { field: "title" as SortField, label: "Atividade" },
-                { field: "status" as SortField, label: "Status" },
-                { field: "priority" as SortField, label: "Prior." },
-                { field: "date" as SortField, label: "Prazo" },
-                { field: "assignee" as SortField, label: "Resp." },
-              ]).map(s => (
-                <button key={s.field} onClick={() => toggleSort(s.field)}
-                  className={cn("px-1.5 py-0.5 rounded hover:bg-accent/50 transition-colors flex items-center gap-0.5",
-                    sortField === s.field && "text-primary font-medium"
-                  )}>
-                  {s.label}
-                  {sortField === s.field && <ArrowUpDown className="h-2.5 w-2.5" />}
-                </button>
-              ))}
-              <div className="ml-auto flex gap-0.5">
-                <button onClick={cycleExpand} className="p-0.5 rounded hover:bg-accent/50 flex items-center gap-0.5" title={`Nível: ${expandLabel}`}>
-                  <ChevronsUpDown className="h-3 w-3" />
-                  <span className="text-[9px]">{expandLevel}</span>
-                </button>
-                <button onClick={() => {
-                  const printContent = tasks.map(t => `${t.is_completed ? "✅" : "⬜"} ${t.title}`).join("\n");
-                  const w = window.open("", "_blank");
-                  if (w) { w.document.write(`<pre style="font-family:sans-serif;font-size:14px;">${printContent}</pre>`); w.print(); }
-                }} className="p-0.5 rounded hover:bg-accent/50" title="Imprimir">
-                  <Printer className="h-3 w-3" />
-                </button>
-              </div>
-            </div>
-
-            {/* EAP Content */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-1">
-              {sortedCategories.filter(c => c.is_project).map((cat) => {
-                const catProjects = activeProjects.filter(p => p.category_id === cat.id);
-                const catOrphanTasks = allActiveTasks.filter(t => t.category_id === cat.id && !t.project_id);
-                if (catProjects.length === 0 && catOrphanTasks.length === 0) return null;
-                return (
-                  <Collapsible key={cat.id} open={expandLevel >= 1} className="mb-1">
-                    <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold text-foreground hover:bg-accent/50">
-                      <Layers className="h-4 w-4 text-primary" />
-                      {cat.color && <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />}
-                      <span className="truncate">{cat.icon} {cat.name}</span>
-                      <span className="ml-auto text-[10px] text-muted-foreground font-normal">{catProjects.length} projetos • {catOrphanTasks.length} atividades</span>
-                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pl-4 pt-0.5 space-y-0.5">
-                      {expandLevel >= 2 && catProjects.map((p) => <ProjectBlock key={p.id} p={p} />)}
-                      {expandLevel >= 3 && catOrphanTasks.map(task => <TaskRow key={task.id} task={task} />)}
-                    </CollapsibleContent>
-                  </Collapsible>
-                );
-              })}
-
-              {/* Uncategorized */}
-              {(() => {
-                const uncatProjects = activeProjects.filter(p => !p.category_id);
-                const uncatTasks = allActiveTasks.filter(t => !t.category_id && !t.project_id);
-                if (uncatProjects.length === 0 && uncatTasks.length === 0) return null;
-                return (
-                  <Collapsible open={expandLevel >= 1} className="mb-1">
-                    <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold text-foreground hover:bg-accent/50">
-                      <FolderKanban className="h-4 w-4 text-muted-foreground" />
-                      <span>Sem Programa</span>
-                      <span className="ml-auto text-[10px] text-muted-foreground font-normal">{uncatProjects.length}P / {uncatTasks.length}T</span>
-                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pl-4 pt-0.5 space-y-0.5">
-                      {expandLevel >= 2 && uncatProjects.map((p) => <ProjectBlock key={p.id} p={p} />)}
-                      {expandLevel >= 3 && uncatTasks.map(task => <TaskRow key={task.id} task={task} />)}
-                    </CollapsibleContent>
-                  </Collapsible>
-                );
-              })()}
-
-              {activeProjects.length === 0 && allActiveTasks.filter(t => !t.project_id).length === 0 && (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                  <Layers className="h-10 w-10 mb-3 opacity-30" />
-                  <p className="text-sm font-medium">Nenhum programa ou projeto</p>
-                  <p className="text-xs">Crie um novo projeto para começar a organizar suas atividades.</p>
-                </div>
-              )}
-
-              {/* Completed */}
-              {completedProjectsList.length > 0 && (
-                <Collapsible open={showCompletedProjects} onOpenChange={setShowCompletedProjects} className="mt-4">
-                  <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground w-full px-2 py-1.5">
-                    <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !showCompletedProjects && "-rotate-90")} />
-                    <Check className="h-3.5 w-3.5" />
-                    Concluídos ({completedProjectsList.length})
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-0.5 mt-1">
-                    {completedProjectsList.map((p) => (
-                      <div key={p.id} onClick={() => openEditProject(p)}
-                        className="flex items-center gap-2 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-accent/50 opacity-50">
-                        <FolderClosed className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <p className="text-xs truncate line-through">{p.name}</p>
-                        <span className="ml-auto text-[10px] text-muted-foreground">{getProjectProgress(p.id)}%</span>
-                      </div>
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </div>
-          </>
-        )}
+      <div className="flex h-full overflow-hidden bg-background">
+        <ProgramsPanel />
+        <ProjectsPanel />
+        <ActivitiesPanel />
       </div>
 
       {/* Project Dialog */}
@@ -852,7 +824,7 @@ export default function ProgramsProjectsView() {
                     <Button size="sm" onClick={() => addPhase(editingProject.id)} className="shrink-0"><Plus className="h-3.5 w-3.5" /></Button>
                   </div>
                   {phases.filter(ph => ph.project_id === editingProject.id).sort((a, b) => a.sort_order - b.sort_order).map(ph => {
-                    const phaseTasks = [...tasks, ...completedTasks].filter((t: any) => t.phase_id === ph.id);
+                    const phaseTasks = allTasks.filter((t: any) => t.phase_id === ph.id);
                     const done = phaseTasks.filter(t => t.is_completed).length;
                     return (
                       <div key={ph.id} className="flex items-center gap-3 rounded-lg border border-border/30 p-2.5">
