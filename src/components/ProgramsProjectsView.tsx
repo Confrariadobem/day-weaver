@@ -16,14 +16,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Search, ChevronRight, Star, Trash2, Save, User,
   Check, FolderKanban, Layers, ListTodo, Clock,
-  ArrowLeft, BarChart3, CircleDollarSign,
+  ArrowLeft, BarChart3, CircleDollarSign, Plus, GripVertical,
+  AlertCircle, Flag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
 import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
 
-type FilterStatus = "all" | "active" | "completed";
+type FilterStatus = "all" | "programs" | "projects" | "tasks";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
@@ -32,13 +33,27 @@ interface Phase {
   name: string; sort_order: number; created_at: string;
 }
 
+interface Program {
+  id: string; user_id: string; name: string; description: string | null;
+  color: string | null; status: string | null;
+  created_at: string; updated_at: string;
+}
+
+const PRIORITY_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  urgent: { label: "Urgente", icon: <AlertCircle className="h-3 w-3" />, color: "text-destructive" },
+  high: { label: "Alta", icon: <Flag className="h-3 w-3" />, color: "text-destructive" },
+  medium: { label: "Média", icon: <Flag className="h-3 w-3" />, color: "text-warning" },
+  low: { label: "Baixa", icon: <Flag className="h-3 w-3" />, color: "text-[hsl(var(--success))]" },
+};
+
 export default function ProgramsProjectsView() {
   const { user } = useAuth();
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Tables<"tasks">[]>([]);
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
-  const [projects, setProjects] = useState<Tables<"projects">[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [entries, setEntries] = useState<any[]>([]);
   const [resources, setResources] = useState<any[]>([]);
   const [phases, setPhases] = useState<Phase[]>([]);
@@ -47,7 +62,7 @@ export default function ProgramsProjectsView() {
   const [newPhaseName, setNewPhaseName] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Tables<"projects"> | null>(null);
+  const [editingProject, setEditingProject] = useState<any | null>(null);
   const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<string | null>(null);
   const [projName, setProjName] = useState("");
   const [projDescription, setProjDescription] = useState("");
@@ -55,6 +70,7 @@ export default function ProgramsProjectsView() {
   const [projStatus, setProjStatus] = useState("active");
   const [projCategoryId, setProjCategoryId] = useState("");
   const [projResponsible, setProjResponsible] = useState("");
+  const [projProgramId, setProjProgramId] = useState("");
   const [projDialogTab, setProjDialogTab] = useState("details");
   const [resName, setResName] = useState("");
   const [resRole, setResRole] = useState("");
@@ -63,9 +79,21 @@ export default function ProgramsProjectsView() {
   const [taskEditDefaultDate, setTaskEditDefaultDate] = useState<Date>(new Date());
   const lastTaskClickRef = useRef<{ id: string; time: number } | null>(null);
 
+  // Program dialog
+  const [programDialogOpen, setProgramDialogOpen] = useState(false);
+  const [editingProgram, setEditingProgram] = useState<Program | null>(null);
+  const [progName, setProgName] = useState("");
+  const [progDescription, setProgDescription] = useState("");
+  const [progColor, setProgColor] = useState("#3b82f6");
+  const [progProjectIds, setProgProjectIds] = useState<string[]>([]);
+  const [deleteProgramConfirm, setDeleteProgramConfirm] = useState<string | null>(null);
+
+  // WBS view
+  const [showWBS, setShowWBS] = useState(false);
+
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [tasksRes, completedRes, catsRes, projRes, entRes, resRes, phaseRes] = await Promise.all([
+    const [tasksRes, completedRes, catsRes, projRes, entRes, resRes, phaseRes, progRes] = await Promise.all([
       supabase.from("tasks").select("*").eq("user_id", user.id).eq("is_completed", false).order("sort_order"),
       supabase.from("tasks").select("*").eq("user_id", user.id).eq("is_completed", true).order("updated_at", { ascending: false }).limit(50),
       supabase.from("categories").select("*").eq("user_id", user.id),
@@ -73,6 +101,7 @@ export default function ProgramsProjectsView() {
       supabase.from("financial_entries").select("*").eq("user_id", user.id),
       supabase.from("project_resources").select("*"),
       supabase.from("project_phases").select("*").eq("user_id", user.id).order("sort_order"),
+      supabase.from("programs").select("*").eq("user_id", user.id).order("name"),
     ]);
     if (tasksRes.data) setTasks(tasksRes.data);
     if (completedRes.data) setCompletedTasks(completedRes.data);
@@ -81,6 +110,7 @@ export default function ProgramsProjectsView() {
     if (entRes.data) setEntries(entRes.data);
     if (resRes.data) setResources(resRes.data);
     if (phaseRes.data) setPhases(phaseRes.data as Phase[]);
+    if (progRes.data) setPrograms(progRes.data as Program[]);
   }, [user]);
 
   useEffect(() => {
@@ -90,6 +120,7 @@ export default function ProgramsProjectsView() {
       .channel("programs-projects")
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` }, fetchData)
       .on("postgres_changes", { event: "*", schema: "public", table: "projects", filter: `user_id=eq.${user.id}` }, fetchData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "programs", filter: `user_id=eq.${user.id}` }, fetchData)
       .subscribe();
     const handleDataChanged = () => fetchData();
     window.addEventListener("lovable:data-changed", handleDataChanged);
@@ -118,19 +149,18 @@ export default function ProgramsProjectsView() {
     const totalBudget = projects.reduce((s, p) => s + Number(p.budget || 0), 0);
     const totalCost = projects.reduce((s, p) => s + getProjectCosts(p.id).totalCost, 0);
     const pendingTasks = tasks.length;
-    return { active, completed, totalBudget, totalCost, pendingTasks };
-  }, [projects, tasks, getProjectCosts]);
+    const programCount = programs.length;
+    return { active, completed, totalBudget, totalCost, pendingTasks, programCount };
+  }, [projects, tasks, getProjectCosts, programs]);
 
   const visibleProjects = useMemo(() => {
     let list = projects;
-    if (filterStatus === "active") list = list.filter(p => p.status !== "completed");
-    else if (filterStatus === "completed") list = list.filter(p => p.status === "completed");
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(p => p.name.toLowerCase().includes(q));
     }
     return list;
-  }, [projects, filterStatus, search]);
+  }, [projects, search]);
 
   const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId) || null, [projects, selectedProjectId]);
 
@@ -159,14 +189,15 @@ export default function ProgramsProjectsView() {
 
   const resetProjectForm = () => {
     setProjName(""); setProjDescription(""); setProjBudget(""); setProjStatus("active");
-    setProjCategoryId(""); setProjResponsible(""); setEditingProject(null); setProjDialogTab("details");
+    setProjCategoryId(""); setProjResponsible(""); setProjProgramId(""); setEditingProject(null); setProjDialogTab("details");
   };
 
-  const openEditProject = (p: Tables<"projects">) => {
+  const openEditProject = (p: any) => {
     setEditingProject(p);
     setProjName(p.name); setProjDescription(p.description || "");
     setProjBudget(p.budget ? String(p.budget) : ""); setProjStatus(p.status || "active");
-    setProjCategoryId(p.category_id || ""); setProjResponsible((p as any).responsible || "");
+    setProjCategoryId(p.category_id || ""); setProjResponsible(p.responsible || "");
+    setProjProgramId(p.program_id || "");
     setProjDialogTab("details"); setProjectDialogOpen(true);
   };
 
@@ -177,6 +208,7 @@ export default function ProgramsProjectsView() {
       budget: projBudget ? parseFloat(projBudget.replace(/\./g, "").replace(",", ".")) : 0,
       status: projStatus, category_id: projCategoryId || null,
       responsible: projResponsible || null, user_id: user.id,
+      program_id: projProgramId || null,
     };
     if (editingProject) await supabase.from("projects").update(data).eq("id", editingProject.id);
     else await supabase.from("projects").insert(data);
@@ -226,6 +258,56 @@ export default function ProgramsProjectsView() {
     return resources.filter((r: any) => r.project_id === editingProject.id);
   }, [resources, editingProject]);
 
+  // Program CRUD
+  const resetProgramForm = () => {
+    setProgName(""); setProgDescription(""); setProgColor("#3b82f6");
+    setProgProjectIds([]); setEditingProgram(null);
+  };
+
+  const openEditProgram = (prog: Program) => {
+    setEditingProgram(prog);
+    setProgName(prog.name); setProgDescription(prog.description || "");
+    setProgColor(prog.color || "#3b82f6");
+    const linkedProjects = projects.filter(p => p.program_id === prog.id).map(p => p.id);
+    setProgProjectIds(linkedProjects);
+    setProgramDialogOpen(true);
+  };
+
+  const saveProgram = async () => {
+    if (!progName.trim() || !user) return;
+    const data = {
+      name: progName.trim(), description: progDescription || null,
+      color: progColor, user_id: user.id,
+    };
+    let programId: string;
+    if (editingProgram) {
+      await supabase.from("programs").update(data).eq("id", editingProgram.id);
+      programId = editingProgram.id;
+    } else {
+      const { data: result } = await supabase.from("programs").insert(data).select("id").single();
+      if (!result) return;
+      programId = result.id;
+    }
+    // Update project associations
+    const currentLinked = projects.filter(p => p.program_id === programId).map(p => p.id);
+    const toAdd = progProjectIds.filter(id => !currentLinked.includes(id));
+    const toRemove = currentLinked.filter(id => !progProjectIds.includes(id));
+    for (const id of toAdd) await supabase.from("projects").update({ program_id: programId }).eq("id", id);
+    for (const id of toRemove) await supabase.from("projects").update({ program_id: null }).eq("id", id);
+    resetProgramForm(); setProgramDialogOpen(false); fetchData();
+  };
+
+  const deleteProgram = async (id: string) => {
+    await supabase.from("projects").update({ program_id: null }).eq("program_id", id);
+    await supabase.from("programs").delete().eq("id", id);
+    setDeleteProgramConfirm(null); setProgramDialogOpen(false);
+    resetProgramForm(); fetchData();
+  };
+
+  const toggleProgProjectId = (id: string) => {
+    setProgProjectIds(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
+  };
+
   const handleTaskClick = (task: Tables<"tasks">) => {
     const now = Date.now();
     if (lastTaskClickRef.current?.id === task.id && now - lastTaskClickRef.current.time < 400) {
@@ -258,6 +340,41 @@ export default function ProgramsProjectsView() {
 
   const projectCategories = useMemo(() => categories.filter(c => c.is_project).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")), [categories]);
 
+  // Get program name for a project
+  const getProgramName = (programId: string | null) => {
+    if (!programId) return null;
+    return programs.find(p => p.id === programId)?.name || null;
+  };
+
+  // Group projects by program
+  const projectsByProgram = useMemo(() => {
+    const groups: { program: Program | null; projects: any[] }[] = [];
+    const programMap = new Map<string, any[]>();
+    const unlinked: any[] = [];
+
+    visibleProjects.forEach(p => {
+      if (p.program_id) {
+        if (!programMap.has(p.program_id)) programMap.set(p.program_id, []);
+        programMap.get(p.program_id)!.push(p);
+      } else {
+        unlinked.push(p);
+      }
+    });
+
+    programs.forEach(prog => {
+      const projList = programMap.get(prog.id) || [];
+      if (projList.length > 0 || filterStatus === "programs") {
+        groups.push({ program: prog, projects: projList });
+      }
+    });
+
+    if (unlinked.length > 0) {
+      groups.push({ program: null, projects: unlinked });
+    }
+
+    return groups;
+  }, [visibleProjects, programs, filterStatus]);
+
   // ─── DETAIL VIEW ───
   if (selectedProject) {
     const projectTasks = allTasks.filter(t => t.project_id === selectedProject.id);
@@ -268,38 +385,52 @@ export default function ProgramsProjectsView() {
     const progress = getProjectProgress(selectedProject.id);
     const isOverBudget = Number(selectedProject.budget || 0) > 0 && costs.totalCost > Number(selectedProject.budget);
 
-    const TaskItem = ({ task }: { task: Tables<"tasks"> }) => (
-      <div
-        onClick={() => handleTaskClick(task)}
-        className="group flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-accent/50 cursor-pointer transition-colors"
-      >
-        <Checkbox
-          checked={!!task.is_completed}
-          onCheckedChange={() => toggleTaskComplete(task)}
-          onClick={(e) => e.stopPropagation()}
-          className="h-4 w-4 shrink-0"
-        />
-        <div className="flex-1 min-w-0">
-          <p className={cn("text-sm truncate", task.is_completed && "line-through text-muted-foreground")}>{task.title}</p>
-          {task.assignee && (
-            <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-              <User className="h-2.5 w-2.5" /> {task.assignee}
-            </p>
+    const TaskItem = ({ task }: { task: Tables<"tasks"> }) => {
+      const desc = task.description || "";
+      const priorityMatch = desc.match(/\[prioridade:(\w+)\]/);
+      const priority = priorityMatch ? priorityMatch[1] : null;
+      const pConfig = priority ? PRIORITY_CONFIG[priority] : null;
+
+      return (
+        <div
+          onClick={() => handleTaskClick(task)}
+          className="group flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-accent/50 cursor-pointer transition-colors"
+        >
+          <Checkbox
+            checked={!!task.is_completed}
+            onCheckedChange={() => toggleTaskComplete(task)}
+            onClick={(e) => e.stopPropagation()}
+            className="h-4 w-4 shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <p className={cn("text-sm truncate", task.is_completed && "line-through text-muted-foreground")}>{task.title}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              {task.assignee && (
+                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <User className="h-2.5 w-2.5" /> {task.assignee}
+                </span>
+              )}
+              {pConfig && (
+                <span className={cn("text-[10px] flex items-center gap-0.5", pConfig.color)}>
+                  {pConfig.icon} {pConfig.label}
+                </span>
+              )}
+            </div>
+          </div>
+          {task.scheduled_date && (
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1 shrink-0">
+              <Clock className="h-3 w-3" /> {format(new Date(task.scheduled_date), "dd/MM")}
+            </span>
           )}
+          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(task); }} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Star className={cn("h-3.5 w-3.5", task.is_favorite ? "fill-warning text-warning" : "text-muted-foreground")} />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive">
+            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
         </div>
-        {task.scheduled_date && (
-          <span className="text-[10px] text-muted-foreground flex items-center gap-1 shrink-0">
-            <Clock className="h-3 w-3" /> {format(new Date(task.scheduled_date), "dd/MM")}
-          </span>
-        )}
-        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(task); }} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Star className={cn("h-3.5 w-3.5", task.is_favorite ? "fill-warning text-warning" : "text-muted-foreground")} />
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive">
-          <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-        </button>
-      </div>
-    );
+      );
+    };
 
     return (
       <>
@@ -312,13 +443,23 @@ export default function ProgramsProjectsView() {
               </button>
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg font-bold truncate">{selectedProject.name}</h2>
-                {selectedProject.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-1">{selectedProject.description}</p>
-                )}
+                <div className="flex items-center gap-2">
+                  {getProgramName(selectedProject.program_id) && (
+                    <span className="text-[10px] text-primary">Programa: {getProgramName(selectedProject.program_id)}</span>
+                  )}
+                  {selectedProject.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-1">{selectedProject.description}</p>
+                  )}
+                </div>
               </div>
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => openEditProject(selectedProject)}>
-                Editar
-              </Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant={showWBS ? "default" : "outline"} className="h-8 text-xs gap-1" onClick={() => setShowWBS(!showWBS)}>
+                  <BarChart3 className="h-3 w-3" /> EAP
+                </Button>
+                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => openEditProject(selectedProject)}>
+                  Editar
+                </Button>
+              </div>
             </div>
 
             {/* KPI row */}
@@ -352,6 +493,74 @@ export default function ProgramsProjectsView() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* ─── WBS / EAP Table ─── */}
+            {showWBS && (
+              <Card className="bg-card overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="px-4 py-2 border-b border-border/30 bg-muted/30">
+                    <p className="text-xs font-semibold flex items-center gap-1.5">
+                      <BarChart3 className="h-3.5 w-3.5 text-primary" /> Estrutura Analítica do Projeto (EAP)
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20 bg-muted/20">
+                          <th className="text-left py-2 px-3 w-8">#</th>
+                          <th className="text-left py-2 px-3">Atividade</th>
+                          <th className="text-left py-2 px-3">Etapa</th>
+                          <th className="text-left py-2 px-3">Responsável</th>
+                          <th className="text-left py-2 px-3">Prazo</th>
+                          <th className="text-left py-2 px-3">Prioridade</th>
+                          <th className="text-center py-2 px-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {projectTasks.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map((task, idx) => {
+                          const phase = phases.find(ph => ph.id === task.phase_id);
+                          const desc = task.description || "";
+                          const priorityMatch = desc.match(/\[prioridade:(\w+)\]/);
+                          const priority = priorityMatch ? priorityMatch[1] : "medium";
+                          const pConfig = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.medium;
+
+                          return (
+                            <tr key={task.id} className={cn(
+                              "border-b border-border/10 transition-colors hover:bg-accent/30 cursor-pointer",
+                              task.is_completed && "opacity-50"
+                            )} onClick={() => handleTaskClick(task)}>
+                              <td className="py-2 px-3 text-xs text-muted-foreground">{idx + 1}</td>
+                              <td className="py-2 px-3 text-xs font-medium">
+                                <span className={cn(task.is_completed && "line-through")}>{task.title}</span>
+                              </td>
+                              <td className="py-2 px-3 text-xs text-muted-foreground">{phase?.name || "—"}</td>
+                              <td className="py-2 px-3 text-xs text-muted-foreground">{task.assignee || "—"}</td>
+                              <td className="py-2 px-3 text-xs text-muted-foreground">
+                                {task.scheduled_date ? format(new Date(task.scheduled_date), "dd/MM/yy") : "—"}
+                              </td>
+                              <td className="py-2 px-3">
+                                <span className={cn("text-[10px] flex items-center gap-0.5", pConfig.color)}>
+                                  {pConfig.icon} {pConfig.label}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                {task.is_completed
+                                  ? <Badge variant="outline" className="text-[10px] bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">Concluída</Badge>
+                                  : <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30">Pendente</Badge>
+                                }
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {projectTasks.length === 0 && (
+                          <tr><td colSpan={7} className="py-4 text-center text-xs text-muted-foreground">Nenhuma atividade cadastrada</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Phases & Tasks */}
             {projectPhases.map(phase => {
@@ -482,6 +691,15 @@ export default function ProgramsProjectsView() {
               <div className="space-y-3">
                 <div><Label className="text-sm">Nome</Label><Input value={projName} onChange={(e) => setProjName(e.target.value)} placeholder="Nome do projeto" /></div>
                 <div><Label className="text-sm">Descrição</Label><Textarea value={projDescription} onChange={(e) => setProjDescription(e.target.value)} placeholder="Opcional" rows={2} className="resize-none" /></div>
+                <div>
+                  <Label className="text-sm">Programa</Label>
+                  <Select value={projProgramId} onValueChange={setProjProgramId}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar programa (opcional)" /></SelectTrigger>
+                    <SelectContent>
+                      {programs.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-sm">Categoria</Label>
@@ -565,30 +783,98 @@ export default function ProgramsProjectsView() {
     );
   }
 
+  function renderProgramDialog() {
+    return (
+      <>
+        <Dialog open={programDialogOpen} onOpenChange={(o) => { setProgramDialogOpen(o); if (!o) resetProgramForm(); }}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-base">{editingProgram ? "Editar programa" : "Novo programa"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div><Label className="text-sm">Nome</Label><Input value={progName} onChange={(e) => setProgName(e.target.value)} placeholder="Nome do programa" /></div>
+              <div><Label className="text-sm">Descrição</Label><Textarea value={progDescription} onChange={(e) => setProgDescription(e.target.value)} placeholder="Opcional" rows={2} className="resize-none" /></div>
+              <div>
+                <Label className="text-sm">Cor</Label>
+                <Input type="color" value={progColor} onChange={(e) => setProgColor(e.target.value)} className="h-10 w-20 p-1" />
+              </div>
+              <div>
+                <Label className="text-sm">Projetos associados</Label>
+                <p className="text-[10px] text-muted-foreground mb-2">Selecione os projetos que pertencem a este programa</p>
+                <div className="space-y-1.5 max-h-48 overflow-y-auto rounded-lg border border-border/30 p-2">
+                  {projects.map(p => (
+                    <div key={p.id} className="flex items-center gap-2 py-1">
+                      <Checkbox
+                        checked={progProjectIds.includes(p.id)}
+                        onCheckedChange={() => toggleProgProjectId(p.id)}
+                        id={`prog-proj-${p.id}`}
+                      />
+                      <label htmlFor={`prog-proj-${p.id}`} className="text-sm cursor-pointer flex-1">{p.name}</label>
+                      {p.program_id && p.program_id !== editingProgram?.id && (
+                        <span className="text-[10px] text-warning">Já vinculado</span>
+                      )}
+                    </div>
+                  ))}
+                  {projects.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">Nenhum projeto criado</p>}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-3 border-t border-border/20">
+              {editingProgram && (
+                <Button variant="destructive" size="sm" onClick={() => setDeleteProgramConfirm(editingProgram.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <div className="flex gap-2 ml-auto">
+                <Button variant="outline" size="sm" onClick={() => { setProgramDialogOpen(false); resetProgramForm(); }}>Cancelar</Button>
+                <Button size="sm" onClick={saveProgram} className="gap-1.5" disabled={!progName.trim()}>
+                  <Save className="h-3.5 w-3.5" /> Salvar
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!deleteProgramConfirm} onOpenChange={(o) => { if (!o) setDeleteProgramConfirm(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Confirmar exclusão do programa</DialogTitle>
+              <DialogDescription>Os projetos associados não serão excluídos, apenas desvinculados.</DialogDescription>
+            </DialogHeader>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setDeleteProgramConfirm(null)}>Cancelar</Button>
+              <Button variant="destructive" size="sm" onClick={() => deleteProgramConfirm && deleteProgram(deleteProgramConfirm)}>Excluir</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
   return (
     <>
       <ScrollArea className="h-full">
         <div className="p-4 space-y-4">
-          {/* Filter buttons - Patrimônio pattern */}
+          {/* Filter buttons */}
           <div className="flex items-center gap-2 overflow-x-auto">
             <Button size="sm"
-              variant={filterStatus === "all" && !search ? "default" : "ghost"}
-              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", !(filterStatus === "all" && !search) && "text-muted-foreground")}
-              onClick={() => { setFilterStatus("all"); setSearch(""); }}
+              variant={filterStatus === "programs" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "programs" && "text-muted-foreground")}
+              onClick={() => setFilterStatus("programs")}
             >
               <FolderKanban className="h-3 w-3" /> Programas
             </Button>
             <Button size="sm"
-              variant={filterStatus === "active" ? "default" : "ghost"}
-              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "active" && "text-muted-foreground")}
-              onClick={() => setFilterStatus("active")}
+              variant={filterStatus === "projects" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "projects" && "text-muted-foreground")}
+              onClick={() => setFilterStatus("projects")}
             >
-              <Layers className="h-3 w-3" /> Projetos
+              <Layers className="h-3 w-3" /> Projeto
             </Button>
             <Button size="sm"
-              variant={filterStatus === "completed" ? "default" : "ghost"}
-              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "completed" && "text-muted-foreground")}
-              onClick={() => setFilterStatus("completed")}
+              variant={filterStatus === "tasks" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "tasks" && "text-muted-foreground")}
+              onClick={() => setFilterStatus("tasks")}
             >
               <ListTodo className="h-3 w-3" /> Tarefas
             </Button>
@@ -599,19 +885,32 @@ export default function ProgramsProjectsView() {
             >
               Todos
             </Button>
-            <div className="ml-auto relative">
-              <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
-              <Input placeholder="Buscar projeto..." value={search} onChange={(e) => setSearch(e.target.value)}
-                className="h-7 pl-8 text-xs w-40" />
+            <div className="ml-auto flex gap-2">
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setProgramDialogOpen(true)}>
+                <Plus className="h-3 w-3" /> Programa
+              </Button>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)}
+                  className="h-7 pl-8 text-xs w-40" />
+              </div>
             </div>
           </div>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <Card className="bg-card">
               <CardContent className="p-3">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <FolderKanban className="h-3 w-3" /> Em Andamento
+                  <FolderKanban className="h-3 w-3" /> Programas
+                </p>
+                <p className="text-lg font-bold text-primary">{kpis.programCount}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Layers className="h-3 w-3" /> Em Andamento
                 </p>
                 <p className="text-lg font-bold text-primary">{kpis.active}</p>
               </CardContent>
@@ -627,7 +926,7 @@ export default function ProgramsProjectsView() {
             <Card className="bg-card">
               <CardContent className="p-3">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <ListTodo className="h-3 w-3" /> Tarefas Pendentes
+                  <ListTodo className="h-3 w-3" /> Tarefas
                 </p>
                 <p className="text-lg font-bold">{kpis.pendingTasks}</p>
               </CardContent>
@@ -635,7 +934,7 @@ export default function ProgramsProjectsView() {
             <Card className="bg-card">
               <CardContent className="p-3">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <CircleDollarSign className="h-3 w-3" /> Orçamento Total
+                  <CircleDollarSign className="h-3 w-3" /> Orçamento
                 </p>
                 <p className="text-lg font-bold">{brl(kpis.totalBudget)}</p>
               </CardContent>
@@ -643,7 +942,7 @@ export default function ProgramsProjectsView() {
             <Card className="bg-card">
               <CardContent className="p-3">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <BarChart3 className="h-3 w-3" /> Gasto Total
+                  <BarChart3 className="h-3 w-3" /> Gasto
                 </p>
                 <p className={cn("text-lg font-bold", kpis.totalCost > kpis.totalBudget && kpis.totalBudget > 0 ? "text-destructive" : "text-foreground")}>
                   {brl(kpis.totalCost)}
@@ -652,77 +951,94 @@ export default function ProgramsProjectsView() {
             </Card>
           </div>
 
+          {/* Project cards grouped by program */}
+          {projectsByProgram.map((group, gi) => (
+            <div key={group.program?.id || "unlinked"}>
+              <div className="flex items-center gap-2 mb-2">
+                {group.program ? (
+                  <>
+                    <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: group.program.color || "#3b82f6" }} />
+                    <h3 className="text-sm font-semibold flex-1">{group.program.name}</h3>
+                    <span className="text-[10px] text-muted-foreground">{group.projects.length} projeto{group.projects.length !== 1 ? "s" : ""}</span>
+                    <button onClick={() => openEditProgram(group.program!)} className="text-xs text-primary hover:underline">Editar</button>
+                  </>
+                ) : (
+                  <h3 className="text-sm font-semibold text-muted-foreground">Sem programa</h3>
+                )}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 mb-4">
+                {group.projects.map(p => {
+                  const progress = getProjectProgress(p.id);
+                  const costs = getProjectCosts(p.id);
+                  const pTasks = allTasks.filter(t => t.project_id === p.id);
+                  const pending = pTasks.filter(t => !t.is_completed).length;
+                  const done = pTasks.filter(t => t.is_completed).length;
+                  const isOverBudget = Number(p.budget || 0) > 0 && costs.totalCost > Number(p.budget);
 
-          <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-            {visibleProjects.map(p => {
-              const progress = getProjectProgress(p.id);
-              const costs = getProjectCosts(p.id);
-              const pTasks = allTasks.filter(t => t.project_id === p.id);
-              const pending = pTasks.filter(t => !t.is_completed).length;
-              const done = pTasks.filter(t => t.is_completed).length;
-              const isOverBudget = Number(p.budget || 0) > 0 && costs.totalCost > Number(p.budget);
+                  return (
+                    <Card
+                      key={p.id}
+                      onClick={() => setSelectedProjectId(p.id)}
+                      className="cursor-pointer transition-all hover:shadow-md group"
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-semibold truncate">{p.name}</h4>
+                            {p.description && (
+                              <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{p.description}</p>
+                            )}
+                          </div>
+                          {getStatusBadge(p.status)}
+                        </div>
 
-              return (
-                <Card
-                  key={p.id}
-                  onClick={() => setSelectedProjectId(p.id)}
-                  className="cursor-pointer transition-all hover:shadow-md group"
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-semibold truncate">{p.name}</h4>
-                        {p.description && (
-                          <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{p.description}</p>
+                        <div className="space-y-1.5 mt-3">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-muted-foreground">Progresso</span>
+                            <span className="font-medium">{progress}%</span>
+                          </div>
+                          <Progress value={progress} className="h-1.5" />
+                        </div>
+
+                        <div className="flex items-center gap-4 mt-3 text-[11px] text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <ListTodo className="h-3 w-3" /> {pending} pendente{pending !== 1 ? "s" : ""}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Check className="h-3 w-3 text-[hsl(var(--success))]" /> {done}
+                          </span>
+                        </div>
+
+                        {(costs.totalCost > 0 || Number(p.budget) > 0) && (
+                          <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/30 text-[11px]">
+                            <span className={cn("font-medium", isOverBudget ? "text-destructive" : "text-foreground")}>
+                              {brl(costs.totalCost)}
+                            </span>
+                            {Number(p.budget) > 0 && (
+                              <span className="text-muted-foreground">/ {brl(Number(p.budget))}</span>
+                            )}
+                          </div>
                         )}
-                      </div>
-                      {getStatusBadge(p.status)}
-                    </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
 
-                    <div className="space-y-1.5 mt-3">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-muted-foreground">Progresso</span>
-                        <span className="font-medium">{progress}%</span>
-                      </div>
-                      <Progress value={progress} className="h-1.5" />
-                    </div>
-
-                    <div className="flex items-center gap-4 mt-3 text-[11px] text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <ListTodo className="h-3 w-3" /> {pending} pendente{pending !== 1 ? "s" : ""}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Check className="h-3 w-3 text-[hsl(var(--success))]" /> {done}
-                      </span>
-                    </div>
-
-                    {(costs.totalCost > 0 || Number(p.budget) > 0) && (
-                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/30 text-[11px]">
-                        <span className={cn("font-medium", isOverBudget ? "text-destructive" : "text-foreground")}>
-                          {brl(costs.totalCost)}
-                        </span>
-                        {Number(p.budget) > 0 && (
-                          <span className="text-muted-foreground">/ {brl(Number(p.budget))}</span>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          {visibleProjects.length === 0 && (
+          {visibleProjects.length === 0 && programs.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <FolderKanban className="h-12 w-12 mb-3 opacity-20" />
               <p className="text-sm font-medium">Nenhum projeto encontrado</p>
-              <p className="text-xs mt-1">Use o botão + para criar um novo projeto.</p>
+              <p className="text-xs mt-1">Use o botão + para criar um novo projeto ou programa.</p>
             </div>
           )}
         </div>
       </ScrollArea>
 
       {renderProjectDialog()}
+      {renderProgramDialog()}
     </>
   );
 }

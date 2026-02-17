@@ -342,6 +342,39 @@ export type Database = {
         }
         Relationships: []
       }
+      programs: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       project_phases: {
         Row: {
           created_at: string
@@ -420,6 +453,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          program_id: string | null
           responsible: string | null
           status: string | null
           updated_at: string
@@ -432,6 +466,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          program_id?: string | null
           responsible?: string | null
           status?: string | null
           updated_at?: string
@@ -444,6 +479,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          program_id?: string | null
           responsible?: string | null
           status?: string | null
           updated_at?: string
@@ -455,6 +491,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
             referencedColumns: ["id"]
           },
         ]

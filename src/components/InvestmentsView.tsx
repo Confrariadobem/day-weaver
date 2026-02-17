@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useInvestments, useInvestment, useAddInvestment, type Investment } from "@/hooks/useInvestments";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useCryptoPrices } from "@/hooks/useCryptoPrices";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,7 @@ export default function InvestmentsView() {
   const { user } = useAuth();
   const { investments, loading } = useInvestments();
   const { addInvestment, updateInvestment, deleteInvestment } = useAddInvestment();
+  const cryptoPrices = useCryptoPrices();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -287,6 +289,47 @@ export default function InvestmentsView() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Crypto multi-currency display */}
+        {(() => {
+          const cryptoInvestments = investments.filter(i => i.type === "crypto" && i.is_active);
+          if (cryptoInvestments.length === 0 && filterType !== "crypto") return null;
+          const totalCryptoBrl = cryptoInvestments.reduce((s, i) => s + (Number(i.current_price) || 0) * (Number(i.quantity) || 0), 0);
+          return (
+            <Card className="bg-card">
+              <CardContent className="p-3">
+                <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+                  <Bitcoin className="h-3.5 w-3.5 text-warning" /> Criptoativos — Multi-moeda
+                </p>
+                {cryptoPrices.loading ? (
+                  <p className="text-xs text-muted-foreground">Carregando cotações...</p>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-lg bg-accent/50 p-2">
+                        <p className="text-[10px] text-muted-foreground uppercase">BRL</p>
+                        <p className="text-sm font-bold">{brl(totalCryptoBrl)}</p>
+                      </div>
+                      <div className="rounded-lg bg-accent/50 p-2">
+                        <p className="text-[10px] text-muted-foreground uppercase">USD</p>
+                        <p className="text-sm font-bold">$ {cryptoPrices.convertToUsd(totalCryptoBrl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      </div>
+                      <div className="rounded-lg bg-accent/50 p-2">
+                        <p className="text-[10px] text-muted-foreground uppercase">BTC</p>
+                        <p className="text-sm font-bold">₿ {cryptoPrices.convertToBtc(totalCryptoBrl).toFixed(6)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                      <span>BTC: $ {cryptoPrices.btcUsd.toLocaleString("en-US")} | R$ {cryptoPrices.btcBrl.toLocaleString("pt-BR")}</span>
+                      <span>USD/BRL: {cryptoPrices.usdBrl.toFixed(2)}</span>
+                      {cryptoPrices.lastUpdated && <span className="ml-auto">Atualizado: {cryptoPrices.lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Secondary row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -532,6 +575,13 @@ export default function InvestmentsView() {
                         {isPositive ? "+" : ""}{profitPct.toFixed(2)}%
                       </div>
                     </div>
+
+                    {inv.type === "crypto" && !cryptoPrices.loading && (
+                      <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
+                        <span>$ {cryptoPrices.convertToUsd(totalCurrent).toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>
+                        <span>₿ {cryptoPrices.convertToBtc(totalCurrent).toFixed(6)}</span>
+                      </div>
+                    )}
 
                     {inv.purchase_date && (
                       <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">

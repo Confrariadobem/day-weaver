@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import EventEditDialog from "@/components/calendar/EventEditDialog";
 import type { ModuleKey } from "@/components/NavSidebar";
 
-type EventType = "birthday" | "event" | "cashflow" | "investment" | "project" | "patrimonio";
+type EventType = "birthday" | "event" | "cashflow" | "investment" | "project" | "patrimonio" | "programa";
 
 const MODULE_TO_EVENT_TYPE: Partial<Record<ModuleKey, EventType>> = {
   calendar: "event",
