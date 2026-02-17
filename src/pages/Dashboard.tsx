@@ -54,7 +54,7 @@ export default function Dashboard() {
       </main>
 
       {/* Global FAB */}
-      <FloatingActionButton />
+      <FloatingActionButton activeModule={activeModule} />
     </div>
   );
 }

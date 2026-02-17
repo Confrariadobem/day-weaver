@@ -4,10 +4,28 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import EventEditDialog from "@/components/calendar/EventEditDialog";
+import type { ModuleKey } from "@/components/NavSidebar";
 
-export default function FloatingActionButton() {
+type EventType = "birthday" | "event" | "cashflow" | "investment" | "project";
+
+const MODULE_TO_EVENT_TYPE: Partial<Record<ModuleKey, EventType>> = {
+  calendar: "event",
+  finances: "cashflow",
+  investments: "investment",
+  programs: "project",
+  patrimonio: "cashflow",
+  dashboard: "event",
+};
+
+interface FloatingActionButtonProps {
+  activeModule?: ModuleKey;
+}
+
+export default function FloatingActionButton({ activeModule }: FloatingActionButtonProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+
+  const defaultEventType = activeModule ? MODULE_TO_EVENT_TYPE[activeModule] : undefined;
 
   return (
     <>
@@ -39,6 +57,7 @@ export default function FloatingActionButton() {
         defaultDate={new Date()}
         userId={user?.id || ""}
         onSaved={() => {}}
+        defaultEventType={defaultEventType}
       />
     </>
   );

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash, Star, Wallet, Repeat } from "lucide-react";
+import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash, Star, Wallet, Repeat, Cake, CalendarDays, TrendingUp, FolderKanban, CircleDollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -40,16 +40,25 @@ interface EventEditDialogProps {
   defaultDate?: Date;
   userId: string;
   onSaved: () => void;
+  defaultEventType?: EventType;
 }
 
 type EventType = "birthday" | "event" | "cashflow" | "investment" | "project";
 
-const EVENT_TYPES: { value: EventType; label: string; icon: string; color: string }[] = [
-  { value: "birthday", label: "Aniversário", icon: "🎂", color: "#ec4899" },
-  { value: "cashflow", label: "Fluxo de caixa", icon: "💵", color: "#22c55e" },
-  { value: "event", label: "Evento", icon: "📅", color: "#3b82f6" },
-  { value: "investment", label: "Investimento", icon: "📈", color: "#d4a017" },
-  { value: "project", label: "Projetos", icon: "📁", color: "#eab308" },
+const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
+  birthday: <Cake className="h-3.5 w-3.5" />,
+  event: <CalendarDays className="h-3.5 w-3.5" />,
+  cashflow: <CircleDollarSign className="h-3.5 w-3.5" />,
+  investment: <TrendingUp className="h-3.5 w-3.5" />,
+  project: <FolderKanban className="h-3.5 w-3.5" />,
+};
+
+const EVENT_TYPES: { value: EventType; label: string; color: string }[] = [
+  { value: "birthday", label: "Aniversário", color: "#ec4899" },
+  { value: "cashflow", label: "Fluxo de caixa", color: "#22c55e" },
+  { value: "event", label: "Evento", color: "#3b82f6" },
+  { value: "investment", label: "Investimento", color: "#d4a017" },
+  { value: "project", label: "Projetos", color: "#eab308" },
 ];
 
 type RecurrenceDateMode = "same_date" | "first_business_day";
@@ -78,7 +87,7 @@ const REMINDER_OPTIONS = [
 
 const PAYMENT_METHODS = ["Débito", "Crédito", "PIX", "Boleto", "Transferência", "Dinheiro", "Crypto"];
 
-export default function EventEditDialog({ open, onOpenChange, item, defaultDate, userId, onSaved }: EventEditDialogProps) {
+export default function EventEditDialog({ open, onOpenChange, item, defaultDate, userId, onSaved, defaultEventType }: EventEditDialogProps) {
   const [eventType, setEventType] = useState<EventType>("event");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -191,7 +200,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setRecurrence("none");
       setRecurrenceCount("12");
       setRecurrenceDateMode("same_date");
-      setEventType("event");
+      setEventType(defaultEventType || "event");
       setReminder("none");
       setPriority("medium");
       setBillAmount("");
@@ -203,7 +212,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setIsPaid(false);
       setInstallments("1");
     }
-  }, [item, defaultDate, open]);
+  }, [item, defaultDate, open, defaultEventType]);
 
   // Compute filtered suggestions
   const filteredSuggestions = useMemo(() => {
@@ -505,7 +514,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                     }`}
                     style={eventType === t.value ? { backgroundColor: t.color } : {}}
                   >
-                    <span>{t.icon}</span>
+                    {EVENT_TYPE_ICONS[t.value]}
                     <span>{t.label}</span>
                   </button>
                 ))}
