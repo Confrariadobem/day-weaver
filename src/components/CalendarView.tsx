@@ -123,19 +123,54 @@ export default function CalendarView() {
         is_birthday: isBirthday, is_investment: isInvestment, is_favorite: isFavorite,
       };
     });
+
+    // Tasks with scheduled_date (not already linked to a calendar event)
     const linkedTaskIds = new Set(events.filter((e) => e.task_id).map((e) => e.task_id));
     tasks.forEach((t) => {
       if (t.scheduled_date && !linkedTaskIds.has(t.id)) {
+        const isProjectTask = !!t.project_id;
         items.push({
           id: `task-${t.id}`, title: t.title,
           start_time: new Date(`${t.scheduled_date}T00:00:00`).toISOString(),
-          all_day: true, color: "#f97316", description: t.description,
+          all_day: true,
+          color: isProjectTask ? "#3b82f6" : "#f97316",
+          description: t.description,
           task_id: t.id, user_id: t.user_id, is_task: true, is_completed: t.is_completed,
           is_favorite: t.is_favorite || false,
+          is_project: isProjectTask,
         });
       }
     });
-    // Add Brazilian holidays - gray color
+
+    // Financial entries as calendar events (auto-generated, read-only visualization)
+    entries.forEach((fe: any) => {
+      if (!fe.entry_date) return;
+      const isExpense = fe.type === "expense";
+      const isRevenue = fe.type === "revenue";
+      const isInvestment = fe.type === "investment";
+      const amount = Number(fe.amount || 0);
+      const amountLabel = amount > 0 ? ` R$ ${amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "";
+      const color = isInvestment ? "#a855f7" : isExpense ? "#ef4444" : "#22c55e";
+      const icon = isInvestment ? "📈" : isExpense ? "💸" : "💰";
+      items.push({
+        id: `fin-${fe.id}`,
+        title: `${icon} ${fe.title}${amountLabel}`,
+        start_time: new Date(`${fe.entry_date}T00:00:00`).toISOString(),
+        all_day: true,
+        color,
+        description: fe.project_id ? `[tipo:cashflow] Projeto vinculado` : `[tipo:cashflow]`,
+        user_id: fe.user_id,
+        is_task: false,
+        is_cashflow: true,
+        is_finance: true,
+        is_investment: isInvestment,
+        is_project: !!fe.project_id,
+        is_favorite: false,
+        
+      });
+    });
+
+    // Brazilian holidays
     const yearsToCheck = new Set<number>();
     yearsToCheck.add(currentDate.getFullYear());
     yearsToCheck.add(currentDate.getFullYear() - 1);
@@ -150,6 +185,7 @@ export default function CalendarView() {
         });
       });
     });
+
     items.sort((a, b) => {
       const dayA = a.start_time.slice(0, 10);
       const dayB = b.start_time.slice(0, 10);
@@ -159,7 +195,7 @@ export default function CalendarView() {
       return 0;
     });
     return items;
-  }, [events, tasks, currentDate, user]);
+  }, [events, tasks, entries, currentDate, user]);
 
   const toggleFilter = (f: CalendarFilter) => {
     if (f === "all") {
