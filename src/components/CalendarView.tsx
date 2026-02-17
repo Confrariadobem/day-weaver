@@ -695,9 +695,13 @@ function HourlyDayView({ days, items, onDrop, onToggle, onClick, onNewEvent }: H
       )}
 
       {/* Scrollable hourly grid */}
-      <div className="flex-1 overflow-auto">
-        {HOURS.map((h) => (
-          <div key={h} className={cn("grid border-b border-border/10", days.length === 1 ? "grid-cols-[50px_1fr]" : `grid-cols-[50px_repeat(${days.length},1fr)]`)}>
+      <div className="flex-1 overflow-auto relative">
+        {HOURS.map((h) => {
+          const now = new Date();
+          const isCurrentHour = days.some(d => isToday(d)) && now.getHours() === h;
+          const minuteOffset = now.getMinutes();
+          return (
+          <div key={h} className={cn("grid border-b border-border/10 relative", days.length === 1 ? "grid-cols-[50px_1fr]" : `grid-cols-[50px_repeat(${days.length},1fr)]`)}>
             <div className="flex h-14 items-start justify-end pr-2 pt-0.5 sticky left-0 bg-background z-10">
               <span className="text-xs text-muted-foreground">{String(h).padStart(2, "0")}:00</span>
             </div>
@@ -708,20 +712,30 @@ function HourlyDayView({ days, items, onDrop, onToggle, onClick, onNewEvent }: H
               });
               const slotDate = new Date(day);
               slotDate.setHours(h, 0, 0, 0);
+              const showTimeLine = isToday(day) && isCurrentHour;
               return (
                 <div
                   key={day.toISOString()}
-                  className="h-14 border-l border-border/10 px-0.5 hover:bg-accent/10 transition-colors"
+                  className="h-14 border-l border-border/10 px-0.5 hover:bg-accent/10 transition-colors relative"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => onDrop(e, slotDate)}
                   onClick={() => onNewEvent(slotDate)}
                 >
+                  {showTimeLine && (
+                    <div className="absolute left-0 right-0 z-20 pointer-events-none" style={{ top: `${(minuteOffset / 60) * 100}%` }}>
+                      <div className="flex items-center">
+                        <div className="h-2 w-2 rounded-full bg-destructive shrink-0 -ml-1" />
+                        <div className="h-[2px] w-full bg-destructive" />
+                      </div>
+                    </div>
+                  )}
                   {hourItems.map((it) => <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />)}
                 </div>
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

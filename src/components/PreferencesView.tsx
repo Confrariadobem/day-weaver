@@ -11,8 +11,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Moon, Sun, Save, Globe, CalendarDays, Tag, Plus, Edit2, Trash2, Cake, CircleDollarSign, TrendingUp, FolderKanban, Flag, CheckSquare, Briefcase, Home, Car, Utensils, Pill, BookOpen, Gamepad2, Plane, Gift, PiggyBank, BarChart3, ShoppingCart, Target, Zap, Wrench, Smartphone, Music, Dumbbell, Clapperboard, Shirt, Dog, Sprout, Coffee, Database } from "lucide-react";
+import { Moon, Sun, Save, Globe, CalendarDays, Tag, Trash2, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LAUNCH_TYPE_ICONS, DATA_MODULE_ICONS, CATEGORY_ICON_MAP, CATEGORY_ICON_KEYS } from "@/lib/icons";
 
 const LANGUAGES = [
   { value: "pt-BR", label: "Português (Brasil)" },
@@ -59,9 +60,6 @@ const SLOT_DURATIONS = [
   { value: "240", label: "4 horas" },
   { value: "360", label: "6 horas" },
   { value: "morning", label: "Manhã (6h–12h)" },
-  { value: "afternoon", label: "Tarde (12h–18h)" },
-  { value: "night", label: "Noite (18h–00h)" },
-  { value: "period", label: "Por Período (Manhã/Tarde/Noite)" },
 ];
 
 const CATEGORY_COLORS = [
@@ -70,29 +68,18 @@ const CATEGORY_COLORS = [
   "#a855f7", "#84cc16",
 ];
 
-const CATEGORY_ICONS = [
-  "💼", "🏠", "🚗", "🍔", "💊", "📚", "🎮", "✈️", "🎂",
-  "💰", "📊", "🛒", "🎯", "⚡", "🔧", "📱", "🎵", "🏋️",
-  "🎬", "👕", "🐶", "🌱", "☕", "🎁",
-];
-
-const LAUNCH_TYPE_ICONS: Record<string, React.ReactNode> = {
-  "Aniversário": <Cake className="h-4 w-4" />,
-  "Evento": <CalendarDays className="h-4 w-4" />,
-  "Fluxo de Caixa": <CircleDollarSign className="h-4 w-4" />,
-  "Investimento": <TrendingUp className="h-4 w-4" />,
-  "Projetos": <FolderKanban className="h-4 w-4" />,
-  "Feriado": <Flag className="h-4 w-4" />,
-};
-
-const DATA_MODULE_ICONS: Record<string, React.ReactNode> = {
-  "calendar_events": <CalendarDays className="h-4 w-4" />,
-  "categories": <Tag className="h-4 w-4" />,
-  "financial_accounts": <PiggyBank className="h-4 w-4" />,
-  "financial_entries": <CircleDollarSign className="h-4 w-4" />,
-  "projects": <FolderKanban className="h-4 w-4" />,
-  "tasks": <CheckSquare className="h-4 w-4" />,
-};
+// All data modules in alphabetical order
+const DATA_MODULES = [
+  { key: "calendar_events", label: "Calendário (Eventos)" },
+  { key: "categories", label: "Categorias" },
+  { key: "financial_accounts", label: "Carteira" },
+  { key: "financial_entries", label: "Fluxo de Caixa" },
+  { key: "investments", label: "Investimentos" },
+  { key: "project_phases", label: "Etapas de Projetos" },
+  { key: "project_resources", label: "Recursos de Projetos" },
+  { key: "projects", label: "Projetos" },
+  { key: "tasks", label: "Tarefas" },
+].sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
 
 export default function PreferencesView() {
   const { user } = useAuth();
@@ -116,12 +103,19 @@ export default function PreferencesView() {
   const [editingCat, setEditingCat] = useState<any>(null);
   const [catName, setCatName] = useState("");
   const [catColor, setCatColor] = useState(CATEGORY_COLORS[0]);
-  const [catIcon, setCatIcon] = useState("💼");
+  const [catIcon, setCatIcon] = useState("briefcase");
   const [catIsRevenue, setCatIsRevenue] = useState(false);
   const [catIsExpense, setCatIsExpense] = useState(false);
   const [catIsProject, setCatIsProject] = useState(false);
   const [catBudget, setCatBudget] = useState("0");
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
+
+  // Data module toggles
+  const [dataToggles, setDataToggles] = useState<Record<string, boolean>>({});
+  const lastDataClickRef = useRef<{ key: string; time: number } | null>(null);
+
+  // Data module edit state
+  const [dataEditDialog, setDataEditDialog] = useState<{ open: boolean; key: string; label: string } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -153,19 +147,11 @@ export default function PreferencesView() {
   };
 
   // Category handlers
-  const openNewCat = () => {
-    setEditingCat(null);
-    setCatName(""); setCatColor(CATEGORY_COLORS[0]); setCatIcon("💼");
-    setCatIsRevenue(false); setCatIsExpense(false); setCatIsProject(false);
-    setCatBudget("0");
-    setCatDialogOpen(true);
-  };
-
   const openEditCat = (cat: any) => {
     setEditingCat(cat);
     setCatName(cat.name);
     setCatColor(cat.color || CATEGORY_COLORS[0]);
-    setCatIcon(cat.icon || "💼");
+    setCatIcon(cat.icon || "briefcase");
     setCatIsRevenue(cat.is_revenue || false);
     setCatIsExpense(cat.is_expense || false);
     setCatIsProject(cat.is_project || false);
@@ -204,6 +190,57 @@ export default function PreferencesView() {
     fetchCategories();
   };
 
+  // Data module toggles
+  const allDataToggled = DATA_MODULES.every(m => dataToggles[m.key]);
+  const toggleAllData = () => {
+    const newState = !allDataToggled;
+    const newToggles: Record<string, boolean> = {};
+    DATA_MODULES.forEach(m => { newToggles[m.key] = newState; });
+    setDataToggles(newToggles);
+  };
+
+  const toggleDataModule = (key: string) => {
+    setDataToggles(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleDataRowClick = (mod: { key: string; label: string }) => {
+    const now = Date.now();
+    if (lastDataClickRef.current?.key === mod.key && now - lastDataClickRef.current.time < 400) {
+      setDataEditDialog({ open: true, key: mod.key, label: mod.label });
+      lastDataClickRef.current = null;
+    } else {
+      lastDataClickRef.current = { key: mod.key, time: now };
+    }
+  };
+
+  const handleClearData = async () => {
+    if (!user) return;
+    const selected = DATA_MODULES.filter(m => dataToggles[m.key]);
+    if (selected.length === 0) { toast({ title: "Selecione ao menos um módulo" }); return; }
+    const confirmed = window.confirm(`Tem certeza que deseja limpar ${selected.length} módulo(s)? Esta ação é irreversível.`);
+    if (!confirmed) return;
+
+    for (const mod of selected) {
+      if (mod.key === "projects") {
+        await supabase.from("project_resources").delete().eq("user_id", user.id);
+        await supabase.from("project_phases").delete().eq("user_id", user.id);
+        await supabase.from("tasks").delete().eq("user_id", user.id).not("project_id", "is", null);
+        await supabase.from("projects").delete().eq("user_id", user.id);
+      } else if (mod.key === "project_phases") {
+        await supabase.from("project_phases").delete().eq("user_id", user.id);
+      } else if (mod.key === "project_resources") {
+        await supabase.from("project_resources").delete().eq("user_id", user.id);
+      } else if (mod.key === "tasks") {
+        await supabase.from("tasks").delete().eq("user_id", user.id);
+      } else {
+        await supabase.from(mod.key as any).delete().eq("user_id", user.id);
+      }
+    }
+    toast({ title: `${selected.length} módulo(s) limpos com sucesso!` });
+    setDataToggles({});
+    fetchCategories();
+  };
+
   return (
     <div className="h-full overflow-auto p-6">
       <div className="mx-auto max-w-3xl space-y-6">
@@ -220,11 +257,10 @@ export default function PreferencesView() {
 
           {/* ===== GERAL ===== */}
           <TabsContent value="general" className="space-y-6 mt-4">
-            {/* Appearance */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                  {theme === "dark" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                   Aparência
                 </CardTitle>
               </CardHeader>
@@ -236,11 +272,10 @@ export default function PreferencesView() {
               </CardContent>
             </Card>
 
-            {/* Language & Currency */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <Globe className="h-4 w-4" /> Idioma e Moeda
+                  <Globe className="h-5 w-5" /> Idioma e Moeda
                 </CardTitle>
                 <CardDescription>Configure o idioma e formato monetário</CardDescription>
               </CardHeader>
@@ -285,7 +320,7 @@ export default function PreferencesView() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <CalendarDays className="h-4 w-4" /> Configurações do Calendário
+                  <CalendarDays className="h-5 w-5" /> Configurações do Calendário
                 </CardTitle>
                 <CardDescription>Personalize sua agenda e visualização</CardDescription>
               </CardHeader>
@@ -357,7 +392,7 @@ export default function PreferencesView() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <CalendarDays className="h-4 w-4" /> Tipos de Lançamento
+                  <CalendarDays className="h-5 w-5" /> Tipos de Lançamento
                 </CardTitle>
                 <CardDescription>Tipos disponíveis para lançamentos no calendário e seus filtros de visualização.</CardDescription>
               </CardHeader>
@@ -390,61 +425,61 @@ export default function PreferencesView() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base text-destructive">
-                  <Trash2 className="h-4 w-4" /> Limpar Dados
+                  <Database className="h-5 w-5" /> Gerenciamento de Dados
                 </CardTitle>
-                <CardDescription>Selecione os módulos que deseja limpar. Esta ação é irreversível.</CardDescription>
+                <CardDescription>Selecione os módulos que deseja limpar. Clique duas vezes para editar. Esta ação é irreversível.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {[
-                  { key: "calendar_events", label: "Calendário (Eventos)" },
-                  { key: "categories", label: "Categorias" },
-                  { key: "financial_accounts", label: "Carteira" },
-                  { key: "financial_entries", label: "Fluxo de Caixa" },
-                  { key: "projects", label: "Projetos" },
-                  { key: "tasks", label: "Tarefas" },
-                ].sort((a, b) => a.label.localeCompare(b.label, "pt-BR")).map(mod => (
-                  <div key={mod.key} className="flex items-center justify-between rounded-lg border border-border p-3">
+                {/* Toggle all */}
+                <div className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/20">
+                  <div className="flex items-center gap-2">
+                    <Database className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-sm font-semibold">Selecionar Todos</span>
+                  </div>
+                  <Switch checked={allDataToggled} onCheckedChange={toggleAllData} />
+                </div>
+
+                {/* Individual modules */}
+                {DATA_MODULES.map(mod => (
+                  <div
+                    key={mod.key}
+                    onClick={() => handleDataRowClick(mod)}
+                    className="flex items-center justify-between rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors cursor-pointer select-none"
+                  >
                     <div className="flex items-center gap-2">
                       <span className="text-primary">{DATA_MODULE_ICONS[mod.key]}</span>
                       <span className="text-sm font-medium">{mod.label}</span>
                     </div>
-                    <Button variant="destructive" size="sm" className="h-7 text-xs gap-1" onClick={async () => {
-                      if (!user) return;
-                      const confirmed = window.confirm(`Tem certeza que deseja apagar todos os dados de "${mod.label}"? Esta ação não pode ser desfeita.`);
-                      if (!confirmed) return;
-                      if (mod.key === "projects") {
-                        await supabase.from("project_resources").delete().eq("user_id", user.id);
-                        await supabase.from("tasks").delete().eq("user_id", user.id).not("project_id", "is", null);
-                        await supabase.from("projects").delete().eq("user_id", user.id);
-                      } else if (mod.key === "tasks") {
-                        await supabase.from("tasks").delete().eq("user_id", user.id);
-                      } else {
-                        await supabase.from(mod.key as any).delete().eq("user_id", user.id);
-                      }
-                      toast({ title: `${mod.label} limpos com sucesso!` });
-                      fetchCategories();
-                    }}>
-                      <Trash2 className="h-3 w-3" /> Limpar
-                    </Button>
+                    <Switch
+                      checked={!!dataToggles[mod.key]}
+                      onCheckedChange={() => toggleDataModule(mod.key)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
                   </div>
                 ))}
               </CardContent>
             </Card>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setDataToggles({})}>Cancelar</Button>
+              <Button variant="destructive" size="sm" className="gap-1.5" onClick={handleClearData}
+                disabled={!DATA_MODULES.some(m => dataToggles[m.key])}>
+                <Trash2 className="h-3.5 w-3.5" /> Limpar
+              </Button>
+            </div>
           </TabsContent>
 
           {/* ===== CATEGORIAS ===== */}
           <TabsContent value="categories" className="space-y-4 mt-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <div>
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <Tag className="h-4 w-4" /> Categorias
+                    <Tag className="h-5 w-5" /> Categorias
                   </CardTitle>
-                  <CardDescription>Categorias unificadas para todos os módulos. Clique duas vezes para editar.</CardDescription>
+                  <CardDescription>Categorias unificadas para todos os módulos. Clique duas vezes para editar. Use a Central de Lançamentos para criar novas categorias.</CardDescription>
                 </div>
-                <Button size="sm" onClick={openNewCat} className="gap-1.5">
-                  <Plus className="h-3.5 w-3.5" /> Nova
-                </Button>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -454,7 +489,9 @@ export default function PreferencesView() {
                       onClick={() => handleCatRowClick(cat)}
                       className="flex items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors cursor-pointer select-none"
                     >
-                      <span className="text-lg shrink-0">{cat.icon || "💼"}</span>
+                      <span className="text-primary shrink-0">
+                        {CATEGORY_ICON_MAP[cat.icon] || CATEGORY_ICON_MAP["briefcase"]}
+                      </span>
                       <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: cat.color || "#3b82f6" }} />
                       <div className="flex-1 min-w-0">
                         <span className="font-medium">{cat.name}</span>
@@ -492,16 +529,16 @@ export default function PreferencesView() {
                   <div>
                     <Label>Ícone</Label>
                     <div className="mt-1 flex flex-wrap gap-1.5">
-                      {CATEGORY_ICONS.map((icon) => (
+                      {CATEGORY_ICON_KEYS.map((key) => (
                         <button
-                          key={icon}
-                          onClick={() => setCatIcon(icon)}
+                          key={key}
+                          onClick={() => setCatIcon(key)}
                           className={cn(
-                            "flex h-9 w-9 items-center justify-center rounded-lg border text-lg transition-colors",
-                            catIcon === icon ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"
+                            "flex h-10 w-10 items-center justify-center rounded-lg border transition-colors",
+                            catIcon === key ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-muted-foreground text-muted-foreground"
                           )}
                         >
-                          {icon}
+                          {CATEGORY_ICON_MAP[key]}
                         </button>
                       ))}
                     </div>
@@ -551,13 +588,10 @@ export default function PreferencesView() {
                       <Switch checked={catIsProject} onCheckedChange={setCatIsProject} />
                     </div>
                   </div>
-                  {/* Standardized footer buttons */}
+                  {/* Standardized footer */}
                   <div className="flex items-center gap-2 pt-4 border-t border-border/20">
                     {editingCat && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="gap-1.5"
+                      <Button variant="destructive" size="sm" className="gap-1.5"
                         onClick={() => { deleteCat(editingCat.id); setCatDialogOpen(false); }}
                       >
                         <Trash2 className="h-3.5 w-3.5" /> Excluir
@@ -565,7 +599,9 @@ export default function PreferencesView() {
                     )}
                     <div className="flex gap-2 ml-auto">
                       <Button variant="ghost" size="sm" onClick={() => setCatDialogOpen(false)}>Cancelar</Button>
-                      <Button size="sm" onClick={saveCat}>Salvar</Button>
+                      <Button size="sm" onClick={saveCat} className="gap-1.5">
+                        <Save className="h-3.5 w-3.5" /> Salvar
+                      </Button>
                     </div>
                   </div>
                 </div>

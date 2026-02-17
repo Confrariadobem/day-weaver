@@ -571,18 +571,34 @@ export default function ProgramsProjectsView() {
         <div className="p-4 space-y-4">
           {/* Filter buttons - Patrimônio pattern */}
           <div className="flex items-center gap-2 overflow-x-auto">
-            {(["all", "active", "completed"] as FilterStatus[]).map(f => (
-              <Button key={f} size="sm"
-                variant={filterStatus === f ? "default" : "ghost"}
-                className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== f && "text-muted-foreground")}
-                onClick={() => setFilterStatus(f)}
-              >
-                {f === "all" && <FolderKanban className="h-3 w-3" />}
-                {f === "active" && <Layers className="h-3 w-3" />}
-                {f === "completed" && <Check className="h-3 w-3" />}
-                {f === "all" ? "Todos" : f === "active" ? "Ativos" : "Concluídos"}
-              </Button>
-            ))}
+            <Button size="sm"
+              variant={filterStatus === "all" && !search ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", !(filterStatus === "all" && !search) && "text-muted-foreground")}
+              onClick={() => { setFilterStatus("all"); setSearch(""); }}
+            >
+              <FolderKanban className="h-3 w-3" /> Programas
+            </Button>
+            <Button size="sm"
+              variant={filterStatus === "active" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "active" && "text-muted-foreground")}
+              onClick={() => setFilterStatus("active")}
+            >
+              <Layers className="h-3 w-3" /> Projetos
+            </Button>
+            <Button size="sm"
+              variant={filterStatus === "completed" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "completed" && "text-muted-foreground")}
+              onClick={() => setFilterStatus("completed")}
+            >
+              <ListTodo className="h-3 w-3" /> Tarefas
+            </Button>
+            <Button size="sm"
+              variant={filterStatus === "all" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "all" && "text-muted-foreground")}
+              onClick={() => setFilterStatus("all")}
+            >
+              Todos
+            </Button>
             <div className="ml-auto relative">
               <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
               <Input placeholder="Buscar projeto..." value={search} onChange={(e) => setSearch(e.target.value)}

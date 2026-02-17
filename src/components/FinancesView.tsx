@@ -897,7 +897,6 @@ export default function FinancesView() {
                   { key: "all" as CashFlowFilter, label: "Todos" },
                   { key: "payable" as CashFlowFilter, label: "A Pagar" },
                   { key: "receivable" as CashFlowFilter, label: "A Receber" },
-                  { key: "overdue" as CashFlowFilter, label: "Atrasados" },
                   { key: "pending" as CashFlowFilter, label: "Pendentes" },
                 ]).map(f => (
                   <Button key={f.key} size="sm"
