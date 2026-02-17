@@ -514,173 +514,176 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </div>
           )}
 
-          {/* ─── TERTIARY GROUP: Type-specific fields ─── */}
-
-          {/* Dates - common for all */}
-          <div className="space-y-3 rounded-lg border border-border/30 p-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Data início</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-sm">Data fim</Label>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
-              <Label htmlFor="allday" className="text-sm">Dia inteiro</Label>
-            </div>
-
-            {!allDay && (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-sm flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Início</Label>
-                  <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+          {/* ─── TERTIARY GROUP: Type-specific fields (only shown after type selection or when editing) ─── */}
+          {(item || eventType !== "event" || title.trim()) && (
+            <>
+              {/* Dates - common for all */}
+              <div className="space-y-3 rounded-lg border border-border/30 p-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Data início</Label>
+                    <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Data fim</Label>
+                    <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-sm">Fim</Label>
-                  <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                </div>
-              </div>
-            )}
-          </div>
 
-          {/* Cashflow: direction + amount + payment fields */}
-          {eventType === "cashflow" && (
-            <div className="space-y-3 rounded-lg border border-border/30 p-3">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCashflowDirection("expense")}
-                  className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
-                    cashflowDirection === "expense" ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"
-                  )}
-                >💳 Pagar</button>
-                <button
-                  onClick={() => setCashflowDirection("revenue")}
-                  className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
-                    cashflowDirection === "revenue" ? "bg-[hsl(var(--success))] text-white" : "bg-muted text-muted-foreground"
-                  )}
-                >💰 Receber</button>
+                <div className="flex items-center gap-1.5">
+                  <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
+                  <Label htmlFor="allday" className="text-sm">Dia inteiro</Label>
+                </div>
+
+                {!allDay && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-sm flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Início</Label>
+                      <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Fim</Label>
+                      <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                    </div>
+                  </div>
+                )}
               </div>
-              <div>
-                <Label className="text-sm">Valor (R$)</Label>
-                <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
-                  onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
-              </div>
-              {!item && recurrence === "none" && (
-                <div>
-                  <Label className="text-sm">Parcelas</Label>
-                  <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} />
+
+              {/* Cashflow: direction + amount + payment fields */}
+              {eventType === "cashflow" && (
+                <div className="space-y-3 rounded-lg border border-border/30 p-3">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCashflowDirection("expense")}
+                      className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
+                        cashflowDirection === "expense" ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"
+                      )}
+                    >💳 Pagar</button>
+                    <button
+                      onClick={() => setCashflowDirection("revenue")}
+                      className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
+                        cashflowDirection === "revenue" ? "bg-[hsl(var(--success))] text-white" : "bg-muted text-muted-foreground"
+                      )}
+                    >💰 Receber</button>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Valor (R$)</Label>
+                    <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
+                      onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
+                  </div>
+                  {!item && recurrence === "none" && (
+                    <div>
+                      <Label className="text-sm">Parcelas</Label>
+                      <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-sm">Carteira</Label>
+                      <Select value={accountId} onValueChange={setAccountId}>
+                        <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((a: any) => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-sm">Forma Pgto</Label>
+                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                        <SelectContent>
+                          {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid-central" />
+                    <label htmlFor="is-paid-central" className="text-xs cursor-pointer">Marcar como pago</label>
+                  </div>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-2">
+
+              {/* Investment amount */}
+              {eventType === "investment" && (
+                <div className="space-y-3 rounded-lg border border-border/30 p-3">
+                  <div>
+                    <Label className="text-sm">Valor (R$)</Label>
+                    <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
+                      onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
+                  </div>
+                </div>
+              )}
+
+              {/* Task priority */}
+              {eventType === "task" && (
+                <div className="space-y-3 rounded-lg border border-border/30 p-3">
+                  <div>
+                    <Label className="text-sm flex items-center gap-1.5"><Tag className="h-3.5 w-3.5" /> Prioridade</Label>
+                    <Select value={priority} onValueChange={setPriority}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">🟢 Baixa</SelectItem>
+                        <SelectItem value="medium">🟡 Média</SelectItem>
+                        <SelectItem value="high">🔴 Alta</SelectItem>
+                        <SelectItem value="urgent">🔥 Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Extra fields: Lembrete + Recorrência ─── */}
+              <div className="space-y-3 rounded-lg border border-border/30 p-3">
                 <div>
-                  <Label className="text-sm">Carteira</Label>
-                  <Select value={accountId} onValueChange={setAccountId}>
-                    <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <Label className="text-sm flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Lembrete</Label>
+                  <Select value={reminder} onValueChange={setReminder}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {accounts.map((a: any) => (
-                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                      {REMINDER_OPTIONS.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div>
-                  <Label className="text-sm">Forma Pgto</Label>
-                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                    <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <Label className="text-sm flex items-center gap-1.5"><Repeat className="h-3.5 w-3.5" /> Recorrência</Label>
+                  <Select value={recurrence} onValueChange={setRecurrence}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      {RECURRENCE_OPTIONS.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid-central" />
-                <label htmlFor="is-paid-central" className="text-xs cursor-pointer">Marcar como pago</label>
-              </div>
-            </div>
-          )}
 
-          {/* Investment amount */}
-          {eventType === "investment" && (
-            <div className="space-y-3 rounded-lg border border-border/30 p-3">
-              <div>
-                <Label className="text-sm">Valor (R$)</Label>
-                <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
-                  onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
-              </div>
-            </div>
-          )}
-
-          {/* Task priority */}
-          {eventType === "task" && (
-            <div className="space-y-3 rounded-lg border border-border/30 p-3">
-              <div>
-                <Label className="text-sm flex items-center gap-1.5"><Tag className="h-3.5 w-3.5" /> Prioridade</Label>
-                <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">🟢 Baixa</SelectItem>
-                    <SelectItem value="medium">🟡 Média</SelectItem>
-                    <SelectItem value="high">🔴 Alta</SelectItem>
-                    <SelectItem value="urgent">🔥 Urgente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-
-          {/* ─── Extra fields: Lembrete + Recorrência ─── */}
-          <div className="space-y-3 rounded-lg border border-border/30 p-3">
-            <div>
-              <Label className="text-sm flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Lembrete</Label>
-              <Select value={reminder} onValueChange={setReminder}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {REMINDER_OPTIONS.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="text-sm flex items-center gap-1.5"><Repeat className="h-3.5 w-3.5" /> Recorrência</Label>
-              <Select value={recurrence} onValueChange={setRecurrence}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {RECURRENCE_OPTIONS.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {recurrence !== "none" && !item && (
-              <>
-                <div>
-                  <Label className="text-sm flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Quantidade de ocorrências</Label>
-                  <Input type="number" min="1" max="365" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} />
-                </div>
-                {(recurrence === "FREQ=MONTHLY" || recurrence === "FREQ=QUARTERLY" || recurrence === "FREQ=SEMIANNUAL") && (
-                  <div>
-                    <Label className="text-sm">Repetir na:</Label>
-                    <Select value={recurrenceDateMode} onValueChange={(v) => setRecurrenceDateMode(v as RecurrenceDateMode)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="same_date">Mesma data</SelectItem>
-                        <SelectItem value="first_business_day">Primeiro dia útil do mês</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {recurrence !== "none" && !item && (
+                  <>
+                    <div>
+                      <Label className="text-sm flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Quantidade de ocorrências</Label>
+                      <Input type="number" min="1" max="365" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} />
+                    </div>
+                    {(recurrence === "FREQ=MONTHLY" || recurrence === "FREQ=QUARTERLY" || recurrence === "FREQ=SEMIANNUAL") && (
+                      <div>
+                        <Label className="text-sm">Repetir na:</Label>
+                        <Select value={recurrenceDateMode} onValueChange={(v) => setRecurrenceDateMode(v as RecurrenceDateMode)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="same_date">Mesma data</SelectItem>
+                            <SelectItem value="first_business_day">Primeiro dia útil do mês</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-2 pt-4 border-t border-border/20">

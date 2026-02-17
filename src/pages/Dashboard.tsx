@@ -7,6 +7,7 @@ import ProfileView from "@/components/ProfileView";
 import PreferencesView from "@/components/PreferencesView";
 import DashboardView from "@/components/DashboardView";
 import ProgramsProjectsView from "@/components/ProgramsProjectsView";
+import InvestmentsView from "@/components/InvestmentsView";
 import FloatingActionButton from "@/components/FloatingActionButton";
 
 export default function Dashboard() {
@@ -28,7 +29,8 @@ export default function Dashboard() {
             {activeModule === "dashboard" && "Dashboard"}
             {activeModule === "profile" && "Perfil"}
             {activeModule === "preferences" && "Preferências"}
-            {activeModule === "programs" && "Programas e Projetos"}
+            {activeModule === "programs" && "Projetos"}
+            {activeModule === "investments" && "Investimentos"}
           </span>
         </header>
 
@@ -38,6 +40,7 @@ export default function Dashboard() {
             {activeModule === "calendar" && <CalendarView />}
             {activeModule === "finances" && <FinancesView />}
             {activeModule === "programs" && <ProgramsProjectsView />}
+            {activeModule === "investments" && <InvestmentsView />}
             {activeModule === "profile" && <ProfileView />}
             {activeModule === "preferences" && <PreferencesView />}
           </div>
