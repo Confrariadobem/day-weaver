@@ -3,7 +3,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import {
   CalendarDays,
-  Wallet,
   LayoutDashboard,
   User,
   Settings,
@@ -12,6 +11,7 @@ import {
   FolderKanban,
   TrendingUp,
   Building2,
+  BadgeDollarSign,
 } from "lucide-react";
 
 export type ModuleKey = "calendar" | "finances" | "dashboard" | "profile" | "preferences" | "programs" | "investments" | "patrimonio";
@@ -25,7 +25,7 @@ interface NavItem {
 const topNavItems: NavItem[] = [
   { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
   { key: "calendar", label: "Calendário", icon: <CalendarDays className="h-5 w-5" /> },
-  { key: "finances", label: "Finanças", icon: <Wallet className="h-5 w-5" /> },
+  { key: "finances", label: "Finanças", icon: <BadgeDollarSign className="h-5 w-5" /> },
   { key: "programs", label: "Projetos", icon: <FolderKanban className="h-5 w-5" /> },
   { key: "investments", label: "Investimentos", icon: <TrendingUp className="h-5 w-5" /> },
   { key: "patrimonio", label: "Patrimônio", icon: <Building2 className="h-5 w-5" /> },

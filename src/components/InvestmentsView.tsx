@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useInvestments, useInvestment, useAddInvestment, type Investment } from "@/hooks/useInvestments";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,10 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Plus, TrendingUp, TrendingDown, ArrowLeft, Trash2, Save, Search,
   PieChart as PieChartIcon, Wallet, Calendar, BarChart3, AlertTriangle,
-  Edit, PiggyBank,
+  Edit, PiggyBank, Building2, Bitcoin, Coins, Eye, EyeOff, BadgeDollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -27,12 +29,12 @@ import EventEditDialog from "@/components/calendar/EventEditDialog";
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 const INVESTMENT_TYPES = [
-  { value: "stock", label: "Ações", icon: <TrendingUp className="h-4 w-4" /> },
-  { value: "fii", label: "FIIs", icon: <Wallet className="h-4 w-4" /> },
-  { value: "crypto", label: "Criptoativos", icon: <BarChart3 className="h-4 w-4" /> },
-  { value: "fixed_income", label: "Renda Fixa", icon: <PiggyBank className="h-4 w-4" /> },
-  { value: "etf", label: "ETFs", icon: <PieChartIcon className="h-4 w-4" /> },
-  { value: "other", label: "Outros", icon: <Wallet className="h-4 w-4" /> },
+  { value: "stock", label: "Ações", icon: <TrendingUp className="h-5 w-5" /> },
+  { value: "crypto", label: "Criptoativos", icon: <Bitcoin className="h-5 w-5" /> },
+  { value: "etf", label: "ETFs", icon: <BarChart3 className="h-5 w-5" /> },
+  { value: "fii", label: "FIIs", icon: <Building2 className="h-5 w-5" /> },
+  { value: "other", label: "Outros", icon: <Coins className="h-5 w-5" /> },
+  { value: "fixed_income", label: "Renda Fixa", icon: <PiggyBank className="h-5 w-5" /> },
 ];
 
 const TYPE_COLORS: Record<string, string> = {
@@ -41,7 +43,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 const getTypeLabel = (type: string) => INVESTMENT_TYPES.find(t => t.value === type)?.label || type;
-const getTypeIcon = (type: string) => INVESTMENT_TYPES.find(t => t.value === type)?.icon || <Wallet className="h-4 w-4" />;
+const getTypeIcon = (type: string) => INVESTMENT_TYPES.find(t => t.value === type)?.icon || <Coins className="h-5 w-5" />;
 
 export default function InvestmentsView() {
   const { user } = useAuth();
@@ -54,6 +56,11 @@ export default function InvestmentsView() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
+
+  // Financial entries for investments
+  const [investmentEntries, setInvestmentEntries] = useState<any[]>([]);
+  const [showPaidEntries, setShowPaidEntries] = useState(false);
+  const [categories, setCategories] = useState<any[]>([]);
 
   // Form state
   const [formStep, setFormStep] = useState(0);
@@ -70,6 +77,31 @@ export default function InvestmentsView() {
 
   // FAB for adding aporte via Central de Lançamentos
   const [aporteDialogOpen, setAporteDialogOpen] = useState(false);
+
+  const fetchEntries = useCallback(async () => {
+    if (!user) return;
+    const [entRes, catRes] = await Promise.all([
+      supabase.from("financial_entries").select("*").eq("user_id", user.id).eq("type", "investment").order("entry_date", { ascending: false }),
+      supabase.from("categories").select("*").eq("user_id", user.id),
+    ]);
+    // Also get entries linked to investments
+    const { data: linkedEntries } = await supabase.from("financial_entries").select("*").eq("user_id", user.id).not("investment_id", "is", null).order("entry_date", { ascending: false });
+    const allEntries = [...(entRes.data || [])];
+    if (linkedEntries) {
+      linkedEntries.forEach(le => {
+        if (!allEntries.find(e => e.id === le.id)) allEntries.push(le);
+      });
+    }
+    setInvestmentEntries(allEntries);
+    if (catRes.data) setCategories(catRes.data);
+  }, [user]);
+
+  useEffect(() => {
+    fetchEntries();
+    const handleDataChanged = () => fetchEntries();
+    window.addEventListener("lovable:data-changed", handleDataChanged);
+    return () => window.removeEventListener("lovable:data-changed", handleDataChanged);
+  }, [fetchEntries]);
 
   const resetForm = () => {
     setFormStep(0); setFType("stock"); setFName(""); setFTicker("");
@@ -126,7 +158,6 @@ export default function InvestmentsView() {
     const totalCurrent = active.reduce((s, i) => s + (Number(i.current_price) || 0) * (Number(i.quantity) || 0), 0);
     const profitPct = totalInvested > 0 ? ((totalCurrent - totalInvested) / totalInvested) * 100 : 0;
 
-    // Allocation by type
     const allocationMap: Record<string, number> = {};
     active.forEach(i => {
       const val = (Number(i.current_price) || 0) * (Number(i.quantity) || 0);
@@ -136,12 +167,10 @@ export default function InvestmentsView() {
       name: getTypeLabel(type), value, color: TYPE_COLORS[type] || "#6b7280",
     }));
 
-    // Top 3 by current value
     const top3 = [...active]
       .sort((a, b) => ((Number(b.current_price) || 0) * (Number(b.quantity) || 0)) - ((Number(a.current_price) || 0) * (Number(a.quantity) || 0)))
       .slice(0, 3);
 
-    // Upcoming dividends this week
     const now = new Date();
     const weekEnd = new Date(now); weekEnd.setDate(weekEnd.getDate() + 7);
     const upcomingDividends = active.filter(i => {
@@ -150,7 +179,6 @@ export default function InvestmentsView() {
       return d >= now && d <= weekEnd;
     });
 
-    // Alerts: investments with negative performance > 5%
     const alerts = active.filter(i => {
       const pp = Number(i.purchase_price) || 0;
       const cp = Number(i.current_price) || 0;
@@ -160,7 +188,7 @@ export default function InvestmentsView() {
     return { totalInvested, totalCurrent, profitPct, allocation, top3, upcomingDividends, alerts };
   }, [investments]);
 
-  // Filtered list
+  // Filtered investments
   const filteredInvestments = useMemo(() => {
     let list = investments;
     if (filterType !== "all") list = list.filter(i => i.type === filterType);
@@ -170,6 +198,19 @@ export default function InvestmentsView() {
     }
     return list;
   }, [investments, filterType, searchQuery]);
+
+  // Filtered entries for the list
+  const filteredEntries = useMemo(() => {
+    let entries = investmentEntries;
+    if (filterType !== "all") {
+      const invIds = investments.filter(i => i.type === filterType).map(i => i.id);
+      entries = entries.filter(e => e.investment_id && invIds.includes(e.investment_id));
+    }
+    return entries;
+  }, [investmentEntries, filterType, investments]);
+
+  const pendingEntries = filteredEntries.filter(e => !e.is_paid);
+  const paidEntries = filteredEntries.filter(e => e.is_paid);
 
   // ─── Detail view ───
   if (selectedId) {
@@ -184,13 +225,8 @@ export default function InvestmentsView() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Type filter buttons - Patrimônio pattern */}
+      {/* Type filter buttons - alphabetical, Todos last */}
       <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/30 overflow-x-auto">
-        <Button size="sm"
-          variant={filterType === "all" ? "default" : "ghost"}
-          className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterType !== "all" && "text-muted-foreground")}
-          onClick={() => setFilterType("all")}
-        >Todos</Button>
         {INVESTMENT_TYPES.map(t => (
           <Button key={t.value} size="sm"
             variant={filterType === t.value ? "default" : "ghost"}
@@ -200,6 +236,11 @@ export default function InvestmentsView() {
             {t.icon} {t.label}
           </Button>
         ))}
+        <Button size="sm"
+          variant={filterType === "all" ? "default" : "ghost"}
+          className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterType !== "all" && "text-muted-foreground")}
+          onClick={() => setFilterType("all")}
+        >Todos</Button>
         <div className="ml-auto relative">
           <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
           <Input placeholder="Buscar ativo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
@@ -207,7 +248,7 @@ export default function InvestmentsView() {
         </div>
       </div>
 
-      {/* KPI Cards - Patrimônio pattern */}
+      {/* KPI Cards */}
       <div className="p-4 border-b border-border/30 space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card className="bg-card">
@@ -240,7 +281,7 @@ export default function InvestmentsView() {
           </Card>
         </div>
 
-        {/* Secondary row: Allocation + Top 3 + Alerts */}
+        {/* Secondary row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Card className="bg-card">
             <CardContent className="p-3">
@@ -321,75 +362,176 @@ export default function InvestmentsView() {
         </div>
       </div>
 
-      {/* Investment Cards Grid */}
+      {/* Entries list + Investment cards */}
       <ScrollArea className="flex-1">
-        <div className="p-4 grid gap-3 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-          {filteredInvestments.map(inv => {
-            const totalInvested = (Number(inv.purchase_price) || 0) * (Number(inv.quantity) || 0);
-            const totalCurrent = (Number(inv.current_price) || 0) * (Number(inv.quantity) || 0);
-            const profitPct = totalInvested > 0 ? ((totalCurrent - totalInvested) / totalInvested) * 100 : 0;
-            const isPositive = profitPct >= 0;
-
-            return (
-              <Card
-                key={inv.id}
-                onClick={() => setSelectedId(inv.id)}
-                className="cursor-pointer transition-all hover:shadow-md group"
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-primary shrink-0">{getTypeIcon(inv.type)}</span>
-                        <h4 className="text-sm font-semibold truncate">{inv.name}</h4>
-                      </div>
-                      {inv.ticker && <p className="text-[10px] text-muted-foreground mt-0.5">{inv.ticker}</p>}
-                    </div>
-                    <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: TYPE_COLORS[inv.type], color: TYPE_COLORS[inv.type] }}>
-                      {getTypeLabel(inv.type)}
-                    </Badge>
+        <div className="p-4 space-y-4">
+          {/* ── Financial entries list (like Finanças module) ── */}
+          <div>
+            <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+              <BadgeDollarSign className="h-4 w-4 text-primary" /> Lançamentos de Investimentos
+            </p>
+            {pendingEntries.length === 0 && paidEntries.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <BadgeDollarSign className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                <p className="text-xs">Nenhum lançamento de investimento encontrado.</p>
+                <p className="text-[10px] mt-1">Use a Central de Lançamentos para registrar aportes.</p>
+              </div>
+            ) : (
+              <div className="rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
+                      <th className="text-left py-2 px-2">Data</th>
+                      <th className="text-left py-2 px-2">Título</th>
+                      <th className="text-left py-2 px-2">Categoria</th>
+                      <th className="text-right py-2 px-2">Valor</th>
+                      <th className="text-center py-2 px-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingEntries.map(e => {
+                      const cat = categories.find(c => c.id === e.category_id);
+                      const isOverdue = !e.is_paid && new Date(e.entry_date) < new Date();
+                      const inv = investments.find(i => i.id === e.investment_id);
+                      return (
+                        <tr key={e.id}
+                          className={cn(
+                            "border-b border-border/10 transition-colors hover:bg-accent/30",
+                            isOverdue && "bg-destructive/5"
+                          )}
+                        >
+                          <td className="py-2 px-2 text-xs">{format(new Date(e.entry_date), "dd/MM/yy")}</td>
+                          <td className="py-2 px-2 text-xs font-medium truncate max-w-[200px]">
+                            {e.title}
+                            {inv && <span className="text-[10px] text-muted-foreground ml-1">({inv.ticker || inv.name})</span>}
+                          </td>
+                          <td className="py-2 px-2 text-xs text-muted-foreground">{cat?.name || "—"}</td>
+                          <td className={cn("py-2 px-2 text-xs text-right font-medium",
+                            e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive"
+                          )}>
+                            {e.type === "revenue" ? "+" : "-"}{brl(Number(e.amount))}
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <span className={cn("text-[10px] px-1.5 py-0.5 rounded",
+                              isOverdue ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning"
+                            )}>
+                              {isOverdue ? "Atrasado" : "Pendente"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {/* Paid entries section */}
+                {paidEntries.length > 0 && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => setShowPaidEntries(!showPaidEntries)}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+                    >
+                      {showPaidEntries ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                      {paidEntries.length} lançamento{paidEntries.length !== 1 ? "s" : ""} baixado{paidEntries.length !== 1 ? "s" : ""}
+                    </button>
+                    {showPaidEntries && (
+                      <table className="w-full text-sm mt-1">
+                        <tbody>
+                          {paidEntries.map(e => {
+                            const cat = categories.find(c => c.id === e.category_id);
+                            const inv = investments.find(i => i.id === e.investment_id);
+                            return (
+                              <tr key={e.id} className="border-b border-border/10 opacity-60">
+                                <td className="py-2 px-2 text-xs">{format(new Date(e.entry_date), "dd/MM/yy")}</td>
+                                <td className="py-2 px-2 text-xs font-medium truncate max-w-[200px]">
+                                  {e.title}
+                                  {inv && <span className="text-[10px] text-muted-foreground ml-1">({inv.ticker || inv.name})</span>}
+                                </td>
+                                <td className="py-2 px-2 text-xs text-muted-foreground">{cat?.name || "—"}</td>
+                                <td className={cn("py-2 px-2 text-xs text-right font-medium",
+                                  e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive"
+                                )}>
+                                  {e.type === "revenue" ? "+" : "-"}{brl(Number(e.amount))}
+                                </td>
+                                <td className="py-2 px-2 text-center">
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]">Pago</span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
-
-                  <div className="space-y-1.5 mt-3">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Qtd</span>
-                      <span className="font-medium">{Number(inv.quantity)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Preço Médio</span>
-                      <span className="font-medium">{brl(Number(inv.purchase_price))}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Valor Atual</span>
-                      <span className="font-medium">{brl(Number(inv.current_price))}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 pt-2 border-t border-border/30 flex items-center justify-between">
-                    <span className="text-xs font-semibold">{brl(totalCurrent)}</span>
-                    <div className={cn("flex items-center gap-1 text-xs font-medium", isPositive ? "text-[hsl(var(--success))]" : "text-destructive")}>
-                      {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                      {isPositive ? "+" : ""}{profitPct.toFixed(2)}%
-                    </div>
-                  </div>
-
-                  {inv.purchase_date && (
-                    <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
-                      <Calendar className="h-2.5 w-2.5" /> {format(new Date(inv.purchase_date), "dd/MM/yyyy")}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-        {filteredInvestments.length === 0 && !loading && (
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <TrendingUp className="h-12 w-12 mb-3 opacity-20" />
-            <p className="text-sm font-medium">Nenhum investimento encontrado</p>
-            <p className="text-xs mt-1">Use o botão + para adicionar seu primeiro ativo.</p>
+                )}
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Investment Cards Grid */}
+          <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+            {filteredInvestments.map(inv => {
+              const totalInvested = (Number(inv.purchase_price) || 0) * (Number(inv.quantity) || 0);
+              const totalCurrent = (Number(inv.current_price) || 0) * (Number(inv.quantity) || 0);
+              const profitPct = totalInvested > 0 ? ((totalCurrent - totalInvested) / totalInvested) * 100 : 0;
+              const isPositive = profitPct >= 0;
+
+              return (
+                <Card key={inv.id} onClick={() => setSelectedId(inv.id)} className="cursor-pointer transition-all hover:shadow-md group">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-primary shrink-0">{getTypeIcon(inv.type)}</span>
+                          <h4 className="text-sm font-semibold truncate">{inv.name}</h4>
+                        </div>
+                        {inv.ticker && <p className="text-[10px] text-muted-foreground mt-0.5">{inv.ticker}</p>}
+                      </div>
+                      <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: TYPE_COLORS[inv.type], color: TYPE_COLORS[inv.type] }}>
+                        {getTypeLabel(inv.type)}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-1.5 mt-3">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Qtd</span>
+                        <span className="font-medium">{Number(inv.quantity)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Preço Médio</span>
+                        <span className="font-medium">{brl(Number(inv.purchase_price))}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Valor Atual</span>
+                        <span className="font-medium">{brl(Number(inv.current_price))}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-2 border-t border-border/30 flex items-center justify-between">
+                      <span className="text-xs font-semibold">{brl(totalCurrent)}</span>
+                      <div className={cn("flex items-center gap-1 text-xs font-medium", isPositive ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                        {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {isPositive ? "+" : ""}{profitPct.toFixed(2)}%
+                      </div>
+                    </div>
+
+                    {inv.purchase_date && (
+                      <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
+                        <Calendar className="h-2.5 w-2.5" /> {format(new Date(inv.purchase_date), "dd/MM/yyyy")}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          {filteredInvestments.length === 0 && !loading && (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <TrendingUp className="h-12 w-12 mb-3 opacity-20" />
+              <p className="text-sm font-medium">Nenhum investimento encontrado</p>
+              <p className="text-xs mt-1">Use o botão + para adicionar seu primeiro ativo.</p>
+            </div>
+          )}
+        </div>
       </ScrollArea>
 
       {/* Add/Edit Investment Dialog - Wizard */}
@@ -478,12 +620,12 @@ export default function InvestmentsView() {
           {formStep === 1 && (
             <div className="flex items-center gap-2 pt-3 border-t border-border/20">
               {editingInv && (
-                <Button variant="destructive" size="sm" onClick={() => { setDeleteConfirm(editingInv.id); setFormOpen(false); }}>
-                  <Trash2 className="h-3.5 w-3.5" />
+                <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => { setDeleteConfirm(editingInv.id); setFormOpen(false); }}>
+                  <Trash2 className="h-3.5 w-3.5" /> Excluir
                 </Button>
               )}
               <div className="flex gap-2 ml-auto">
-                <Button variant="outline" size="sm" onClick={() => { setFormOpen(false); resetForm(); }}>Cancelar</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setFormOpen(false); resetForm(); }}>Cancelar</Button>
                 <Button size="sm" onClick={handleSave} className="gap-1.5" disabled={!fName.trim()}>
                   <Save className="h-3.5 w-3.5" /> Salvar
                 </Button>
@@ -500,9 +642,11 @@ export default function InvestmentsView() {
             <DialogTitle>Confirmar Exclusão</DialogTitle>
             <DialogDescription>Tem certeza? Esta ação não pode ser desfeita.</DialogDescription>
           </DialogHeader>
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" size="sm" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
-            <Button variant="destructive" size="sm" onClick={() => deleteConfirm && handleDelete(deleteConfirm)}>Excluir</Button>
+          <div className="flex items-center gap-2 pt-3 border-t border-border/20">
+            <div className="flex gap-2 ml-auto">
+              <Button variant="ghost" size="sm" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
+              <Button variant="destructive" size="sm" onClick={() => deleteConfirm && handleDelete(deleteConfirm)}>Excluir</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -532,7 +676,6 @@ function InvestmentDetail({ id, onBack, onEdit, onDelete, userId }: {
   const profitValue = totalCurrent - totalInvested;
   const isPositive = profitPct >= 0;
 
-  // Build simple chart data from entries
   const chartData = entries
     .filter(e => e.type === "investment" || e.type === "expense" || e.type === "revenue")
     .map(e => ({
@@ -543,7 +686,6 @@ function InvestmentDetail({ id, onBack, onEdit, onDelete, userId }: {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
       <div className="p-4 border-b border-border/30">
         <div className="flex items-center gap-3 mb-3">
           <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-accent transition-colors">
@@ -569,7 +711,6 @@ function InvestmentDetail({ id, onBack, onEdit, onDelete, userId }: {
           </div>
         </div>
 
-        {/* Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="rounded-lg bg-accent p-3 text-center">
             <p className="text-[10px] text-muted-foreground uppercase">Valor Atual</p>
@@ -597,7 +738,6 @@ function InvestmentDetail({ id, onBack, onEdit, onDelete, userId }: {
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
-          {/* Chart */}
           {chartData.length > 1 && (
             <Card>
               <CardContent className="p-3">
@@ -615,11 +755,12 @@ function InvestmentDetail({ id, onBack, onEdit, onDelete, userId }: {
             </Card>
           )}
 
-          {/* Próximos dividendos */}
           {investment.next_dividend_date && Number(investment.dividend_amount) > 0 && (
             <Card>
               <CardContent className="p-3">
-                <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">💎 Próximos Dividendos</p>
+                <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+                  <TrendingUp className="h-3.5 w-3.5 text-[hsl(var(--success))]" /> Próximos Dividendos
+                </p>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{format(new Date(investment.next_dividend_date), "dd/MM/yyyy")}</span>
                   <span className="font-medium text-[hsl(var(--success))]">{brl(Number(investment.dividend_amount))}</span>
@@ -628,7 +769,6 @@ function InvestmentDetail({ id, onBack, onEdit, onDelete, userId }: {
             </Card>
           )}
 
-          {/* Histórico de movimentações */}
           <Card>
             <CardContent className="p-3">
               <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
@@ -654,7 +794,6 @@ function InvestmentDetail({ id, onBack, onEdit, onDelete, userId }: {
             </CardContent>
           </Card>
 
-          {/* Notes */}
           {investment.notes && (
             <Card>
               <CardContent className="p-3">
@@ -664,7 +803,6 @@ function InvestmentDetail({ id, onBack, onEdit, onDelete, userId }: {
             </Card>
           )}
 
-          {/* Info */}
           <Card>
             <CardContent className="p-3 space-y-1.5 text-xs">
               <div className="flex justify-between"><span className="text-muted-foreground">Quantidade</span><span className="font-medium">{Number(investment.quantity)}</span></div>
@@ -678,7 +816,6 @@ function InvestmentDetail({ id, onBack, onEdit, onDelete, userId }: {
         </div>
       </ScrollArea>
 
-      {/* Aporte dialog via Central de Lançamentos */}
       <EventEditDialog
         open={aporteOpen}
         onOpenChange={setAporteOpen}
@@ -686,6 +823,7 @@ function InvestmentDetail({ id, onBack, onEdit, onDelete, userId }: {
         defaultDate={new Date()}
         userId={userId}
         onSaved={() => {}}
+        defaultEventType="investment"
       />
     </div>
   );
