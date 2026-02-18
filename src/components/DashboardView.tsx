@@ -88,9 +88,47 @@ export default function DashboardView() {
   const totalInvestments = investments.reduce((s: number, i: any) => s + (Number(i.current_price) || 0) * (Number(i.quantity) || 0), 0);
   const totalPatrimony = totalCash + totalInvestments;
 
+  // Monthly bullet chart data (current month)
+  const monthlyBullet = useMemo(() => {
+    const now = new Date();
+    const monthEntries = entries.filter(e => {
+      const d = new Date(e.entry_date);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+    const rev = monthEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
+    const exp = monthEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
+    const balance = rev - exp;
+    const maxVal = Math.max(rev, exp, 1);
+    return { rev, exp, balance, maxVal };
+  }, [entries]);
+
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
+        {/* Bullet Chart - monthly cash flow */}
+        <div className="flex items-center justify-end">
+          <div className="flex items-center gap-3" style={{ width: 180, height: 40 }}>
+            <div className="flex-1 relative h-full flex flex-col justify-center gap-0.5">
+              <div className="relative h-3 rounded-full bg-muted/30 overflow-hidden">
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full bg-[hsl(var(--success))]"
+                  style={{ width: `${Math.min(100, (monthlyBullet.rev / monthlyBullet.maxVal) * 100)}%` }}
+                />
+                <div
+                  className="absolute top-0 h-full w-[2px] bg-destructive"
+                  style={{ left: `${Math.min(100, (monthlyBullet.exp / monthlyBullet.maxVal) * 100)}%` }}
+                />
+              </div>
+              <span className={cn(
+                "text-[11px] font-bold tabular-nums",
+                monthlyBullet.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive"
+              )}>
+                {brl(monthlyBullet.balance)}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* KPI Cards - Patrimônio pattern */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card className="bg-card">
