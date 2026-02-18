@@ -118,6 +118,9 @@ export default function FinancesView() {
   const [accountId, setAccountId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [isPaid, setIsPaid] = useState(false);
+  const [counterpart, setCounterpart] = useState("");
+  const [isFixed, setIsFixed] = useState(false);
+  const [allDay, setAllDay] = useState(true);
 
   // Account form state
   const [accName, setAccName] = useState("");
@@ -156,6 +159,7 @@ export default function FinancesView() {
     setEntryDate(format(new Date(), "yyyy-MM-dd")); setType("expense");
     setRecurrence("none"); setRecurrenceCount("12"); setRecurrenceDateMode("same_date");
     setEditingEntry(null); setAccountId(""); setPaymentMethod(""); setIsPaid(false);
+    setCounterpart(""); setIsFixed(false); setAllDay(true);
   };
 
   const resetAccForm = () => {
@@ -189,6 +193,8 @@ export default function FinancesView() {
     setAccountId(entry.account_id || "");
     setPaymentMethod(entry.payment_method || "");
     setIsPaid(entry.is_paid || false);
+    setCounterpart(entry.counterpart || "");
+    setIsFixed(entry.is_fixed || false);
     setInstallments("1");
     setRecurrence("none");
     setDialogOpen(true);
@@ -224,6 +230,7 @@ export default function FinancesView() {
         entry_date: entryDate, account_id: accountId || null,
         payment_method: paymentMethod || null, is_paid: isPaid,
         payment_date: isPaid ? format(new Date(), "yyyy-MM-dd") : null,
+        counterpart: counterpart || null, is_fixed: isFixed,
       };
       if (recurrenceEditDialog.mode === "all" && editingEntry.installment_group) {
         const allGroup = entries.filter(
@@ -247,16 +254,17 @@ export default function FinancesView() {
       if (recurrence !== "none") {
         const count = Math.max(1, parseInt(recurrenceCount) || 12);
         const group = crypto.randomUUID();
-        const entriesToInsert = Array.from({ length: count }, (_, i) => ({
-          user_id: user.id,
-          title: `${title} (${i + 1}/${count})`,
-          amount: baseAmount, type,
-          category_id: categoryId || null, project_id: projectId || null,
-          entry_date: format(getNextDate(baseDate, recurrence, i, recurrenceDateMode), "yyyy-MM-dd"),
-          installment_group: group, installment_number: i + 1, total_installments: count,
-          account_id: accountId || null, payment_method: paymentMethod || null,
-          is_paid: i === 0 ? isPaid : false,
-        }));
+          const entriesToInsert = Array.from({ length: count }, (_, i) => ({
+            user_id: user.id,
+            title: `${title} (${i + 1}/${count})`,
+            amount: baseAmount, type,
+            category_id: categoryId || null, project_id: projectId || null,
+            entry_date: format(getNextDate(baseDate, recurrence, i, recurrenceDateMode), "yyyy-MM-dd"),
+            installment_group: group, installment_number: i + 1, total_installments: count,
+            account_id: accountId || null, payment_method: paymentMethod || null,
+            is_paid: i === 0 ? isPaid : false,
+            counterpart: counterpart || null, is_fixed: isFixed,
+          }));
         await supabase.from("financial_entries").insert(entriesToInsert);
         const calEvents = Array.from({ length: count }, (_, i) => ({
           user_id: user.id, title: `💰 ${title}`,
@@ -268,16 +276,17 @@ export default function FinancesView() {
       } else {
         const numInst = Math.max(1, parseInt(installments) || 1);
         const instGroup = numInst > 1 ? crypto.randomUUID() : null;
-        const entriesToInsert = Array.from({ length: numInst }, (_, i) => ({
-          user_id: user.id,
-          title: numInst > 1 ? `${title} (${i + 1}/${numInst})` : title,
-          amount: baseAmount / numInst, type,
-          category_id: categoryId || null, project_id: projectId || null,
-          entry_date: format(addMonths(baseDate, i), "yyyy-MM-dd"),
-          installment_group: instGroup, installment_number: i + 1, total_installments: numInst,
-          account_id: accountId || null, payment_method: paymentMethod || null,
-          is_paid: i === 0 ? isPaid : false,
-        }));
+          const entriesToInsert = Array.from({ length: numInst }, (_, i) => ({
+            user_id: user.id,
+            title: numInst > 1 ? `${title} (${i + 1}/${numInst})` : title,
+            amount: baseAmount / numInst, type,
+            category_id: categoryId || null, project_id: projectId || null,
+            entry_date: format(addMonths(baseDate, i), "yyyy-MM-dd"),
+            installment_group: instGroup, installment_number: i + 1, total_installments: numInst,
+            account_id: accountId || null, payment_method: paymentMethod || null,
+            is_paid: i === 0 ? isPaid : false,
+            counterpart: counterpart || null, is_fixed: isFixed,
+          }));
         await supabase.from("financial_entries").insert(entriesToInsert);
       }
     }
@@ -709,22 +718,31 @@ export default function FinancesView() {
       <DialogHeader><DialogTitle>{editingEntry ? "Editar fluxo de caixa" : "Novo lançamento"}</DialogTitle></DialogHeader>
       <div className="space-y-3">
         <Input placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <div className="grid grid-cols-2 gap-2">
-          <div className="relative">
+        <Input placeholder="Contraparte (Recebedor / Pagador)" value={counterpart} onChange={(e) => setCounterpart(e.target.value)} />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
             <Input type="text" inputMode="decimal" placeholder="0,00" value={amount}
               onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
               className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
           </div>
           <Select value={type} onValueChange={(v) => setType(v as "revenue" | "expense")}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="revenue">🟢 Receita</SelectItem>
               <SelectItem value="expense">🔴 Despesa</SelectItem>
             </SelectContent>
           </Select>
+          {!editingEntry && recurrence === "none" && (
+            <Input type="number" placeholder="Parcelas" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="w-[90px] text-xs" />
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 mb-1">
+          <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday-fin" />
+          <Label htmlFor="allday-fin" className="text-sm">Dia inteiro</Label>
         </div>
         <div>
+          <Label className="text-xs text-muted-foreground">Data de vencimento</Label>
           <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
         </div>
         {!editingEntry && (
@@ -750,9 +768,6 @@ export default function FinancesView() {
                 <Input type="number" placeholder="Quantidade" min="1" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} className="text-xs" />
               )}
             </div>
-            {recurrence === "none" && (
-              <Input type="number" placeholder="Parcelas" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="text-xs" />
-            )}
             {recurrence === "monthly" && (
               <div className="mt-2">
                 <Label className="text-xs text-muted-foreground mb-1">Repetir na:</Label>
@@ -799,9 +814,15 @@ export default function FinancesView() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center gap-2">
-            <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid" />
-            <label htmlFor="is-paid" className="text-xs cursor-pointer">Marcar como pago</label>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid" />
+              <label htmlFor="is-paid" className="text-xs cursor-pointer">Marcar como pago</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="is-fixed" />
+              <label htmlFor="is-fixed" className="text-xs cursor-pointer">Conta fixa</label>
+            </div>
           </div>
         </div>
       </div>
@@ -1028,11 +1049,12 @@ export default function FinancesView() {
                     <th className="text-right py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("amount")}>Valor <SortIcon field="amount" /></th>
                     <th className="text-right py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("balance")}>Saldo <SortIcon field="balance" /></th>
                     <th className="text-center py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("is_paid")}>Status <SortIcon field="is_paid" /></th>
+                    <th className="text-center py-2 px-2">Fixa</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">Sem lançamentos pendentes</td></tr>
+                    <tr><td colSpan={9} className="text-center text-muted-foreground/40 py-12">Sem lançamentos pendentes</td></tr>
                   )}
                   {filtered.map((e, idx) => {
                     const cat = categories.find(c => c.id === e.category_id);
@@ -1063,9 +1085,6 @@ export default function FinancesView() {
                         <td className="py-2.5 px-2 text-muted-foreground">{format(parseEntryDate(e.entry_date), "dd/MM/yy")}</td>
                         <td className="py-2.5 px-2">
                           <span>{e.title}</span>
-                          {e.total_installments === 0 && (
-                            <span className="ml-1.5 text-[10px] text-muted-foreground/60 font-medium">Conta fixa</span>
-                          )}
                         </td>
                         <td className="py-2.5 px-2 text-muted-foreground/60">{cat?.name || "—"}</td>
                         <td className="py-2.5 px-2">
@@ -1090,6 +1109,11 @@ export default function FinancesView() {
                               className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-success transition-colors">
                               <CircleDollarSign className="h-2.5 w-2.5" /> Baixa
                             </button>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          {(e.is_fixed || e.total_installments === 0) && (
+                            <span className="text-[10px] text-muted-foreground/60 font-medium">✓</span>
                           )}
                         </td>
                       </tr>

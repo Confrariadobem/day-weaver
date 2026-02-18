@@ -16,7 +16,9 @@ import {
   startOfYear, endOfYear, differenceInDays,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, MoreVertical, Search, CalendarDays, Calculator, Timer, Star, Cake, Flag, CircleDollarSign, TrendingUp, FolderKanban, CheckSquare } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, MoreVertical, Search, CalendarDays, Calculator, Timer, Star, Cake, Flag, CircleDollarSign, TrendingUp, FolderKanban, CheckSquare, Repeat } from "lucide-react";
+
+const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 import type { Tables } from "@/integrations/supabase/types";
 import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
 
@@ -381,7 +383,7 @@ export default function CalendarView() {
   };
 
   const views: { key: ViewMode; label: string }[] = [
-    { key: "today", label: "Dia" },
+    { key: "today", label: "Hoje" },
     { key: "3days", label: "3 Dias" },
     { key: "weekly", label: "Semana" },
     { key: "monthly", label: "Mês" },
@@ -432,20 +434,25 @@ export default function CalendarView() {
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-        {/* Mini finance bars */}
-        <div className="flex items-center gap-2 mr-2">
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-1">
-              <div className="h-2 rounded-full bg-[hsl(var(--success))]" style={{ width: `${Math.max(4, (viewFinSummary.rev / maxFinVal) * 60)}px` }} />
-              <span className="text-[9px] text-[hsl(var(--success))]">{viewFinSummary.rev > 0 ? `+${(viewFinSummary.rev / 1000).toFixed(0)}k` : "0"}</span>
+        {/* Bullet Chart - weekly cash flow */}
+        <div className="flex items-center gap-3 mr-2" style={{ width: 180, height: 40 }}>
+          <div className="flex-1 relative h-full flex flex-col justify-center gap-0.5">
+            <div className="relative h-3 rounded-full bg-muted/30 overflow-hidden">
+              <div
+                className="absolute left-0 top-0 h-full rounded-full bg-[hsl(var(--success))]"
+                style={{ width: `${Math.min(100, (viewFinSummary.rev / maxFinVal) * 100)}%` }}
+              />
+              <div
+                className="absolute top-0 h-full w-[2px] bg-destructive"
+                style={{ left: `${Math.min(100, (viewFinSummary.exp / maxFinVal) * 100)}%` }}
+              />
             </div>
-            <div className="flex items-center gap-1">
-              <div className="h-2 rounded-full bg-destructive" style={{ width: `${Math.max(4, (viewFinSummary.exp / maxFinVal) * 60)}px` }} />
-              <span className="text-[9px] text-destructive">{viewFinSummary.exp > 0 ? `-${(viewFinSummary.exp / 1000).toFixed(0)}k` : "0"}</span>
-            </div>
-          </div>
-          <div className={cn("text-[10px] font-semibold", viewFinSummary.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
-            {viewFinSummary.balance >= 0 ? "+" : "-"}R${Math.abs(viewFinSummary.balance).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            <span className={cn(
+              "text-[11px] font-bold tabular-nums",
+              viewFinSummary.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive"
+            )}>
+              {brl(viewFinSummary.balance)}
+            </span>
           </div>
         </div>
 
@@ -478,9 +485,8 @@ export default function CalendarView() {
             ))}
           </div>
 
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleToday} title="Hoje">
-            <CalendarDays className="h-4 w-4" />
-          </Button>
+
+
 
           <Button
             variant="ghost"
@@ -631,6 +637,7 @@ interface HourlyViewProps {
 
 function EventChip({ item, onToggle, onClick, compact }: { item: CalendarItem; onToggle: (i: CalendarItem) => void; onClick: (i: CalendarItem) => void; compact?: boolean }) {
   const completed = item.is_completed;
+  const hasRecurrence = item.recurrence_rule || item.title.includes("↻");
   return (
     <div
       draggable
@@ -648,9 +655,10 @@ function EventChip({ item, onToggle, onClick, compact }: { item: CalendarItem; o
         </span>
       )}
       {!item.is_task && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color || "#3b82f6" }} />}
-      <span className="truncate">{item.title}</span>
+      <span className="truncate">{item.title.replace(/^↻\s*/, "")}</span>
       {item.is_favorite && <Star className="h-2.5 w-2.5 shrink-0 fill-warning text-warning" />}
-      {!item.all_day && <span className="ml-auto shrink-0 opacity-70 text-xs">{format(new Date(item.start_time), "HH:mm")}</span>}
+      {hasRecurrence && <Repeat className="h-2.5 w-2.5 shrink-0 ml-auto opacity-70" />}
+      {!item.all_day && !hasRecurrence && <span className="ml-auto shrink-0 opacity-70 text-xs">{format(new Date(item.start_time), "HH:mm")}</span>}
     </div>
   );
 }
@@ -912,18 +920,10 @@ function YearlyView({ date, items, entries, tasks, getFinSummary, onMonthClick, 
 
   return (
     <div className="h-full overflow-auto p-4">
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-2">
         <div className="rounded-lg border border-border/30 p-3">
-          <p className="text-xs text-muted-foreground">Receitas anuais</p>
-          <p className="text-lg font-semibold text-[hsl(var(--success))]">{brlFmt(yearFin.rev)}</p>
-        </div>
-        <div className="rounded-lg border border-border/30 p-3">
-          <p className="text-xs text-muted-foreground">Despesas anuais</p>
-          <p className="text-lg font-semibold text-destructive">{brlFmt(yearFin.exp)}</p>
-        </div>
-        <div className="rounded-lg border border-border/30 p-3">
-          <p className="text-xs text-muted-foreground">Saldo previsto</p>
-          <p className={cn("text-lg font-semibold", yearFin.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brlFmt(yearFin.balance)}</p>
+          <p className="text-xs text-muted-foreground">Eventos do ano</p>
+          <p className="text-lg font-semibold">{items.filter(it => !it.is_holiday && new Date(it.start_time).getFullYear() === date.getFullYear()).length}</p>
         </div>
         <div className="rounded-lg border border-border/30 p-3">
           <p className="text-xs text-muted-foreground">Tarefas anuais</p>
