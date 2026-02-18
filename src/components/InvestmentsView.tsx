@@ -221,6 +221,15 @@ export default function InvestmentsView() {
   const pendingEntries = filteredEntries.filter(e => !e.is_paid);
   const paidEntries = filteredEntries.filter(e => e.is_paid);
 
+  // Bullet chart: invested vs current
+  const investBullet = useMemo(() => {
+    const invested = metrics.totalInvested;
+    const current = metrics.totalCurrent;
+    const profit = current - invested;
+    const maxVal = Math.max(invested, current, 1);
+    return { invested, current, profit, maxVal };
+  }, [metrics]);
+
   // ─── Detail view ───
   if (selectedId) {
     return <InvestmentDetail
@@ -234,7 +243,7 @@ export default function InvestmentsView() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Type filter buttons - alphabetical, Todos last */}
+      {/* Type filter buttons + Bullet Chart */}
       <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/30 overflow-x-auto">
         {INVESTMENT_TYPES.map(t => (
           <Button key={t.value} size="sm"
@@ -250,10 +259,33 @@ export default function InvestmentsView() {
           className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterType !== "all" && "text-muted-foreground")}
           onClick={() => setFilterType("all")}
         >Todos</Button>
-        <div className="ml-auto relative">
-          <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
-          <Input placeholder="Buscar ativo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-7 pl-8 text-xs w-40" />
+        <div className="ml-auto flex items-center gap-3">
+          {/* Bullet Chart - invested vs current */}
+          <div className="flex items-center gap-3" style={{ width: 180, height: 40 }}>
+            <div className="flex-1 relative h-full flex flex-col justify-center gap-0.5">
+              <div className="relative h-3 rounded-full bg-muted/30 overflow-hidden">
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full bg-[hsl(var(--success))]"
+                  style={{ width: `${Math.min(100, (investBullet.current / investBullet.maxVal) * 100)}%` }}
+                />
+                <div
+                  className="absolute top-0 h-full w-[2px] bg-primary"
+                  style={{ left: `${Math.min(100, (investBullet.invested / investBullet.maxVal) * 100)}%` }}
+                />
+              </div>
+              <span className={cn(
+                "text-[11px] font-bold tabular-nums",
+                investBullet.profit >= 0 ? "text-[hsl(var(--success))]" : "text-destructive"
+              )}>
+                {investBullet.profit >= 0 ? "+" : ""}{brl(investBullet.profit)}
+              </span>
+            </div>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Input placeholder="Buscar ativo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-7 pl-8 text-xs w-40" />
+          </div>
         </div>
       </div>
 
