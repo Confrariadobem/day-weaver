@@ -81,7 +81,7 @@ function getNextRecurrence(date: Date, type: string): Date {
   return d;
 }
 
-export default function CalendarView() {
+export default function CalendarView({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("monthly");
@@ -134,6 +134,8 @@ export default function CalendarView() {
     window.addEventListener("lovable:data-changed", handleDataChanged);
     return () => { supabase.removeChannel(ch); window.removeEventListener("lovable:data-changed", handleDataChanged); };
   }, [user, fetchData]);
+
+  useEffect(() => { onTabChange?.(viewMode); }, [viewMode, onTabChange]);
 
   const calendarItems = useMemo(() => {
     const items: CalendarItem[] = events.map((e) => {
@@ -419,6 +421,12 @@ export default function CalendarView() {
     { key: "tasks", label: "Tarefas", color: "#f97316", icon: <CheckSquare className="h-3 w-3" /> },
   ];
 
+  const allFiltersActive = FILTER_OPTIONS.every(f => activeFilters.includes(f.key));
+  const toggleAllFilters = () => {
+    if (allFiltersActive) setActiveFilters([]);
+    else setActiveFilters(FILTER_OPTIONS.map(f => f.key));
+  };
+
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
@@ -437,16 +445,7 @@ export default function CalendarView() {
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => nav(-1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <h2 className="min-w-[120px] text-center text-sm font-semibold capitalize">{headerLabel}</h2>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => nav(1)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-
+        {/* View tabs */}
         <div className="flex items-center gap-1">
           {views.map((v) => (
             <Button key={v.key} size="sm"
@@ -462,36 +461,72 @@ export default function CalendarView() {
           ))}
         </div>
 
+        {/* Month/Year nav + Go to date */}
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => nav(-1)}>
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs px-2 font-semibold capitalize min-w-[100px] text-center"
+            onClick={() => setGotoDateOpen(true)}
+            title="Ir para data"
+          >
+            {headerLabel}
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => nav(1)}>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
         {/* Filters as icon buttons - right aligned */}
         <div className="ml-auto flex items-center gap-1">
-          {FILTER_OPTIONS.map((f) => (
-            <Tooltip key={f.key} delayDuration={200}>
+          {/* Grouped filter icons with border */}
+          <div className="flex items-center gap-0.5 border border-border/40 rounded-full px-1 py-0.5">
+            {FILTER_OPTIONS.map((f) => (
+              <Tooltip key={f.key} delayDuration={200}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn("h-6 w-6", activeFilters.includes(f.key) ? "opacity-100" : "opacity-30")}
+                    style={{ color: f.color }}
+                    onClick={() => toggleFilter(f.key)}
+                  >
+                    {f.icon}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">{f.label}</TooltipContent>
+              </Tooltip>
+            ))}
+            <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={cn("h-7 w-7", activeFilters.includes(f.key) ? "opacity-100" : "opacity-30")}
-                  style={{ color: f.color }}
-                  onClick={() => toggleFilter(f.key)}
+                  className={cn("h-6 w-6", favoriteFilter ? "text-warning" : "text-muted-foreground")}
+                  onClick={() => setFavoriteFilter(!favoriteFilter)}
                 >
-                  {f.icon}
+                  <Star className={cn("h-3 w-3", favoriteFilter && "fill-warning")} />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">{f.label}</TooltipContent>
+              <TooltipContent side="bottom" className="text-xs">Favoritos</TooltipContent>
             </Tooltip>
-          ))}
-
-          <div className="w-px h-5 bg-border/30 mx-1" />
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn("h-7 w-7", favoriteFilter ? "text-warning" : "text-muted-foreground")}
-            onClick={() => setFavoriteFilter(!favoriteFilter)}
-            title="Filtrar favoritos"
-          >
-            <Star className={cn("h-3.5 w-3.5", favoriteFilter && "fill-warning")} />
-          </Button>
+            {/* Select all checkbox */}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <div className="flex items-center pl-0.5 pr-1">
+                  <Checkbox
+                    checked={allFiltersActive}
+                    onCheckedChange={toggleAllFilters}
+                    className="h-3.5 w-3.5"
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Todos</TooltipContent>
+            </Tooltip>
+          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -502,9 +537,6 @@ export default function CalendarView() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setSearchOpen(true)}>
                 <Search className="mr-2 h-4 w-4" /> Pesquisar eventos
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setGotoDateOpen(true)}>
-                <CalendarDays className="mr-2 h-4 w-4" /> Ir para data
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCalcDateOpen(true)}>
                 <Calculator className="mr-2 h-4 w-4" /> Calcular data

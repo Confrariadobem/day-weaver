@@ -56,6 +56,7 @@ export default function Dashboard() {
   const [financeTab, setFinanceTab] = useState<string>("previsao");
   const [investmentTab, setInvestmentTab] = useState<string>("dashboard");
   const [projectTab, setProjectTab] = useState<string>("projects");
+  const [calendarTab, setCalendarTab] = useState<string>("monthly");
 
   useEffect(() => {
     if (!user) return;
@@ -89,8 +90,34 @@ export default function Dashboard() {
     return { rev, exp, balance: rev - exp, maxVal: Math.max(rev, exp, 1) };
   }, [entries]);
 
-  // Calendar bullet: current month
-  const calBullet = dashBullet;
+  // Calendar bullet: based on active view tab
+  const calBullet = useMemo(() => {
+    const now = new Date();
+    let start: Date, end: Date;
+    if (calendarTab === "today") {
+      start = now; end = now;
+    } else if (calendarTab === "3days") {
+      start = now; end = new Date(now); end.setDate(end.getDate() + 2);
+    } else if (calendarTab === "weekly") {
+      const day = now.getDay();
+      start = new Date(now); start.setDate(start.getDate() - day);
+      end = new Date(start); end.setDate(end.getDate() + 6);
+    } else if (calendarTab === "yearly") {
+      start = new Date(now.getFullYear(), 0, 1);
+      end = new Date(now.getFullYear(), 11, 31);
+    } else {
+      // monthly (default)
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    }
+    const filtered = entries.filter(e => {
+      const d = new Date(e.entry_date);
+      return d >= start && d <= end;
+    });
+    const rev = filtered.filter(e => e.type === "revenue").reduce((s: number, e: any) => s + Number(e.amount), 0);
+    const exp = filtered.filter(e => e.type === "expense").reduce((s: number, e: any) => s + Number(e.amount), 0);
+    return { rev, exp, balance: rev - exp, maxVal: Math.max(rev, exp, 1) };
+  }, [entries, calendarTab]);
 
   // Investments bullet: filtered by active tab
   const invBullet = useMemo(() => {
@@ -183,7 +210,7 @@ export default function Dashboard() {
         <div className="flex flex-1 overflow-hidden">
           <div className="flex-1 overflow-hidden">
             {activeModule === "dashboard" && <DashboardView />}
-            {activeModule === "calendar" && <CalendarView />}
+            {activeModule === "calendar" && <CalendarView onTabChange={setCalendarTab} />}
             {activeModule === "finances" && <FinancesView onTabChange={setFinanceTab} />}
             {activeModule === "programs" && <ProgramsProjectsView onTabChange={setProjectTab} />}
             {activeModule === "investments" && <InvestmentsView onTabChange={setInvestmentTab} />}

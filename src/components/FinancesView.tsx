@@ -278,7 +278,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       case "yearly": d = addMonths(base, i * 12); break;
       default: d = new Date(base); break;
     }
-    if (dateMode === "first_business_day" && rec === "monthly") {
+    if (dateMode === "first_business_day" && (rec === "monthly" || rec === "yearly")) {
       d.setDate(1);
       d = getNextBusinessDay(d);
     }
@@ -854,7 +854,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                   <Input type="number" placeholder="Quantidade" min="1" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} className="text-xs" />
                 )}
               </div>
-              {recurrence === "monthly" && (
+              {(recurrence === "monthly" || recurrence === "yearly") && (
                 <div className="mt-2">
                   <Label className="text-xs text-muted-foreground mb-1">Repetir na:</Label>
                   <Select value={recurrenceDateMode} onValueChange={(v) => setRecurrenceDateMode(v as RecurrenceDateMode)}>
