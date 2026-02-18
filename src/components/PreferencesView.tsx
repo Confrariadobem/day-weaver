@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -159,17 +159,6 @@ export default function PreferencesView() {
   const [calEditDialog, setCalEditDialog] = useState<{ open: boolean; label: string; color: string } | null>(null);
   const [invEditDialog, setInvEditDialog] = useState<{ open: boolean; label: string; color: string } | null>(null);
 
-  // Unified double-click ref
-  const dblClickRef = useRef<{ id: string; time: number } | null>(null);
-  const handleDoubleClick = (id: string, callback: () => void) => {
-    const now = Date.now();
-    if (dblClickRef.current?.id === id && now - dblClickRef.current.time < 400) {
-      callback();
-      dblClickRef.current = null;
-    } else {
-      dblClickRef.current = { id, time: now };
-    }
-  };
 
   useEffect(() => {
     if (!user) return;
@@ -292,7 +281,7 @@ export default function PreferencesView() {
                 {LAUNCH_TYPES.map((type) => (
                   <div
                     key={type.label}
-                    onClick={() => handleDoubleClick(`cal-${type.label}`, () => setCalEditDialog({ open: true, label: type.label, color: type.color }))}
+                    onDoubleClick={() => setCalEditDialog({ open: true, label: type.label, color: type.color })}
                     className="flex items-center gap-3 rounded-lg border border-border p-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none"
                   >
                     <span className="shrink-0" style={{ color: type.color }}>{LAUNCH_TYPE_ICONS[type.label]}</span>
@@ -373,7 +362,7 @@ export default function PreferencesView() {
                 {categories.map((cat) => (
                   <div
                     key={cat.id}
-                    onClick={() => handleDoubleClick(cat.id, () => openEditCat(cat))}
+                    onDoubleClick={() => openEditCat(cat)}
                     className="flex items-center gap-3 rounded-lg border border-border p-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none"
                   >
                     <span className="shrink-0" style={{ color: cat.color || "#3b82f6" }}>
@@ -409,7 +398,7 @@ export default function PreferencesView() {
                 {INVESTMENT_TYPES.map((type) => (
                   <div
                     key={type.key}
-                    onClick={() => handleDoubleClick(`inv-${type.key}`, () => setInvEditDialog({ open: true, label: type.label, color: type.color }))}
+                    onDoubleClick={() => setInvEditDialog({ open: true, label: type.label, color: type.color })}
                     className="flex items-center gap-3 rounded-lg border border-border p-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none"
                   >
                     <span className="shrink-0" style={{ color: type.color }}>
@@ -506,7 +495,7 @@ export default function PreferencesView() {
                 {DATA_MODULES.map(mod => (
                   <div
                     key={mod.key}
-                    onClick={() => handleDoubleClick(`data-${mod.key}`, () => setDataEditDialog({ open: true, key: mod.key, label: mod.label }))}
+                    onDoubleClick={() => setDataEditDialog({ open: true, key: mod.key, label: mod.label })}
                     className="flex items-center justify-between rounded-lg border border-border p-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none"
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
