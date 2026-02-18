@@ -1021,18 +1021,14 @@ export default function FinancesView() {
                   { key: "pending" as CashFlowFilter, label: "Pendentes" },
                 ]).map(f => (
                   <Button key={f.key} size="sm"
-                    variant={cashFlowFilter === f.key ? "default" : "ghost"}
-                    className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", cashFlowFilter !== f.key && "text-muted-foreground hover:text-foreground")}
-                    onClick={() => setCashFlowFilter(f.key)}
+                    variant={cashFlowFilter === f.key ? "default" : (cashFlowFilter === "all" ? "default" : "ghost")}
+                    className={cn("h-7 text-xs px-2.5 gap-1 rounded-full",
+                      cashFlowFilter === "all" ? "bg-primary text-primary-foreground" :
+                      cashFlowFilter !== f.key && "text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setCashFlowFilter(prev => prev === f.key ? "all" : f.key)}
                   >{f.label}</Button>
                 ))}
-
-                {/* Todos before Período */}
-                <Button size="sm"
-                  variant={cashFlowFilter === "all" ? "default" : "ghost"}
-                  className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", cashFlowFilter !== "all" && "text-muted-foreground hover:text-foreground")}
-                  onClick={() => setCashFlowFilter("all")}
-                >Todos</Button>
 
                 {/* Custom period toggle */}
                 <Button size="sm"
@@ -1053,6 +1049,17 @@ export default function FinancesView() {
               )}
 
               <div className="flex items-center gap-1.5 ml-auto">
+                {/* Search field */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar lançamentos..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-7 pl-8 text-xs w-44"
+                  />
+                </div>
+
                 {selectedIds.size > 0 && (
                   <>
                     <span className="text-xs text-muted-foreground">{selectedIds.size} selecionados</span>
@@ -1125,19 +1132,6 @@ export default function FinancesView() {
                 <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
                   {renderEntryDialog()}
                 </Dialog>
-              </div>
-            </div>
-
-            {/* Search bar - matching projects/investments style */}
-            <div className="mb-3">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar lançamentos..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-7 pl-8 text-xs w-56"
-                />
               </div>
             </div>
 
@@ -1542,21 +1536,31 @@ export default function FinancesView() {
         {viewTab === "indicadores" && (
           <div className="space-y-4" ref={reportRef}>
             <div className="flex items-center gap-2 flex-wrap">
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handlePrint}>
-                <Printer className="mr-1 h-3 w-3" /> Imprimir
-              </Button>
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleExportCSV}>
-                <FileDown className="mr-1 h-3 w-3" /> Exportar CSV
-              </Button>
-              <div className="ml-auto">
-                <Select value={String(doarYear)} onValueChange={(v) => setDoarYear(Number(v))}>
-                  <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {[...new Set(entries.map(e => new Date(e.entry_date).getFullYear())), doarYear].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => b - a).map(y => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <Select value={String(doarYear)} onValueChange={(v) => setDoarYear(Number(v))}>
+                <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[...new Set(entries.map(e => new Date(e.entry_date).getFullYear())), doarYear].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => b - a).map(y => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="ml-auto flex items-center gap-1.5">
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handleExportCSV}>
+                      <FileUp className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Exportar CSV</TooltipContent>
+                </Tooltip>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handlePrint}>
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Imprimir</TooltipContent>
+                </Tooltip>
               </div>
             </div>
 

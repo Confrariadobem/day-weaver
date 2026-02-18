@@ -17,6 +17,7 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Plus, MoreVertical, Search, CalendarDays, Calculator, Timer, Star, Cake, Flag, CircleDollarSign, TrendingUp, FolderKanban, CheckSquare, Repeat } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 import type { Tables } from "@/integrations/supabase/types";
@@ -436,52 +437,69 @@ export default function CalendarView() {
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-        <div className="ml-auto flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => nav(-1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <h2 className="min-w-[180px] text-center text-base font-semibold capitalize">{headerLabel}</h2>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => nav(1)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => nav(-1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <h2 className="min-w-[180px] text-center text-base font-semibold capitalize">{headerLabel}</h2>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => nav(1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
 
-          <div className="flex rounded-lg bg-muted p-0.5">
-            {views.map((v) => (
-              <button
-                key={v.key}
-                onClick={() => {
-                  if (v.key === "today") setCurrentDate(new Date());
-                  setViewMode(v.key);
-                }}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  viewMode === v.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex rounded-lg bg-muted p-0.5">
+          {views.map((v) => (
+            <button
+              key={v.key}
+              onClick={() => {
+                if (v.key === "today") setCurrentDate(new Date());
+                setViewMode(v.key);
+              }}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                viewMode === v.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
 
+        {/* Filters as icon buttons - right aligned */}
+        <div className="ml-auto flex items-center gap-1">
+          {FILTER_OPTIONS.map((f) => (
+            <Tooltip key={f.key} delayDuration={200}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn("h-7 w-7", activeFilters.includes(f.key) ? "opacity-100" : "opacity-30")}
+                  style={{ color: f.color }}
+                  onClick={() => toggleFilter(f.key)}
+                >
+                  {f.icon}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">{f.label}</TooltipContent>
+            </Tooltip>
+          ))}
 
-
+          <div className="w-px h-5 bg-border/30 mx-1" />
 
           <Button
             variant="ghost"
             size="icon"
-            className={cn("h-8 w-8", favoriteFilter ? "text-warning" : "text-muted-foreground")}
+            className={cn("h-7 w-7", favoriteFilter ? "text-warning" : "text-muted-foreground")}
             onClick={() => setFavoriteFilter(!favoriteFilter)}
             title="Filtrar favoritos"
           >
-            <Star className={cn("h-4 w-4", favoriteFilter && "fill-warning")} />
+            <Star className={cn("h-3.5 w-3.5", favoriteFilter && "fill-warning")} />
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <MoreVertical className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -503,20 +521,7 @@ export default function CalendarView() {
         </div>
       </div>
 
-      {/* Filter bar */}
-      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/20 overflow-x-auto">
-        {FILTER_OPTIONS.map((f) => (
-          <label key={f.key} className="flex items-center gap-1.5 cursor-pointer text-sm shrink-0">
-            <Checkbox
-              checked={activeFilters.includes(f.key)}
-              onCheckedChange={() => toggleFilter(f.key)}
-              className="h-3.5 w-3.5"
-              style={{ borderColor: f.color, ...(activeFilters.includes(f.key) ? { backgroundColor: f.color } : {}) }}
-            />
-            <span className="text-muted-foreground whitespace-nowrap flex items-center gap-1">{f.icon}{f.label}</span>
-          </label>
-        ))}
-      </div>
+      {/* No separate filter bar - filters integrated into header */}
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
@@ -675,21 +680,21 @@ function EventChip({ item, onToggle, onClick, compact }: { item: CalendarItem; o
       onDragStart={(e) => { e.dataTransfer.setData("event-id", item.id); e.dataTransfer.setData("task-title", item.title); }}
       onClick={(e) => { e.stopPropagation(); onClick(item); }}
       className={cn(
-        "group flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-sm leading-snug transition-colors hover:brightness-110",
-        completed && "opacity-50 line-through", compact ? "truncate" : ""
+        "group flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-xs leading-snug transition-colors hover:brightness-110 overflow-hidden max-w-full",
+        completed && "opacity-50 line-through"
       )}
       style={{ backgroundColor: `${item.color || "#3b82f6"}20`, color: item.color || "#3b82f6" }}
     >
       {item.is_task && (
         <span onClick={(e) => { e.stopPropagation(); onToggle(item); }} className="shrink-0">
-          <Checkbox checked={!!completed} className="h-3.5 w-3.5 border-current" />
+          <Checkbox checked={!!completed} className="h-3 w-3 border-current" />
         </span>
       )}
-      {!item.is_task && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color || "#3b82f6" }} />}
-      <span className="truncate">{item.title.replace(/^↻\s*/, "")}</span>
-      {item.is_favorite && <Star className="h-2.5 w-2.5 shrink-0 fill-warning text-warning" />}
-      {hasRecurrence && <Repeat className="h-2.5 w-2.5 shrink-0 ml-auto opacity-70" />}
-      {!item.all_day && !hasRecurrence && <span className="ml-auto shrink-0 opacity-70 text-xs">{format(new Date(item.start_time), "HH:mm")}</span>}
+      {!item.is_task && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: item.color || "#3b82f6" }} />}
+      <span className="truncate min-w-0 flex-1">{item.title.replace(/^↻\s*/, "")}</span>
+      {item.is_favorite && <Star className="h-2 w-2 shrink-0 fill-warning text-warning" />}
+      {hasRecurrence && <Repeat className="h-2 w-2 shrink-0 opacity-70" />}
+      {!item.all_day && !hasRecurrence && <span className="shrink-0 opacity-70 text-[10px]">{format(new Date(item.start_time), "HH:mm")}</span>}
     </div>
   );
 }
@@ -810,9 +815,9 @@ function HourlyWeekView({ date, items, onDrop, onToggle, onClick, onNewEvent }: 
           {days.map((day) => {
             const allDayItems = items.filter((it) => isSameDay(new Date(it.start_time), day) && it.all_day);
             return (
-              <div key={day.toISOString()} className="px-1 py-1 space-y-0.5 border-l border-border/10">
+              <div key={day.toISOString()} className="px-1 py-1 space-y-0.5 border-l border-border/10 overflow-hidden">
                 {allDayItems.slice(0, 3).map((it) => <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />)}
-                {allDayItems.length > 3 && <span className="block text-center text-xs text-muted-foreground">+{allDayItems.length - 3}</span>}
+                {allDayItems.length > 3 && <span className="block text-center text-[10px] text-muted-foreground">+{allDayItems.length - 3}</span>}
               </div>
             );
           })}
@@ -885,7 +890,7 @@ function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent }: Hou
                   <div
                     key={day.toISOString()}
                     className={cn(
-                      "group relative cursor-pointer rounded-md p-1 transition-colors hover:bg-accent/30",
+                      "group relative cursor-pointer rounded-md p-1 transition-colors hover:bg-accent/30 overflow-hidden",
                       !isSameMonth(day, date) && "opacity-30",
                       isToday(day) && "bg-primary/5"
                     )}
@@ -908,9 +913,9 @@ function MonthlyGrid({ date, items, onDrop, onToggle, onClick, onNewEvent }: Hou
                         </div>
                       )}
                     </div>
-                    <div className="mt-0.5 space-y-[1px]">
+                    <div className="mt-0.5 space-y-[1px] overflow-hidden">
                       {dayItems.slice(0, 3).map((it) => <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />)}
-                      {dayItems.length > 3 && <span className="block text-center text-xs text-muted-foreground">+{dayItems.length - 3}</span>}
+                      {dayItems.length > 3 && <span className="block text-center text-[10px] text-muted-foreground">+{dayItems.length - 3}</span>}
                     </div>
                   </div>
                 );

@@ -57,7 +57,7 @@ export default function InvestmentsView() {
   const [editingInv, setEditingInv] = useState<Investment | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState("all");
+  const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(INVESTMENT_TYPES.map(t => t.value)));
 
   // Financial entries for investments
   const [investmentEntries, setInvestmentEntries] = useState<any[]>([]);
@@ -200,23 +200,25 @@ export default function InvestmentsView() {
   // Filtered investments
   const filteredInvestments = useMemo(() => {
     let list = investments;
-    if (filterType !== "all") list = list.filter(i => i.type === filterType);
+    if (activeTypes.size < INVESTMENT_TYPES.length) {
+      list = list.filter(i => activeTypes.has(i.type));
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(i => i.name.toLowerCase().includes(q) || (i.ticker || "").toLowerCase().includes(q));
     }
     return list;
-  }, [investments, filterType, searchQuery]);
+  }, [investments, activeTypes, searchQuery]);
 
   // Filtered entries for the list
   const filteredEntries = useMemo(() => {
     let entries = investmentEntries;
-    if (filterType !== "all") {
-      const invIds = investments.filter(i => i.type === filterType).map(i => i.id);
+    if (activeTypes.size < INVESTMENT_TYPES.length) {
+      const invIds = investments.filter(i => activeTypes.has(i.type)).map(i => i.id);
       entries = entries.filter(e => e.investment_id && invIds.includes(e.investment_id));
     }
     return entries;
-  }, [investmentEntries, filterType, investments]);
+  }, [investmentEntries, activeTypes, investments]);
 
   const pendingEntries = filteredEntries.filter(e => !e.is_paid);
   const paidEntries = filteredEntries.filter(e => e.is_paid);
@@ -279,7 +281,7 @@ export default function InvestmentsView() {
         {/* Crypto multi-currency display */}
         {(() => {
           const cryptoInvestments = investments.filter(i => i.type === "crypto" && i.is_active);
-          if (cryptoInvestments.length === 0 && filterType !== "crypto") return null;
+          if (cryptoInvestments.length === 0 && activeTypes.size === INVESTMENT_TYPES.length) return null;
           const totalCryptoBrl = cryptoInvestments.reduce((s, i) => s + (Number(i.current_price) || 0) * (Number(i.quantity) || 0), 0);
           return (
             <Card className="bg-card">
@@ -400,20 +402,25 @@ export default function InvestmentsView() {
 
       {/* Type filter buttons + Search - below indicators */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-border/30 overflow-x-auto">
-        {INVESTMENT_TYPES.map(t => (
-          <Button key={t.value} size="sm"
-            variant={filterType === t.value ? "default" : "ghost"}
-            className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterType !== t.value && "text-muted-foreground")}
-            onClick={() => setFilterType(t.value)}
-          >
-            {t.icon} {t.label}
-          </Button>
-        ))}
-        <Button size="sm"
-          variant={filterType === "all" ? "default" : "ghost"}
-          className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterType !== "all" && "text-muted-foreground")}
-          onClick={() => setFilterType("all")}
-        >Todos</Button>
+        {INVESTMENT_TYPES.map(t => {
+          const isActive = activeTypes.has(t.value);
+          return (
+            <Button key={t.value} size="sm"
+              variant={isActive ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", !isActive && "text-muted-foreground")}
+              onClick={() => {
+                setActiveTypes(prev => {
+                  const next = new Set(prev);
+                  if (next.has(t.value)) next.delete(t.value); else next.add(t.value);
+                  if (next.size === 0) return new Set(INVESTMENT_TYPES.map(x => x.value));
+                  return next;
+                });
+              }}
+            >
+              {t.icon} {t.label}
+            </Button>
+          );
+        })}
         <div className="ml-auto">
           <div className="relative">
             <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
