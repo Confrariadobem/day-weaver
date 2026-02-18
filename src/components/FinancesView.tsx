@@ -1620,26 +1620,46 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               <CardContent>
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={reportChartData.map(d => ({ ...d, saldoPos: Math.max(0, d.saldo), saldoNeg: Math.min(0, d.saldo) }))}>
+                    <AreaChart data={reportChartData}>
                       <defs>
-                        <linearGradient id="saldoGradUp" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(142 76% 26%)" stopOpacity={0.5} />
-                          <stop offset="100%" stopColor="hsl(142 76% 46%)" stopOpacity={0.05} />
-                        </linearGradient>
-                        <linearGradient id="saldoGradDown" x1="0" y1="1" x2="0" y2="0">
-                          <stop offset="0%" stopColor="hsl(0 72% 35%)" stopOpacity={0.5} />
-                          <stop offset="100%" stopColor="hsl(0 72% 51%)" stopOpacity={0.05} />
-                        </linearGradient>
+                        {(() => {
+                          const vals = reportChartData.map(d => d.saldo);
+                          const maxV = Math.max(...vals, 0);
+                          const minV = Math.min(...vals, 0);
+                          const range = maxV - minV || 1;
+                          const zeroOffset = maxV / range; // 0-1 position of zero line
+                          return (
+                            <linearGradient id="saldoGradFill" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="hsl(142 76% 26%)" stopOpacity={0.6} />
+                              <stop offset={`${Math.max(0, zeroOffset * 100 - 5)}%`} stopColor="hsl(142 76% 46%)" stopOpacity={0.15} />
+                              <stop offset={`${zeroOffset * 100}%`} stopColor="hsl(var(--muted))" stopOpacity={0.05} />
+                              <stop offset={`${Math.min(100, zeroOffset * 100 + 5)}%`} stopColor="hsl(0 72% 51%)" stopOpacity={0.15} />
+                              <stop offset="100%" stopColor="hsl(0 72% 35%)" stopOpacity={0.6} />
+                            </linearGradient>
+                          );
+                        })()}
+                        {(() => {
+                          const vals = reportChartData.map(d => d.saldo);
+                          const maxV = Math.max(...vals, 0);
+                          const minV = Math.min(...vals, 0);
+                          const range = maxV - minV || 1;
+                          const zeroOffset = maxV / range;
+                          return (
+                            <linearGradient id="saldoGradStroke" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="hsl(142 76% 30%)" />
+                              <stop offset={`${zeroOffset * 100}%`} stopColor="hsl(var(--muted-foreground))" />
+                              <stop offset="100%" stopColor="hsl(0 72% 45%)" />
+                            </linearGradient>
+                          );
+                        })()}
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
                       <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
                       <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeOpacity={0.5} />
-                      <Area type="monotone" dataKey="saldoPos" name="Saldo Positivo" stroke="hsl(142 76% 36%)" strokeWidth={2}
-                        fill="url(#saldoGradUp)" connectNulls />
-                      <Area type="monotone" dataKey="saldoNeg" name="Saldo Negativo" stroke="hsl(0 72% 51%)" strokeWidth={2}
-                        fill="url(#saldoGradDown)" connectNulls />
+                      <Area type="monotone" dataKey="saldo" name="Saldo" stroke="url(#saldoGradStroke)" strokeWidth={2}
+                        fill="url(#saldoGradFill)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
