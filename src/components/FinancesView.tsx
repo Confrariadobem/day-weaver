@@ -28,7 +28,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
-  ResponsiveContainer, ComposedChart, Line, Legend, Cell, PieChart, Pie, Area, AreaChart,
+  ResponsiveContainer, ComposedChart, Line, Legend, Cell, PieChart, Pie, Area, AreaChart, ReferenceLine,
 } from "recharts";
 import type { Tables as DBTables } from "@/integrations/supabase/types";
 
@@ -1620,34 +1620,26 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               <CardContent>
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={reportChartData}>
+                    <AreaChart data={reportChartData.map(d => ({ ...d, saldoPos: Math.max(0, d.saldo), saldoNeg: Math.min(0, d.saldo) }))}>
                       <defs>
-                        <linearGradient id="saldoGradientPos" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#15803d" stopOpacity={0.6} />
-                          <stop offset="40%" stopColor="#22c55e" stopOpacity={0.3} />
-                          <stop offset="100%" stopColor="#22c55e" stopOpacity={0.02} />
+                        <linearGradient id="saldoGradUp" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(142 76% 26%)" stopOpacity={0.5} />
+                          <stop offset="100%" stopColor="hsl(142 76% 46%)" stopOpacity={0.05} />
                         </linearGradient>
-                        <linearGradient id="saldoGradientNeg" x1="0" y1="1" x2="0" y2="0">
-                          <stop offset="0%" stopColor="#991b1b" stopOpacity={0.6} />
-                          <stop offset="40%" stopColor="#ef4444" stopOpacity={0.3} />
-                          <stop offset="100%" stopColor="#ef4444" stopOpacity={0.02} />
-                        </linearGradient>
-                        <linearGradient id="saldoStroke" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#22c55e" />
-                          <stop offset="50%" stopColor="#94a3b8" />
-                          <stop offset="100%" stopColor="#ef4444" />
+                        <linearGradient id="saldoGradDown" x1="0" y1="1" x2="0" y2="0">
+                          <stop offset="0%" stopColor="hsl(0 72% 35%)" stopOpacity={0.5} />
+                          <stop offset="100%" stopColor="hsl(0 72% 51%)" stopOpacity={0.05} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
                       <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                      <Area type="monotone" dataKey="saldo" name="Saldo Mensal" stroke="url(#saldoStroke)" strokeWidth={2.5}
-                        fill="url(#saldoGradientPos)" baseLine={0} />
-                      <Area type="monotone" dataKey={(d: any) => d.saldo < 0 ? d.saldo : 0} name="" stroke="none"
-                        fill="url(#saldoGradientNeg)" baseLine={0} />
-                      {/* Zero reference line */}
-                      <CartesianGrid horizontal={false} vertical={false} />
+                      <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeOpacity={0.5} />
+                      <Area type="monotone" dataKey="saldoPos" name="Saldo Positivo" stroke="hsl(142 76% 36%)" strokeWidth={2}
+                        fill="url(#saldoGradUp)" connectNulls />
+                      <Area type="monotone" dataKey="saldoNeg" name="Saldo Negativo" stroke="hsl(0 72% 51%)" strokeWidth={2}
+                        fill="url(#saldoGradDown)" connectNulls />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -1684,21 +1676,10 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                       <div className="h-[200px] w-[200px] shrink-0">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
-                            <defs>
-                              {categoryPieData.map((d, i) => (
-                                <linearGradient key={`exp-grad-${i}`} id={`expPieGrad${i}`} x1="0" y1="0" x2="1" y2="1">
-                                  <stop offset="0%" stopColor={d.color || CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={1} />
-                                  <stop offset="100%" stopColor={d.color || CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.7} />
-                                </linearGradient>
-                              ))}
-                              <filter id="pieShadow">
-                                <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.25" />
-                              </filter>
-                            </defs>
                             <Pie data={categoryPieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
-                              outerRadius={80} innerRadius={40} paddingAngle={3} cornerRadius={4}
-                              stroke="hsl(0 0% 8%)" strokeWidth={2} style={{ filter: "url(#pieShadow)" }}>
-                              {categoryPieData.map((d, i) => <Cell key={d.name} fill={`url(#expPieGrad${i})`} />)}
+                              outerRadius={80} innerRadius={48} paddingAngle={4} cornerRadius={6}
+                              stroke="none">
+                              {categoryPieData.map((d, i) => <Cell key={d.name} fill={d.color || CHART_COLORS[i % CHART_COLORS.length]} />)}
                             </Pie>
                             <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
                           </PieChart>
@@ -1729,18 +1710,10 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                       <div className="h-[200px] w-[200px] shrink-0">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
-                            <defs>
-                              {revenuePieData.map((d, i) => (
-                                <linearGradient key={`rev-grad-${i}`} id={`revPieGrad${i}`} x1="0" y1="0" x2="1" y2="1">
-                                  <stop offset="0%" stopColor={d.color || CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={1} />
-                                  <stop offset="100%" stopColor={d.color || CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.7} />
-                                </linearGradient>
-                              ))}
-                            </defs>
                             <Pie data={revenuePieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
-                              outerRadius={80} innerRadius={40} paddingAngle={3} cornerRadius={4}
-                              stroke="hsl(0 0% 8%)" strokeWidth={2} style={{ filter: "url(#pieShadow)" }}>
-                              {revenuePieData.map((d, i) => <Cell key={d.name} fill={`url(#revPieGrad${i})`} />)}
+                              outerRadius={80} innerRadius={48} paddingAngle={4} cornerRadius={6}
+                              stroke="none">
+                              {revenuePieData.map((d, i) => <Cell key={d.name} fill={d.color || CHART_COLORS[i % CHART_COLORS.length]} />)}
                             </Pie>
                             <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
                           </PieChart>

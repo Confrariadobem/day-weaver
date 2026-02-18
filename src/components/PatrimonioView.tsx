@@ -399,32 +399,19 @@ export default function PatrimonioView() {
                 <div className="flex items-center gap-4">
                   <ResponsiveContainer width={160} height={160}>
                     <PieChart>
-                      <defs>
-                        {metrics.allocation.filter(a => a.value > 0).map((a, i) => (
-                          <linearGradient key={`ag-${i}`} id={`allocGrad${i}`} x1="0" y1="0" x2="1" y2="1">
-                            <stop offset="0%" stopColor={a.color} stopOpacity={1} />
-                            <stop offset="100%" stopColor={a.color} stopOpacity={0.7} />
-                          </linearGradient>
-                        ))}
-                        <filter id="allocShadow">
-                          <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.25" />
-                        </filter>
-                      </defs>
                       <Pie
                         data={metrics.allocation.filter(a => a.value > 0)}
                         dataKey="value"
                         cx="50%"
                         cy="50%"
                         outerRadius={65}
-                        innerRadius={32}
-                        paddingAngle={3}
-                        cornerRadius={4}
-                        stroke="hsl(0 0% 8%)"
-                        strokeWidth={2}
-                        style={{ filter: "url(#allocShadow)" }}
+                        innerRadius={36}
+                        paddingAngle={4}
+                        cornerRadius={6}
+                        stroke="none"
                       >
                         {metrics.allocation.filter(a => a.value > 0).map((a, i) => (
-                          <Cell key={i} fill={`url(#allocGrad${i})`} />
+                          <Cell key={i} fill={a.color} />
                         ))}
                       </Pie>
                       <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
