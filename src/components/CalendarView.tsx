@@ -291,7 +291,7 @@ export default function CalendarView({ onTabChange }: { onTabChange?: (tab: stri
     if (favoriteFilter) {
       result = result.filter(it => it.is_favorite);
     }
-    if (activeFilters.length === 0) return result;
+    if (activeFilters.length === 0) return [];
     return result.filter(it => {
       if (activeFilters.includes("birthdays") && it.is_birthday) return true;
       if (activeFilters.includes("events") && !it.is_task && !it.is_holiday && !it.is_birthday && !it.is_cashflow && !it.is_investment && !it.is_project) return true;
