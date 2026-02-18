@@ -57,6 +57,7 @@ export default function InvestmentsView() {
   const [editingInv, setEditingInv] = useState<Investment | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(INVESTMENT_TYPES.map(t => t.value)));
 
   // Financial entries for investments
@@ -243,11 +244,54 @@ export default function InvestmentsView() {
     />;
   }
 
+  // Filter investments based on active tab
+  const tabFilteredInvestments = useMemo(() => {
+    let list = investments;
+    if (activeTab !== "dashboard") list = list.filter(i => i.type === activeTab);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(i => i.name.toLowerCase().includes(q) || (i.ticker || "").toLowerCase().includes(q));
+    }
+    return list;
+  }, [investments, activeTab, searchQuery]);
+
+  const tabFilteredEntries = useMemo(() => {
+    if (activeTab === "dashboard") return investmentEntries;
+    const invIds = investments.filter(i => i.type === activeTab).map(i => i.id);
+    return investmentEntries.filter(e => e.investment_id && invIds.includes(e.investment_id));
+  }, [investmentEntries, activeTab, investments]);
+  const tabPendingEntries = tabFilteredEntries.filter(e => !e.is_paid);
+  const tabPaidEntries = tabFilteredEntries.filter(e => e.is_paid);
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      <ScrollArea className="flex-1">
+      <div className="p-4 space-y-4">
+      {/* Tab buttons - Finance pattern */}
+      <div className="flex items-center gap-2 overflow-x-auto">
+        <Button size="sm" variant={activeTab === "dashboard" ? "default" : "ghost"}
+          className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== "dashboard" && "text-muted-foreground")}
+          onClick={() => setActiveTab("dashboard")}>
+          <PieChartIcon className="h-3 w-3" /> Dashboard
+        </Button>
+        {INVESTMENT_TYPES.map(t => (
+          <Button key={t.value} size="sm" variant={activeTab === t.value ? "default" : "ghost"}
+            className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== t.value && "text-muted-foreground")}
+            onClick={() => setActiveTab(t.value)}>
+            {t.icon} {t.label}
+          </Button>
+        ))}
+        <div className="ml-auto">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Input placeholder="Buscar ativo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-7 pl-8 text-xs w-40" />
+          </div>
+        </div>
+      </div>
+
       {/* KPI Cards */}
-      <div className="p-4 border-b border-border/30 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card className="bg-card">
             <CardContent className="p-3">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
@@ -278,345 +322,66 @@ export default function InvestmentsView() {
           </Card>
         </div>
 
-        {/* Crypto multi-currency display */}
-        {(() => {
-          const cryptoInvestments = investments.filter(i => i.type === "crypto" && i.is_active);
-          if (cryptoInvestments.length === 0 && activeTypes.size === INVESTMENT_TYPES.length) return null;
-          const totalCryptoBrl = cryptoInvestments.reduce((s, i) => s + (Number(i.current_price) || 0) * (Number(i.quantity) || 0), 0);
-          return (
-            <Card className="bg-card">
-              <CardContent className="p-3">
-                <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-                  <Bitcoin className="h-3.5 w-3.5 text-warning" /> Criptoativos — Multi-moeda
-                </p>
-                {cryptoPrices.loading ? (
-                  <p className="text-xs text-muted-foreground">Carregando cotações...</p>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="rounded-lg bg-accent/50 p-2">
-                        <p className="text-[10px] text-muted-foreground uppercase">BRL</p>
-                        <p className="text-sm font-bold">{brl(totalCryptoBrl)}</p>
-                      </div>
-                      <div className="rounded-lg bg-accent/50 p-2">
-                        <p className="text-[10px] text-muted-foreground uppercase">USD</p>
-                        <p className="text-sm font-bold">$ {cryptoPrices.convertToUsd(totalCryptoBrl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                      </div>
-                      <div className="rounded-lg bg-accent/50 p-2">
-                        <p className="text-[10px] text-muted-foreground uppercase">BTC</p>
-                        <p className="text-sm font-bold">₿ {cryptoPrices.convertToBtc(totalCryptoBrl).toFixed(6)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                      <span>BTC: $ {cryptoPrices.btcUsd.toLocaleString("en-US")} | R$ {cryptoPrices.btcBrl.toLocaleString("pt-BR")}</span>
-                      <span>USD/BRL: {cryptoPrices.usdBrl.toFixed(2)}</span>
-                      {cryptoPrices.lastUpdated && <span className="ml-auto">Atualizado: {cryptoPrices.lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })()}
-
-        {/* Secondary row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Card className="bg-card">
-            <CardContent className="p-3">
-              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-                <PieChartIcon className="h-3.5 w-3.5 text-primary" /> Alocação
-              </p>
-              {metrics.allocation.length > 0 ? (
-                <div className="flex items-center gap-3">
-                  <ResponsiveContainer width={80} height={80}>
-                    <PieChart>
-                      <Pie data={metrics.allocation} dataKey="value" cx="50%" cy="50%" outerRadius={35} innerRadius={18} strokeWidth={1}>
-                        {metrics.allocation.map((a, i) => <Cell key={i} fill={a.color} />)}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="space-y-1">
-                    {metrics.allocation.map((a, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-[10px]">
-                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: a.color }} />
-                        <span className="text-muted-foreground">{a.name}</span>
-                        <span className="font-medium text-foreground ml-auto">{brl(a.value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : <p className="text-xs text-muted-foreground">Nenhum ativo</p>}
-            </CardContent>
-          </Card>
-          <Card className="bg-card">
-            <CardContent className="p-3">
-              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-                <BarChart3 className="h-3.5 w-3.5 text-primary" /> Top 3 Ativos
-              </p>
-              <div className="space-y-2">
-                {metrics.top3.map((inv, i) => {
-                  const profit = Number(inv.purchase_price) > 0
-                    ? ((Number(inv.current_price) - Number(inv.purchase_price)) / Number(inv.purchase_price)) * 100
-                    : 0;
+          {/* Investment Cards Grid - all types when dashboard, filtered when specific tab */}
+          {activeTab !== "dashboard" && (
+            <>
+              <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+                {tabFilteredInvestments.map(inv => {
+                  const totalInvested = (Number(inv.purchase_price) || 0) * (Number(inv.quantity) || 0);
+                  const totalCurrent = (Number(inv.current_price) || 0) * (Number(inv.quantity) || 0);
+                  const profitPct = totalInvested > 0 ? ((totalCurrent - totalInvested) / totalInvested) * 100 : 0;
+                  const isPositive = profitPct >= 0;
                   return (
-                    <div key={inv.id} className="flex items-center gap-2 text-xs">
-                      <span className="text-muted-foreground w-4">{i + 1}.</span>
-                      <span className="font-medium truncate flex-1">{inv.ticker || inv.name}</span>
-                      <span className={cn("font-medium", profit >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
-                        {profit >= 0 ? "+" : ""}{profit.toFixed(1)}%
-                      </span>
-                    </div>
-                  );
-                })}
-                {metrics.top3.length === 0 && <p className="text-xs text-muted-foreground">—</p>}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card">
-            <CardContent className="p-3">
-              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 text-warning" /> Alertas
-              </p>
-              <div className="space-y-1.5">
-                {metrics.upcomingDividends.map(inv => (
-                  <div key={`div-${inv.id}`} className="text-[10px] text-[hsl(var(--success))] flex items-center gap-1">
-                    <TrendingUp className="h-2.5 w-2.5" /> Dividendo: {inv.ticker || inv.name} - {brl(Number(inv.dividend_amount))}
-                  </div>
-                ))}
-                {metrics.alerts.map(inv => {
-                  const drop = ((Number(inv.current_price) - Number(inv.purchase_price)) / Number(inv.purchase_price)) * 100;
-                  return (
-                    <div key={`alert-${inv.id}`} className="text-[10px] text-destructive flex items-center gap-1">
-                      <TrendingDown className="h-2.5 w-2.5" /> {inv.ticker || inv.name} caiu {Math.abs(drop).toFixed(1)}%
-                    </div>
-                  );
-                })}
-                {metrics.upcomingDividends.length === 0 && metrics.alerts.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Nenhum alerta</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Type filter buttons + Search - below indicators */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border/30 overflow-x-auto">
-        {INVESTMENT_TYPES.map(t => {
-          const isActive = activeTypes.has(t.value);
-          return (
-            <Button key={t.value} size="sm"
-              variant={isActive ? "default" : "ghost"}
-              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", !isActive && "text-muted-foreground")}
-              onClick={() => {
-                setActiveTypes(prev => {
-                  const next = new Set(prev);
-                  if (next.has(t.value)) next.delete(t.value); else next.add(t.value);
-                  if (next.size === 0) return new Set(INVESTMENT_TYPES.map(x => x.value));
-                  return next;
-                });
-              }}
-            >
-              {t.icon} {t.label}
-            </Button>
-          );
-        })}
-        <div className="ml-auto">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
-            <Input placeholder="Buscar ativo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-7 pl-8 text-xs w-40" />
-          </div>
-        </div>
-      </div>
-
-      {/* Entries list + Investment cards */}
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-4">
-          {/* ── Financial entries list (like Finanças module) ── */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold flex items-center gap-1.5">
-                <BadgeDollarSign className="h-4 w-4 text-primary" /> Lançamentos de Investimentos
-              </p>
-              <span className="text-[10px] text-muted-foreground">
-                {filteredEntries.length} lançamento{filteredEntries.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-            {pendingEntries.length === 0 && paidEntries.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <BadgeDollarSign className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                <p className="text-xs">Nenhum lançamento de investimento encontrado.</p>
-                <p className="text-[10px] mt-1">Use a Central de Lançamentos para registrar aportes.</p>
-              </div>
-            ) : (
-              <div className="rounded-lg overflow-hidden border border-border/20">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20 bg-muted/30">
-                      <th className="text-left py-2 px-2">Data</th>
-                      <th className="text-left py-2 px-2">Título</th>
-                      <th className="text-left py-2 px-2">Tipo</th>
-                      <th className="text-left py-2 px-2">Categoria</th>
-                      <th className="text-right py-2 px-2">Valor</th>
-                      <th className="text-center py-2 px-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pendingEntries.map(e => {
-                      const cat = categories.find(c => c.id === e.category_id);
-                      const isOverdue = !e.is_paid && new Date(e.entry_date) < new Date();
-                      const inv = investments.find(i => i.id === e.investment_id);
-                      return (
-                        <tr key={e.id}
-                          className={cn(
-                            "border-b border-border/10 transition-colors hover:bg-accent/30",
-                            isOverdue && "bg-destructive/5"
-                          )}
-                        >
-                          <td className="py-2 px-2 text-xs">{format(new Date(e.entry_date), "dd/MM/yy")}</td>
-                          <td className="py-2 px-2 text-xs font-medium truncate max-w-[200px]">
-                            {e.title}
-                            {inv && <span className="text-[10px] text-muted-foreground ml-1">({inv.ticker || inv.name})</span>}
-                          </td>
-                          <td className="py-2 px-2 text-xs text-muted-foreground">
-                            {e.type === "investment" ? "Aporte" : e.type === "revenue" ? "Receita" : "Despesa"}
-                          </td>
-                          <td className="py-2 px-2 text-xs text-muted-foreground">{cat?.name || "—"}</td>
-                          <td className={cn("py-2 px-2 text-xs text-right font-medium",
-                            e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive"
-                          )}>
-                            {e.type === "revenue" ? "+" : "-"}{brl(Number(e.amount))}
-                          </td>
-                          <td className="py-2 px-2 text-center">
-                            <span className={cn("text-[10px] px-1.5 py-0.5 rounded",
-                              isOverdue ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning"
-                            )}>
-                              {isOverdue ? "Atrasado" : "Pendente"}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {/* Paid entries section */}
-                {paidEntries.length > 0 && (
-                  <div className="mt-2">
-                    <button
-                      onClick={() => setShowPaidEntries(!showPaidEntries)}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
-                    >
-                      {showPaidEntries ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                      {paidEntries.length} lançamento{paidEntries.length !== 1 ? "s" : ""} baixado{paidEntries.length !== 1 ? "s" : ""}
-                    </button>
-                    {showPaidEntries && (
-                      <table className="w-full text-sm mt-1">
-                        <tbody>
-                          {paidEntries.map(e => {
-                            const cat = categories.find(c => c.id === e.category_id);
-                            const inv = investments.find(i => i.id === e.investment_id);
-                            return (
-                              <tr key={e.id} className="border-b border-border/10 opacity-60">
-                                <td className="py-2 px-2 text-xs">{format(new Date(e.entry_date), "dd/MM/yy")}</td>
-                                <td className="py-2 px-2 text-xs font-medium truncate max-w-[200px]">
-                                  {e.title}
-                                  {inv && <span className="text-[10px] text-muted-foreground ml-1">({inv.ticker || inv.name})</span>}
-                                </td>
-                                <td className="py-2 px-2 text-xs text-muted-foreground">
-                                  {e.type === "investment" ? "Aporte" : e.type === "revenue" ? "Receita" : "Despesa"}
-                                </td>
-                                <td className="py-2 px-2 text-xs text-muted-foreground">{cat?.name || "—"}</td>
-                                <td className={cn("py-2 px-2 text-xs text-right font-medium",
-                                  e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive"
-                                )}>
-                                  {e.type === "revenue" ? "+" : "-"}{brl(Number(e.amount))}
-                                </td>
-                                <td className="py-2 px-2 text-center">
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]">Pago</span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Investment Cards Grid */}
-          <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-            {filteredInvestments.map(inv => {
-              const totalInvested = (Number(inv.purchase_price) || 0) * (Number(inv.quantity) || 0);
-              const totalCurrent = (Number(inv.current_price) || 0) * (Number(inv.quantity) || 0);
-              const profitPct = totalInvested > 0 ? ((totalCurrent - totalInvested) / totalInvested) * 100 : 0;
-              const isPositive = profitPct >= 0;
-
-              return (
-                <Card key={inv.id} onClick={() => setSelectedId(inv.id)} className="cursor-pointer transition-all hover:shadow-md group">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-primary shrink-0">{getTypeIcon(inv.type)}</span>
-                          <h4 className="text-sm font-semibold truncate">{inv.name}</h4>
+                    <Card key={inv.id} onClick={() => setSelectedId(inv.id)} className="cursor-pointer transition-all hover:shadow-md group">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-primary shrink-0">{getTypeIcon(inv.type)}</span>
+                              <h4 className="text-sm font-semibold truncate">{inv.name}</h4>
+                            </div>
+                            {inv.ticker && <p className="text-[10px] text-muted-foreground mt-0.5">{inv.ticker}</p>}
+                          </div>
+                          <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: TYPE_COLORS[inv.type], color: TYPE_COLORS[inv.type] }}>
+                            {getTypeLabel(inv.type)}
+                          </Badge>
                         </div>
-                        {inv.ticker && <p className="text-[10px] text-muted-foreground mt-0.5">{inv.ticker}</p>}
-                      </div>
-                      <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: TYPE_COLORS[inv.type], color: TYPE_COLORS[inv.type] }}>
-                        {getTypeLabel(inv.type)}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-1.5 mt-3">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">Qtd</span>
-                        <span className="font-medium">{Number(inv.quantity)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">Preço Médio</span>
-                        <span className="font-medium">{brl(Number(inv.purchase_price))}</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">Valor Atual</span>
-                        <span className="font-medium">{brl(Number(inv.current_price))}</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 pt-2 border-t border-border/30 flex items-center justify-between">
-                      <span className="text-xs font-semibold">{brl(totalCurrent)}</span>
-                      <div className={cn("flex items-center gap-1 text-xs font-medium", isPositive ? "text-[hsl(var(--success))]" : "text-destructive")}>
-                        {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                        {isPositive ? "+" : ""}{profitPct.toFixed(2)}%
-                      </div>
-                    </div>
-
-                    {inv.type === "crypto" && !cryptoPrices.loading && (
-                      <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
-                        <span>$ {cryptoPrices.convertToUsd(totalCurrent).toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>
-                        <span>₿ {cryptoPrices.convertToBtc(totalCurrent).toFixed(6)}</span>
-                      </div>
-                    )}
-
-                    {inv.purchase_date && (
-                      <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
-                        <Calendar className="h-2.5 w-2.5" /> {format(new Date(inv.purchase_date), "dd/MM/yyyy")}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-          {filteredInvestments.length === 0 && !loading && (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <TrendingUp className="h-12 w-12 mb-3 opacity-20" />
-              <p className="text-sm font-medium">Nenhum investimento encontrado</p>
-              <p className="text-xs mt-1">Use o botão + para adicionar seu primeiro ativo.</p>
-            </div>
+                        <div className="space-y-1.5 mt-3">
+                          <div className="flex justify-between text-xs"><span className="text-muted-foreground">Qtd</span><span className="font-medium">{Number(inv.quantity)}</span></div>
+                          <div className="flex justify-between text-xs"><span className="text-muted-foreground">Preço Médio</span><span className="font-medium">{brl(Number(inv.purchase_price))}</span></div>
+                          <div className="flex justify-between text-xs"><span className="text-muted-foreground">Valor Atual</span><span className="font-medium">{brl(Number(inv.current_price))}</span></div>
+                        </div>
+                        <div className="mt-3 pt-2 border-t border-border/30 flex items-center justify-between">
+                          <span className="text-xs font-semibold">{brl(totalCurrent)}</span>
+                          <div className={cn("flex items-center gap-1 text-xs font-medium", isPositive ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                            {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                            {isPositive ? "+" : ""}{profitPct.toFixed(2)}%
+                          </div>
+                        </div>
+                        {inv.type === "crypto" && !cryptoPrices.loading && (
+                          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
+                            <span>$ {cryptoPrices.convertToUsd(totalCurrent).toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>
+                            <span>₿ {cryptoPrices.convertToBtc(totalCurrent).toFixed(6)}</span>
+                          </div>
+                        )}
+                        {inv.purchase_date && (
+                          <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
+                            <Calendar className="h-2.5 w-2.5" /> {format(new Date(inv.purchase_date), "dd/MM/yyyy")}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+              {tabFilteredInvestments.length === 0 && !loading && (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <TrendingUp className="h-12 w-12 mb-3 opacity-20" />
+                  <p className="text-sm font-medium">Nenhum investimento encontrado</p>
+                  <p className="text-xs mt-1">Use o botão + para adicionar seu primeiro ativo.</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </ScrollArea>

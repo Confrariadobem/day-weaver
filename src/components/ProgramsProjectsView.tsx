@@ -25,6 +25,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
 
 type FilterStatus = "all" | "programs" | "projects" | "tasks";
+type ProjectTab = "dashboard" | "programs" | "projects" | "tasks";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
@@ -48,6 +49,7 @@ const PRIORITY_CONFIG: Record<string, { label: string; icon: React.ReactNode; co
 
 export default function ProgramsProjectsView() {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<ProjectTab>("projects");
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(["programs", "projects", "tasks"]));
   const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Tables<"tasks">[]>([]);
@@ -855,6 +857,31 @@ export default function ProgramsProjectsView() {
     <>
       <ScrollArea className="h-full">
         <div className="p-4 space-y-4">
+          {/* Tab buttons - Finance pattern */}
+          <div className="flex items-center gap-2 overflow-x-auto">
+            {([
+              { key: "dashboard" as ProjectTab, label: "Dashboard", icon: <BarChart3 className="h-3 w-3" /> },
+              { key: "programs" as ProjectTab, label: "Programas", icon: <FolderKanban className="h-3 w-3" /> },
+              { key: "projects" as ProjectTab, label: "Projetos", icon: <Layers className="h-3 w-3" /> },
+              { key: "tasks" as ProjectTab, label: "Tarefas", icon: <ListTodo className="h-3 w-3" /> },
+            ]).map(tab => (
+              <Button key={tab.key} size="sm"
+                variant={activeTab === tab.key ? "default" : "ghost"}
+                className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== tab.key && "text-muted-foreground")}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                {tab.icon} {tab.label}
+              </Button>
+            ))}
+            <div className="ml-auto">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)}
+                  className="h-7 pl-8 text-xs w-40" />
+              </div>
+            </div>
+          </div>
+
           {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <Card className="bg-card">
@@ -909,39 +936,88 @@ export default function ProgramsProjectsView() {
             </Card>
           </div>
 
-          {/* Filter buttons - below indicators */}
-          <div className="flex items-center gap-2 overflow-x-auto">
-            {([
-              { key: "programs", label: "Programas", icon: <FolderKanban className="h-3 w-3" /> },
-              { key: "projects", label: "Projeto", icon: <Layers className="h-3 w-3" /> },
-              { key: "tasks", label: "Tarefas", icon: <ListTodo className="h-3 w-3" /> },
-            ] as const).map(f => {
-              const isActive = activeStatuses.has(f.key);
-              return (
-                <Button key={f.key} size="sm"
-                  variant={isActive ? "default" : "ghost"}
-                  className={cn("h-7 text-xs px-3 rounded-full gap-1.5", !isActive && "text-muted-foreground")}
-                  onClick={() => {
-                    setActiveStatuses(prev => {
-                      const next = new Set(prev);
-                      if (next.has(f.key)) next.delete(f.key); else next.add(f.key);
-                      if (next.size === 0) return new Set(["programs", "projects", "tasks"]);
-                      return next;
-                    });
-                  }}
-                >
-                  {f.icon} {f.label}
-                </Button>
-              );
-            })}
-            <div className="ml-auto">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)}
-                  className="h-7 pl-8 text-xs w-40" />
+          {/* Dashboard Tab Content */}
+          {activeTab === "dashboard" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className="bg-card">
+                  <CardContent className="p-4">
+                    <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-primary" /> Projetos por Status
+                    </p>
+                    <div className="space-y-2">
+                      {(["active", "paused", "completed"] as const).map(status => {
+                        const count = projects.filter(p => (p.status || "active") === status).length;
+                        const cfg = statusConfig[status];
+                        return (
+                          <div key={status} className="flex items-center justify-between">
+                            <Badge variant="outline" className={cn("text-[10px] font-medium border", cfg.color)}>{cfg.label}</Badge>
+                            <span className="text-sm font-bold">{count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card">
+                  <CardContent className="p-4">
+                    <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
+                      <CircleDollarSign className="h-3.5 w-3.5 text-primary" /> Orçamento vs Gasto
+                    </p>
+                    <div className="space-y-2">
+                      {projects.filter(p => Number(p.budget || 0) > 0).slice(0, 5).map(p => {
+                        const costs = getProjectCosts(p.id);
+                        const pct = Number(p.budget) > 0 ? Math.min(100, (costs.totalCost / Number(p.budget)) * 100) : 0;
+                        return (
+                          <div key={p.id} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="truncate flex-1">{p.name}</span>
+                              <span className={cn("font-medium", pct > 100 ? "text-destructive" : "text-foreground")}>{pct.toFixed(0)}%</span>
+                            </div>
+                            <Progress value={pct} className="h-1.5" />
+                          </div>
+                        );
+                      })}
+                      {projects.filter(p => Number(p.budget || 0) > 0).length === 0 && (
+                        <p className="text-xs text-muted-foreground text-center py-2">Nenhum projeto com orçamento</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
+              <Card className="bg-card">
+                <CardContent className="p-4">
+                  <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
+                    <ListTodo className="h-3.5 w-3.5 text-primary" /> Tarefas Pendentes por Projeto
+                  </p>
+                  <div className="space-y-2">
+                    {projects.map(p => {
+                      const pTasks = tasks.filter(t => t.project_id === p.id);
+                      if (pTasks.length === 0) return null;
+                      return (
+                        <div key={p.id} className="flex items-center justify-between text-xs">
+                          <span className="truncate flex-1">{p.name}</span>
+                          <span className="font-medium">{pTasks.length}</span>
+                        </div>
+                      );
+                    })}
+                    {tasks.filter(t => !t.project_id).length > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="truncate flex-1 text-muted-foreground">Sem projeto</span>
+                        <span className="font-medium">{tasks.filter(t => !t.project_id).length}</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </div>
+          )}
+
+          {/* Programs/Projects/Tasks Tab Content */}
+          {(activeTab === "programs" || activeTab === "projects" || activeTab === "tasks") && (
+            <>
+
+
 
           {/* Project cards grouped by program */}
           {projectsByProgram.map((group, gi) => (
@@ -1025,6 +1101,8 @@ export default function ProgramsProjectsView() {
               <p className="text-sm font-medium">Nenhum projeto encontrado</p>
               <p className="text-xs mt-1">Use o botão + para criar um novo projeto ou programa.</p>
             </div>
+          )}
+            </>
           )}
         </div>
       </ScrollArea>

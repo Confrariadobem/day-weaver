@@ -441,27 +441,24 @@ export default function CalendarView() {
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => nav(-1)}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <h2 className="min-w-[180px] text-center text-base font-semibold capitalize">{headerLabel}</h2>
+          <h2 className="min-w-[120px] text-center text-sm font-semibold capitalize">{headerLabel}</h2>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => nav(1)}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="flex rounded-lg bg-muted p-0.5">
+        <div className="flex items-center gap-1">
           {views.map((v) => (
-            <button
-              key={v.key}
+            <Button key={v.key} size="sm"
+              variant={viewMode === v.key ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", viewMode !== v.key && "text-muted-foreground")}
               onClick={() => {
                 if (v.key === "today") setCurrentDate(new Date());
                 setViewMode(v.key);
               }}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                viewMode === v.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              )}
             >
               {v.label}
-            </button>
+            </Button>
           ))}
         </div>
 
