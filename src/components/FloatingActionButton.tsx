@@ -25,6 +25,7 @@ export default function FloatingActionButton({ activeModule }: FloatingActionBut
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [defaultDate] = useState(() => new Date());
 
   const defaultEventType = activeModule ? MODULE_TO_EVENT_TYPE[activeModule] : undefined;
 
@@ -63,7 +64,7 @@ export default function FloatingActionButton({ activeModule }: FloatingActionBut
         open={open}
         onOpenChange={setOpen}
         item={null}
-        defaultDate={new Date()}
+        defaultDate={defaultDate}
         userId={user?.id || ""}
         onSaved={handleSaved}
         defaultEventType={defaultEventType}
