@@ -481,7 +481,7 @@ export default function CalendarView({ onTabChange }: { onTabChange?: (tab: stri
         </div>
 
         {/* Filters as icon buttons - right aligned */}
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1.5">
           {/* Grouped filter icons with border */}
           <div className="flex items-center gap-0.5 border border-border/40 rounded-full px-1 py-0.5">
             {FILTER_OPTIONS.map((f) => (
@@ -513,20 +513,20 @@ export default function CalendarView({ onTabChange }: { onTabChange?: (tab: stri
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">Favoritos</TooltipContent>
             </Tooltip>
-            {/* Select all checkbox */}
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <div className="flex items-center pl-0.5 pr-1">
-                  <Checkbox
-                    checked={allFiltersActive}
-                    onCheckedChange={toggleAllFilters}
-                    className="h-3.5 w-3.5"
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">Todos</TooltipContent>
-            </Tooltip>
           </div>
+          {/* Select all checkbox - outside the border to symbolize it activates the whole group */}
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <div className="flex items-center">
+                <Checkbox
+                  checked={allFiltersActive}
+                  onCheckedChange={toggleAllFilters}
+                  className="h-3.5 w-3.5"
+                />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Todos</TooltipContent>
+          </Tooltip>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
