@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import NavSidebar, { type ModuleKey } from "@/components/NavSidebar";
 import CalendarView from "@/components/CalendarView";
 import UnifiedSidebar from "@/components/UnifiedSidebar";
@@ -10,12 +10,120 @@ import ProgramsProjectsView from "@/components/ProgramsProjectsView";
 import InvestmentsView from "@/components/InvestmentsView";
 import PatrimonioView from "@/components/PatrimonioView";
 import FloatingActionButton from "@/components/FloatingActionButton";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
+
+const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+
+function BulletChart({ value, marker, maxVal, balance, label }: { value: number; marker: number; maxVal: number; balance: number; label?: string }) {
+  return (
+    <div className="flex items-center gap-3" style={{ width: 180, height: 36 }}>
+      <div className="flex-1 relative h-full flex flex-col justify-center gap-0.5">
+        <div className="relative h-3 rounded-full bg-muted/30 overflow-hidden">
+          <div
+            className="absolute left-0 top-0 h-full rounded-full bg-[hsl(var(--success))]"
+            style={{ width: `${Math.min(100, (value / maxVal) * 100)}%` }}
+          />
+          <div
+            className="absolute top-0 h-full w-[2px] bg-destructive"
+            style={{ left: `${Math.min(100, (marker / maxVal) * 100)}%` }}
+          />
+        </div>
+        <span className={cn(
+          "text-[10px] font-bold tabular-nums leading-none",
+          balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive"
+        )}>
+          {label || brl(balance)}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [activeModule, setActiveModule] = useState<ModuleKey>("calendar");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  // Data for bullet charts in the header
+  const [entries, setEntries] = useState<any[]>([]);
+  const [investments, setInvestments] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetch = async () => {
+      const [eRes, iRes, pRes] = await Promise.all([
+        supabase.from("financial_entries").select("*").eq("user_id", user.id),
+        supabase.from("investments").select("*").eq("user_id", user.id).eq("is_active", true),
+        supabase.from("projects").select("*").eq("user_id", user.id),
+      ]);
+      if (eRes.data) setEntries(eRes.data);
+      if (iRes.data) setInvestments(iRes.data);
+      if (pRes.data) setProjects(pRes.data);
+    };
+    fetch();
+    const handleDataChanged = () => fetch();
+    window.addEventListener("lovable:data-changed", handleDataChanged);
+    return () => window.removeEventListener("lovable:data-changed", handleDataChanged);
+  }, [user]);
+
+  // Dashboard bullet: current month revenue vs expense
+  const dashBullet = useMemo(() => {
+    const now = new Date();
+    const monthEntries = entries.filter(e => {
+      const d = new Date(e.entry_date);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+    const rev = monthEntries.filter(e => e.type === "revenue").reduce((s: number, e: any) => s + Number(e.amount), 0);
+    const exp = monthEntries.filter(e => e.type === "expense").reduce((s: number, e: any) => s + Number(e.amount), 0);
+    return { rev, exp, balance: rev - exp, maxVal: Math.max(rev, exp, 1) };
+  }, [entries]);
+
+  // Calendar bullet: current month
+  const calBullet = dashBullet; // same data
+
+  // Investments bullet: invested vs current
+  const invBullet = useMemo(() => {
+    const invested = investments.reduce((s: number, i: any) => s + (Number(i.purchase_price) || 0) * (Number(i.quantity) || 0), 0);
+    const current = investments.reduce((s: number, i: any) => s + (Number(i.current_price) || 0) * (Number(i.quantity) || 0), 0);
+    const profit = current - invested;
+    return { invested, current, profit, maxVal: Math.max(invested, current, 1) };
+  }, [investments]);
+
+  // Projects bullet: budget vs cost  
+  const projBullet = useMemo(() => {
+    const totalBudget = projects.reduce((s: number, p: any) => s + Number(p.budget || 0), 0);
+    const totalCost = entries.filter(e => e.type === "expense" && e.project_id).reduce((s: number, e: any) => s + Number(e.amount), 0);
+    return { totalBudget, totalCost, available: totalBudget - totalCost, maxVal: Math.max(totalBudget, totalCost, 1) };
+  }, [projects, entries]);
+
+  // Finances bullet: total revenue vs expense (all time filtered)
+  const finBullet = useMemo(() => {
+    const rev = entries.filter(e => e.type === "revenue" && !e.is_paid).reduce((s: number, e: any) => s + Number(e.amount), 0);
+    const exp = entries.filter(e => e.type === "expense" && !e.is_paid).reduce((s: number, e: any) => s + Number(e.amount), 0);
+    return { rev, exp, balance: rev - exp, maxVal: Math.max(rev, exp, 1) };
+  }, [entries]);
+
   const showUnifiedSidebar = activeModule === "calendar";
+
+  const renderBulletChart = () => {
+    switch (activeModule) {
+      case "dashboard":
+        return <BulletChart value={dashBullet.rev} marker={dashBullet.exp} maxVal={dashBullet.maxVal} balance={dashBullet.balance} />;
+      case "calendar":
+        return <BulletChart value={calBullet.rev} marker={calBullet.exp} maxVal={calBullet.maxVal} balance={calBullet.balance} />;
+      case "finances":
+        return <BulletChart value={finBullet.rev} marker={finBullet.exp} maxVal={finBullet.maxVal} balance={finBullet.balance} />;
+      case "investments":
+        return <BulletChart value={invBullet.current} marker={invBullet.invested} maxVal={invBullet.maxVal} balance={invBullet.profit} label={`${invBullet.profit >= 0 ? "+" : ""}${brl(invBullet.profit)}`} />;
+      case "programs":
+        return <BulletChart value={projBullet.totalBudget - projBullet.totalCost} marker={projBullet.totalCost} maxVal={projBullet.maxVal} balance={projBullet.available} label={`${brl(projBullet.available)} disp.`} />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
@@ -33,6 +141,9 @@ export default function Dashboard() {
             {activeModule === "investments" && "Investimentos"}
             {activeModule === "patrimonio" && "Patrimônio"}
           </h1>
+          <div className="ml-auto">
+            {renderBulletChart()}
+          </div>
         </header>
 
         <div className="flex flex-1 overflow-hidden">
