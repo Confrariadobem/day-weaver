@@ -46,7 +46,7 @@ const TYPE_COLORS: Record<string, string> = {
 const getTypeLabel = (type: string) => INVESTMENT_TYPES.find(t => t.value === type)?.label || type;
 const getTypeIcon = (type: string) => INVESTMENT_TYPES.find(t => t.value === type)?.icon || <Coins className="h-5 w-5" />;
 
-export default function InvestmentsView() {
+export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { user } = useAuth();
   const { investments, loading } = useInvestments();
   const { addInvestment, updateInvestment, deleteInvestment } = useAddInvestment();
@@ -59,6 +59,8 @@ export default function InvestmentsView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(INVESTMENT_TYPES.map(t => t.value)));
+
+  useEffect(() => { onTabChange?.(activeTab); }, [activeTab, onTabChange]);
 
   // Financial entries for investments
   const [investmentEntries, setInvestmentEntries] = useState<any[]>([]);
@@ -233,18 +235,7 @@ export default function InvestmentsView() {
     return { invested, current, profit, maxVal };
   }, [metrics]);
 
-  // ─── Detail view ───
-  if (selectedId) {
-    return <InvestmentDetail
-      id={selectedId}
-      onBack={() => setSelectedId(null)}
-      onEdit={(inv) => openEdit(inv)}
-      onDelete={(id) => setDeleteConfirm(id)}
-      userId={user?.id || ""}
-    />;
-  }
-
-  // Filter investments based on active tab
+  // Filter investments based on active tab (must be before early return)
   const tabFilteredInvestments = useMemo(() => {
     let list = investments;
     if (activeTab !== "dashboard") list = list.filter(i => i.type === activeTab);
@@ -262,6 +253,17 @@ export default function InvestmentsView() {
   }, [investmentEntries, activeTab, investments]);
   const tabPendingEntries = tabFilteredEntries.filter(e => !e.is_paid);
   const tabPaidEntries = tabFilteredEntries.filter(e => e.is_paid);
+
+  // ─── Detail view ───
+  if (selectedId) {
+    return <InvestmentDetail
+      id={selectedId}
+      onBack={() => setSelectedId(null)}
+      onEdit={(inv) => openEdit(inv)}
+      onDelete={(id) => setDeleteConfirm(id)}
+      userId={user?.id || ""}
+    />;
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

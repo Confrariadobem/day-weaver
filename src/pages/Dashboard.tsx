@@ -50,25 +50,29 @@ export default function Dashboard() {
   const [entries, setEntries] = useState<any[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
 
   // Active tab state passed up from child modules for bullet chart filtering
   const [financeTab, setFinanceTab] = useState<string>("previsao");
   const [investmentTab, setInvestmentTab] = useState<string>("dashboard");
+  const [projectTab, setProjectTab] = useState<string>("projects");
 
   useEffect(() => {
     if (!user) return;
-    const fetch = async () => {
-      const [eRes, iRes, pRes] = await Promise.all([
+    const fetchData = async () => {
+      const [eRes, iRes, pRes, tRes] = await Promise.all([
         supabase.from("financial_entries").select("*").eq("user_id", user.id),
         supabase.from("investments").select("*").eq("user_id", user.id).eq("is_active", true),
         supabase.from("projects").select("*").eq("user_id", user.id),
+        supabase.from("tasks").select("*").eq("user_id", user.id),
       ]);
       if (eRes.data) setEntries(eRes.data);
       if (iRes.data) setInvestments(iRes.data);
       if (pRes.data) setProjects(pRes.data);
+      if (tRes.data) setTasks(tRes.data);
     };
-    fetch();
-    const handleDataChanged = () => fetch();
+    fetchData();
+    const handleDataChanged = () => fetchData();
     window.addEventListener("lovable:data-changed", handleDataChanged);
     return () => window.removeEventListener("lovable:data-changed", handleDataChanged);
   }, [user]);
@@ -86,30 +90,52 @@ export default function Dashboard() {
   }, [entries]);
 
   // Calendar bullet: current month
-  const calBullet = dashBullet; // same data
+  const calBullet = dashBullet;
 
-  // Investments bullet: invested vs current
+  // Investments bullet: filtered by active tab
   const invBullet = useMemo(() => {
-    const invested = investments.reduce((s: number, i: any) => s + (Number(i.purchase_price) || 0) * (Number(i.quantity) || 0), 0);
-    const current = investments.reduce((s: number, i: any) => s + (Number(i.current_price) || 0) * (Number(i.quantity) || 0), 0);
+    let filtered = investments;
+    if (investmentTab !== "dashboard") {
+      filtered = investments.filter(i => i.type === investmentTab);
+    }
+    const invested = filtered.reduce((s: number, i: any) => s + (Number(i.purchase_price) || 0) * (Number(i.quantity) || 0), 0);
+    const current = filtered.reduce((s: number, i: any) => s + (Number(i.current_price) || 0) * (Number(i.quantity) || 0), 0);
     const profit = current - invested;
     return { invested, current, profit, maxVal: Math.max(invested, current, 1) };
-  }, [investments]);
+  }, [investments, investmentTab]);
 
-  // Finance bullet: based on active tab
+  // Finance bullet: filtered by active tab
   const finBullet = useMemo(() => {
-    // Fluxo de caixa: pending items (unpaid)
+    if (financeTab === "indicadores" || financeTab === "doar") {
+      // For analytics tabs, show overall pending
+      const rev = entries.filter(e => e.type === "revenue" && !e.is_paid).reduce((s: number, e: any) => s + Number(e.amount), 0);
+      const exp = entries.filter(e => e.type === "expense" && !e.is_paid).reduce((s: number, e: any) => s + Number(e.amount), 0);
+      return { rev, exp, balance: rev - exp, maxVal: Math.max(rev, exp, 1) };
+    }
+    // previsao / fluxo: show pending items
     const rev = entries.filter(e => e.type === "revenue" && !e.is_paid).reduce((s: number, e: any) => s + Number(e.amount), 0);
     const exp = entries.filter(e => e.type === "expense" && !e.is_paid).reduce((s: number, e: any) => s + Number(e.amount), 0);
     return { rev, exp, balance: rev - exp, maxVal: Math.max(rev, exp, 1) };
-  }, [entries]);
+  }, [entries, financeTab]);
 
-  // Projects bullet: budget vs cost  
+  // Projects bullet: filtered by active tab
   const projBullet = useMemo(() => {
+    if (projectTab === "dashboard" || projectTab === "projects") {
+      const totalBudget = projects.reduce((s: number, p: any) => s + Number(p.budget || 0), 0);
+      const totalCost = entries.filter(e => e.type === "expense" && e.project_id).reduce((s: number, e: any) => s + Number(e.amount), 0);
+      return { totalBudget, totalCost, available: totalBudget - totalCost, maxVal: Math.max(totalBudget, totalCost, 1) };
+    }
+    if (projectTab === "tasks") {
+      const total = tasks.length;
+      const completed = tasks.filter(t => t.is_completed).length;
+      const pending = total - completed;
+      return { totalBudget: total, totalCost: completed, available: pending, maxVal: Math.max(total, 1) };
+    }
+    // programs
     const totalBudget = projects.reduce((s: number, p: any) => s + Number(p.budget || 0), 0);
     const totalCost = entries.filter(e => e.type === "expense" && e.project_id).reduce((s: number, e: any) => s + Number(e.amount), 0);
     return { totalBudget, totalCost, available: totalBudget - totalCost, maxVal: Math.max(totalBudget, totalCost, 1) };
-  }, [projects, entries]);
+  }, [projects, entries, tasks, projectTab]);
 
   const showUnifiedSidebar = activeModule === "calendar";
 
@@ -124,6 +150,9 @@ export default function Dashboard() {
       case "investments":
         return <BulletChart value={invBullet.current} marker={invBullet.invested} maxVal={invBullet.maxVal} balance={invBullet.profit} label={`${invBullet.profit >= 0 ? "+" : ""}${brl(invBullet.profit)}`} />;
       case "programs":
+        if (projectTab === "tasks") {
+          return <BulletChart value={projBullet.totalCost} marker={projBullet.totalBudget} maxVal={projBullet.maxVal} balance={projBullet.available} label={`${projBullet.available} pendentes`} />;
+        }
         return <BulletChart value={projBullet.totalBudget - projBullet.totalCost} marker={projBullet.totalCost} maxVal={projBullet.maxVal} balance={projBullet.available} label={`${brl(projBullet.available)} disp.`} />;
       default:
         return null;
@@ -155,9 +184,9 @@ export default function Dashboard() {
           <div className="flex-1 overflow-hidden">
             {activeModule === "dashboard" && <DashboardView />}
             {activeModule === "calendar" && <CalendarView />}
-            {activeModule === "finances" && <FinancesView />}
-            {activeModule === "programs" && <ProgramsProjectsView />}
-            {activeModule === "investments" && <InvestmentsView />}
+            {activeModule === "finances" && <FinancesView onTabChange={setFinanceTab} />}
+            {activeModule === "programs" && <ProgramsProjectsView onTabChange={setProjectTab} />}
+            {activeModule === "investments" && <InvestmentsView onTabChange={setInvestmentTab} />}
             {activeModule === "patrimonio" && <PatrimonioView />}
             {activeModule === "profile" && <ProfileView />}
             {activeModule === "preferences" && <PreferencesView />}

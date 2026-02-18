@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Moon, Sun, Save, Globe, CalendarDays, Tag, Trash2, Database } from "lucide-react";
+import { Moon, Sun, Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LAUNCH_TYPE_ICONS, DATA_MODULE_ICONS, CATEGORY_ICON_MAP, CATEGORY_ICON_KEYS } from "@/lib/icons";
 
@@ -252,6 +252,7 @@ export default function PreferencesView() {
             <TabsTrigger value="calendar">Calendário</TabsTrigger>
             <TabsTrigger value="types">Tipos</TabsTrigger>
             <TabsTrigger value="categories">Categorias</TabsTrigger>
+            <TabsTrigger value="investments">Investimentos</TabsTrigger>
             <TabsTrigger value="data">Dados</TabsTrigger>
           </TabsList>
 
@@ -415,6 +416,57 @@ export default function PreferencesView() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ===== INVESTIMENTOS ===== */}
+          <TabsContent value="investments" className="space-y-6 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <TrendingUp className="h-5 w-5" /> Tipos de Investimentos
+                </CardTitle>
+                <CardDescription>Tipos de ativos disponíveis para cadastro no módulo de investimentos.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {[
+                    { label: "Ações", color: "#3b82f6", desc: "Ações listadas em bolsa de valores" },
+                    { label: "FIIs", color: "#22c55e", desc: "Fundos de Investimento Imobiliário" },
+                    { label: "Criptoativos", color: "#f59e0b", desc: "Bitcoin, Ethereum e outros ativos digitais" },
+                    { label: "ETFs", color: "#06b6d4", desc: "Exchange Traded Funds" },
+                    { label: "Renda Fixa", color: "#8b5cf6", desc: "CDB, Tesouro Direto, LCI, LCA" },
+                    { label: "Outros", color: "#6b7280", desc: "Outros tipos de investimento" },
+                  ].map((type) => (
+                    <div key={type.label} className="flex items-center gap-3 rounded-lg border border-border p-3">
+                      <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: type.color }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{type.label}</p>
+                        <p className="text-xs text-muted-foreground">{type.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <TrendingUp className="h-5 w-5" /> Configurações de Cotações
+                </CardTitle>
+                <CardDescription>Configure a atualização automática de preços</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Atualização automática de preços (cripto)</Label>
+                  <Switch defaultChecked />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Exibir valores em múltiplas moedas</Label>
+                  <Switch defaultChecked />
                 </div>
               </CardContent>
             </Card>
