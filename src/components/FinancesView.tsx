@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useModulePreferences } from "@/hooks/useModulePreferences";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -147,6 +148,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<any | null>(null);
   const [viewTab, setViewTab] = useState<ViewTab>("previsao");
+  const { visibleTabs } = useModulePreferences("finances");
   
   useEffect(() => { onTabChange?.(viewTab); }, [viewTab, onTabChange]);
   const [customPeriodEnabled, setCustomPeriodEnabled] = useState(false);
@@ -961,7 +963,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
           { key: "indicadores" as ViewTab, label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
           { key: "previsao" as ViewTab, label: "Fluxo de Caixa", icon: <CircleDollarSign className="h-3 w-3" /> },
           { key: "doar" as ViewTab, label: "DOAR", icon: <Landmark className="h-3 w-3" /> },
-        ]).map(tab => (
+        ]).filter(tab => visibleTabs.includes(tab.key)).map(tab => (
           <Button key={tab.key} size="sm"
             variant={viewTab === tab.key ? "default" : "ghost"}
             className={cn("h-7 text-xs px-3 rounded-full gap-1.5", viewTab !== tab.key && "text-muted-foreground")}

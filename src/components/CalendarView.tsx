@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useModulePreferences } from "@/hooks/useModulePreferences";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -85,6 +86,7 @@ export default function CalendarView({ onTabChange }: { onTabChange?: (tab: stri
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("monthly");
+  const { visibleTabs } = useModulePreferences("calendar");
   const [events, setEvents] = useState<Tables<"calendar_events">[]>([]);
   const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
   const [entries, setEntries] = useState<any[]>([]);
@@ -387,13 +389,13 @@ export default function CalendarView({ onTabChange }: { onTabChange?: (tab: stri
     else setCurrentDate(dir === 1 ? addDays(currentDate, viewMode === "3days" ? 3 : 1) : subDays(currentDate, viewMode === "3days" ? 3 : 1));
   };
 
-  const views: { key: ViewMode; label: string }[] = [
-    { key: "today", label: "Hoje" },
-    { key: "3days", label: "3 Dias" },
-    { key: "weekly", label: "Semana" },
-    { key: "monthly", label: "Mês" },
-    { key: "yearly", label: "Ano" },
-  ];
+  const views = ([
+    { key: "today" as ViewMode, label: "Hoje" },
+    { key: "3days" as ViewMode, label: "3 Dias" },
+    { key: "weekly" as ViewMode, label: "Semana" },
+    { key: "monthly" as ViewMode, label: "Mês" },
+    { key: "yearly" as ViewMode, label: "Ano" },
+  ] as { key: ViewMode; label: string }[]).filter(v => visibleTabs.includes(v.key));
 
   const headerLabel = viewMode === "yearly"
     ? format(currentDate, "yyyy")
