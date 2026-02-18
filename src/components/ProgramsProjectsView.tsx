@@ -1015,96 +1015,169 @@ export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (t
             </div>
           )}
 
-          {/* Programs/Projects/Tasks Tab Content */}
-          {(activeTab === "programs" || activeTab === "projects" || activeTab === "tasks") && (
-            <>
-
-
-
-          {/* Project cards grouped by program */}
-          {projectsByProgram.map((group, gi) => (
-            <div key={group.program?.id || "unlinked"}>
-              <div className="flex items-center gap-2 mb-2">
-                {group.program ? (
-                  <>
-                    <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: group.program.color || "#3b82f6" }} />
-                    <h3 className="text-sm font-semibold flex-1">{group.program.name}</h3>
-                    <span className="text-[10px] text-muted-foreground">{group.projects.length} projeto{group.projects.length !== 1 ? "s" : ""}</span>
-                    <button onClick={() => openEditProgram(group.program!)} className="text-xs text-primary hover:underline">Editar</button>
-                  </>
-                ) : (
-                  <h3 className="text-sm font-semibold text-muted-foreground">Sem programa</h3>
-                )}
-              </div>
-              <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 mb-4">
-                {group.projects.map(p => {
-                  const progress = getProjectProgress(p.id);
-                  const costs = getProjectCosts(p.id);
-                  const pTasks = allTasks.filter(t => t.project_id === p.id);
-                  const pending = pTasks.filter(t => !t.is_completed).length;
-                  const done = pTasks.filter(t => t.is_completed).length;
-                  const isOverBudget = Number(p.budget || 0) > 0 && costs.totalCost > Number(p.budget);
-
-                  return (
-                    <Card
-                      key={p.id}
-                      onClick={() => setSelectedProjectId(p.id)}
-                      className="cursor-pointer transition-all hover:shadow-md group"
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-semibold truncate">{p.name}</h4>
-                            {p.description && (
-                              <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{p.description}</p>
-                            )}
+          {/* Programs Tab - Table view */}
+          {activeTab === "programs" && (
+            <div className="rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
+                    <th className="text-left py-2 px-2">Programa</th>
+                    <th className="text-left py-2 px-2">Status</th>
+                    <th className="text-center py-2 px-2">Projetos</th>
+                    <th className="text-center py-2 px-2">Tarefas</th>
+                    <th className="text-right py-2 px-2">Orçamento</th>
+                    <th className="text-right py-2 px-2">Gasto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {programs.length === 0 && (
+                    <tr><td colSpan={6} className="text-center text-muted-foreground/40 py-12">Nenhum programa criado. Use o botão + para criar.</td></tr>
+                  )}
+                  {programs.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase())).map((prog, idx) => {
+                    const progProjects = projects.filter(p => p.program_id === prog.id);
+                    const progTasks = allTasks.filter(t => progProjects.some(p => p.id === t.project_id));
+                    const totalBudget = progProjects.reduce((s, p) => s + Number(p.budget || 0), 0);
+                    const totalCost = progProjects.reduce((s, p) => s + getProjectCosts(p.id).totalCost, 0);
+                    return (
+                      <tr key={prog.id}
+                        className={cn("cursor-pointer transition-colors hover:bg-muted/20", idx > 0 && "border-t border-border/10")}
+                        onDoubleClick={() => openEditProgram(prog)}
+                      >
+                        <td className="py-2.5 px-2">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: prog.color || "#3b82f6" }} />
+                            <span className="font-medium">{prog.name}</span>
                           </div>
-                          {getStatusBadge(p.status)}
-                        </div>
-
-                        <div className="space-y-1.5 mt-3">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-muted-foreground">Progresso</span>
-                            <span className="font-medium">{progress}%</span>
-                          </div>
-                          <Progress value={progress} className="h-1.5" />
-                        </div>
-
-                        <div className="flex items-center gap-4 mt-3 text-[11px] text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <ListTodo className="h-3 w-3" /> {pending} pendente{pending !== 1 ? "s" : ""}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Check className="h-3 w-3 text-[hsl(var(--success))]" /> {done}
-                          </span>
-                        </div>
-
-                        {(costs.totalCost > 0 || Number(p.budget) > 0) && (
-                          <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/30 text-[11px]">
-                            <span className={cn("font-medium", isOverBudget ? "text-destructive" : "text-foreground")}>
-                              {brl(costs.totalCost)}
-                            </span>
-                            {Number(p.budget) > 0 && (
-                              <span className="text-muted-foreground">/ {brl(Number(p.budget))}</span>
-                            )}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+                          {prog.description && <p className="text-[11px] text-muted-foreground mt-0.5 pl-[18px]">{prog.description}</p>}
+                        </td>
+                        <td className="py-2.5 px-2">{getStatusBadge(prog.status)}</td>
+                        <td className="py-2.5 px-2 text-center">{progProjects.length}</td>
+                        <td className="py-2.5 px-2 text-center">{progTasks.filter(t => !t.is_completed).length}</td>
+                        <td className="py-2.5 px-2 text-right font-medium tabular-nums">{brl(totalBudget)}</td>
+                        <td className={cn("py-2.5 px-2 text-right font-medium tabular-nums", totalCost > totalBudget && totalBudget > 0 ? "text-destructive" : "text-foreground")}>{brl(totalCost)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          ))}
+          )}
 
-          {visibleProjects.length === 0 && programs.length === 0 && (
+          {/* Projects Tab - Table view */}
+          {activeTab === "projects" && (
+            <div className="rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
+                    <th className="text-left py-2 px-2">Projeto</th>
+                    <th className="text-left py-2 px-2">Programa</th>
+                    <th className="text-left py-2 px-2">Status</th>
+                    <th className="text-center py-2 px-2">Progresso</th>
+                    <th className="text-center py-2 px-2">Tarefas</th>
+                    <th className="text-right py-2 px-2">Orçamento</th>
+                    <th className="text-right py-2 px-2">Gasto</th>
+                    <th className="text-left py-2 px-2">Responsável</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleProjects.length === 0 && (
+                    <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">Nenhum projeto encontrado. Use o botão + para criar.</td></tr>
+                  )}
+                  {visibleProjects.map((p, idx) => {
+                    const progress = getProjectProgress(p.id);
+                    const costs = getProjectCosts(p.id);
+                    const pTasks = allTasks.filter(t => t.project_id === p.id);
+                    const pending = pTasks.filter(t => !t.is_completed).length;
+                    const isOverBudget = Number(p.budget || 0) > 0 && costs.totalCost > Number(p.budget);
+                    const programName = getProgramName(p.program_id);
+                    return (
+                      <tr key={p.id}
+                        className={cn("cursor-pointer transition-colors hover:bg-muted/20", idx > 0 && "border-t border-border/10")}
+                        onClick={() => setSelectedProjectId(p.id)}
+                      >
+                        <td className="py-2.5 px-2">
+                          <span className="font-medium">{p.name}</span>
+                          {p.description && <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{p.description}</p>}
+                        </td>
+                        <td className="py-2.5 px-2 text-muted-foreground text-xs">{programName || "—"}</td>
+                        <td className="py-2.5 px-2">{getStatusBadge(p.status)}</td>
+                        <td className="py-2.5 px-2 text-center">
+                          <div className="flex items-center gap-2">
+                            <Progress value={progress} className="h-1.5 flex-1" />
+                            <span className="text-xs font-medium w-8 text-right">{progress}%</span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-2 text-center">{pending}</td>
+                        <td className="py-2.5 px-2 text-right font-medium tabular-nums">{Number(p.budget || 0) > 0 ? brl(Number(p.budget)) : "—"}</td>
+                        <td className={cn("py-2.5 px-2 text-right font-medium tabular-nums", isOverBudget ? "text-destructive" : "text-foreground")}>{costs.totalCost > 0 ? brl(costs.totalCost) : "—"}</td>
+                        <td className="py-2.5 px-2 text-muted-foreground text-xs truncate max-w-[100px]">{p.responsible || "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Tasks Tab - Table view */}
+          {activeTab === "tasks" && (
+            <div className="rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
+                    <th className="text-left py-2 px-2 w-8"></th>
+                    <th className="text-left py-2 px-2">Tarefa</th>
+                    <th className="text-left py-2 px-2">Projeto</th>
+                    <th className="text-left py-2 px-2">Data</th>
+                    <th className="text-center py-2 px-2">Status</th>
+                    <th className="text-center py-2 px-2 w-8">★</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allTasks.filter(t => !search || t.title.toLowerCase().includes(search.toLowerCase())).length === 0 && (
+                    <tr><td colSpan={6} className="text-center text-muted-foreground/40 py-12">Nenhuma tarefa encontrada.</td></tr>
+                  )}
+                  {allTasks.filter(t => !search || t.title.toLowerCase().includes(search.toLowerCase())).map((t, idx) => {
+                    const projName = projects.find(p => p.id === t.project_id)?.name;
+                    return (
+                      <tr key={t.id}
+                        className={cn("cursor-pointer transition-colors hover:bg-muted/20", idx > 0 && "border-t border-border/10", t.is_completed && "opacity-50")}
+                        onClick={() => handleTaskClick(t)}
+                      >
+                        <td className="py-2 px-2">
+                          <Checkbox checked={!!t.is_completed}
+                            onCheckedChange={() => toggleTaskComplete(t)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-3.5 w-3.5" />
+                        </td>
+                        <td className={cn("py-2 px-2", t.is_completed && "line-through text-muted-foreground")}>{t.title}</td>
+                        <td className="py-2 px-2 text-muted-foreground text-xs">{projName || "Avulsa"}</td>
+                        <td className="py-2 px-2 text-muted-foreground text-xs">{t.scheduled_date ? format(new Date(t.scheduled_date), "dd/MM/yy") : "—"}</td>
+                        <td className="py-2 px-2 text-center">
+                          {t.is_completed
+                            ? <Badge variant="outline" className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">Concluída</Badge>
+                            : <Badge variant="outline" className="text-[10px] bg-primary/15 text-primary border-primary/30">Pendente</Badge>
+                          }
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(t); }} className="p-0.5">
+                            <Star className={cn("h-3 w-3", t.is_favorite ? "fill-warning text-warning" : "text-muted-foreground/30")} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {visibleProjects.length === 0 && programs.length === 0 && activeTab === "dashboard" && (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <FolderKanban className="h-12 w-12 mb-3 opacity-20" />
               <p className="text-sm font-medium">Nenhum projeto encontrado</p>
               <p className="text-xs mt-1">Use o botão + para criar um novo projeto ou programa.</p>
             </div>
-          )}
-            </>
           )}
         </div>
       </ScrollArea>
