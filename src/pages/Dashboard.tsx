@@ -51,6 +51,10 @@ export default function Dashboard() {
   const [investments, setInvestments] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
 
+  // Active tab state passed up from child modules for bullet chart filtering
+  const [financeTab, setFinanceTab] = useState<string>("previsao");
+  const [investmentTab, setInvestmentTab] = useState<string>("dashboard");
+
   useEffect(() => {
     if (!user) return;
     const fetch = async () => {
@@ -92,19 +96,20 @@ export default function Dashboard() {
     return { invested, current, profit, maxVal: Math.max(invested, current, 1) };
   }, [investments]);
 
+  // Finance bullet: based on active tab
+  const finBullet = useMemo(() => {
+    // Fluxo de caixa: pending items (unpaid)
+    const rev = entries.filter(e => e.type === "revenue" && !e.is_paid).reduce((s: number, e: any) => s + Number(e.amount), 0);
+    const exp = entries.filter(e => e.type === "expense" && !e.is_paid).reduce((s: number, e: any) => s + Number(e.amount), 0);
+    return { rev, exp, balance: rev - exp, maxVal: Math.max(rev, exp, 1) };
+  }, [entries]);
+
   // Projects bullet: budget vs cost  
   const projBullet = useMemo(() => {
     const totalBudget = projects.reduce((s: number, p: any) => s + Number(p.budget || 0), 0);
     const totalCost = entries.filter(e => e.type === "expense" && e.project_id).reduce((s: number, e: any) => s + Number(e.amount), 0);
     return { totalBudget, totalCost, available: totalBudget - totalCost, maxVal: Math.max(totalBudget, totalCost, 1) };
   }, [projects, entries]);
-
-  // Finances bullet: total revenue vs expense (all time filtered)
-  const finBullet = useMemo(() => {
-    const rev = entries.filter(e => e.type === "revenue" && !e.is_paid).reduce((s: number, e: any) => s + Number(e.amount), 0);
-    const exp = entries.filter(e => e.type === "expense" && !e.is_paid).reduce((s: number, e: any) => s + Number(e.amount), 0);
-    return { rev, exp, balance: rev - exp, maxVal: Math.max(rev, exp, 1) };
-  }, [entries]);
 
   const showUnifiedSidebar = activeModule === "calendar";
 

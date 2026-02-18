@@ -48,7 +48,7 @@ const PRIORITY_CONFIG: Record<string, { label: string; icon: React.ReactNode; co
 
 export default function ProgramsProjectsView() {
   const { user } = useAuth();
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
+  const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(["programs", "projects", "tasks"]));
   const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Tables<"tasks">[]>([]);
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
@@ -363,7 +363,7 @@ export default function ProgramsProjectsView() {
 
     programs.forEach(prog => {
       const projList = programMap.get(prog.id) || [];
-      if (projList.length > 0 || filterStatus === "programs") {
+      if (projList.length > 0 || activeStatuses.has("programs")) {
         groups.push({ program: prog, projects: projList });
       }
     });
@@ -373,7 +373,7 @@ export default function ProgramsProjectsView() {
     }
 
     return groups;
-  }, [visibleProjects, programs, filterStatus]);
+  }, [visibleProjects, programs, activeStatuses]);
 
   // ─── DETAIL VIEW ───
   if (selectedProject) {
@@ -911,34 +911,29 @@ export default function ProgramsProjectsView() {
 
           {/* Filter buttons - below indicators */}
           <div className="flex items-center gap-2 overflow-x-auto">
-            <Button size="sm"
-              variant={filterStatus === "programs" ? "default" : "ghost"}
-              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "programs" && "text-muted-foreground")}
-              onClick={() => setFilterStatus("programs")}
-            >
-              <FolderKanban className="h-3 w-3" /> Programas
-            </Button>
-            <Button size="sm"
-              variant={filterStatus === "projects" ? "default" : "ghost"}
-              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "projects" && "text-muted-foreground")}
-              onClick={() => setFilterStatus("projects")}
-            >
-              <Layers className="h-3 w-3" /> Projeto
-            </Button>
-            <Button size="sm"
-              variant={filterStatus === "tasks" ? "default" : "ghost"}
-              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "tasks" && "text-muted-foreground")}
-              onClick={() => setFilterStatus("tasks")}
-            >
-              <ListTodo className="h-3 w-3" /> Tarefas
-            </Button>
-            <Button size="sm"
-              variant={filterStatus === "all" ? "default" : "ghost"}
-              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "all" && "text-muted-foreground")}
-              onClick={() => setFilterStatus("all")}
-            >
-              Todos
-            </Button>
+            {([
+              { key: "programs", label: "Programas", icon: <FolderKanban className="h-3 w-3" /> },
+              { key: "projects", label: "Projeto", icon: <Layers className="h-3 w-3" /> },
+              { key: "tasks", label: "Tarefas", icon: <ListTodo className="h-3 w-3" /> },
+            ] as const).map(f => {
+              const isActive = activeStatuses.has(f.key);
+              return (
+                <Button key={f.key} size="sm"
+                  variant={isActive ? "default" : "ghost"}
+                  className={cn("h-7 text-xs px-3 rounded-full gap-1.5", !isActive && "text-muted-foreground")}
+                  onClick={() => {
+                    setActiveStatuses(prev => {
+                      const next = new Set(prev);
+                      if (next.has(f.key)) next.delete(f.key); else next.add(f.key);
+                      if (next.size === 0) return new Set(["programs", "projects", "tasks"]);
+                      return next;
+                    });
+                  }}
+                >
+                  {f.icon} {f.label}
+                </Button>
+              );
+            })}
             <div className="ml-auto">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
