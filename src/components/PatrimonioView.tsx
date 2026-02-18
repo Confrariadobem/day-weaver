@@ -1,26 +1,32 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
   Wallet, TrendingUp, TrendingDown, Landmark, CreditCard, PiggyBank,
   BarChart3, AlertTriangle, Lock, ArrowUpRight, ArrowDownRight,
-  Banknote, WalletCards, Bitcoin,
+  Banknote, WalletCards, Bitcoin, Star, Save, Trash2,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 } from "recharts";
-import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 type ProfileFilter = "pessoal" | "profissional" | "tudo";
+type AccountType = "bank_account" | "credit_card" | "investment" | "wallet" | "cash" | "crypto";
 
 const ALLOC_COLORS = ["#3b82f6", "#22c55e", "#a855f7", "#f59e0b", "#ec4899", "#06b6d4", "#ef4444", "#84cc16"];
 
@@ -33,6 +39,15 @@ const ACCOUNT_ICONS: Record<string, React.ReactNode> = {
   crypto: <Bitcoin className="h-4 w-4" />,
 };
 
+const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
+  bank_account: "Conta Bancária",
+  credit_card: "Cartão de Crédito",
+  investment: "Investimento",
+  wallet: "Carteira Digital",
+  cash: "Dinheiro",
+  crypto: "Criptoativos",
+};
+
 export default function PatrimonioView() {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -40,7 +55,19 @@ export default function PatrimonioView() {
   const [investments, setInvestments] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [profileFilter, setProfileFilter] = useState<ProfileFilter>("pessoal");
-  const [hasUpgrade] = useState(true); // User has full access
+  const [hasUpgrade] = useState(true);
+  const lastClickRef = useRef<{ id: string; time: number } | null>(null);
+
+  // Account edit dialog
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any | null>(null);
+  const [accName, setAccName] = useState("");
+  const [accType, setAccType] = useState<AccountType>("bank_account");
+  const [accBalance, setAccBalance] = useState("0");
+  const [accLimit, setAccLimit] = useState("");
+  const [accClosing, setAccClosing] = useState("");
+  const [accDue, setAccDue] = useState("");
+  const [accIsActive, setAccIsActive] = useState(true);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -56,7 +83,12 @@ export default function PatrimonioView() {
     if (projRes.data) setProjects(projRes.data);
   }, [user]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+    const handleDataChanged = () => fetchData();
+    window.addEventListener("lovable:data-changed", handleDataChanged);
+    return () => window.removeEventListener("lovable:data-changed", handleDataChanged);
+  }, [fetchData]);
 
   // Realtime
   useEffect(() => {
@@ -70,6 +102,74 @@ export default function PatrimonioView() {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [user, fetchData]);
+
+  // Account double-click to edit
+  const handleAccountClick = (acc: any) => {
+    const now = Date.now();
+    if (lastClickRef.current?.id === acc.id && now - lastClickRef.current.time < 400) {
+      openAccountEdit(acc);
+      lastClickRef.current = null;
+    } else {
+      lastClickRef.current = { id: acc.id, time: now };
+    }
+  };
+
+  const openAccountEdit = (acc: any) => {
+    setEditingAccount(acc);
+    setAccName(acc.name);
+    setAccType(acc.type as AccountType);
+    setAccBalance(String(acc.current_balance));
+    setAccLimit(acc.credit_limit ? String(acc.credit_limit) : "");
+    setAccClosing(acc.closing_day ? String(acc.closing_day) : "");
+    setAccDue(acc.due_day ? String(acc.due_day) : "");
+    setAccIsActive(acc.is_active !== false);
+    setEditDialogOpen(true);
+  };
+
+  const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
+
+  const saveAccount = async () => {
+    if (!accName.trim() || !user) return;
+    const bal = parseNum(accBalance);
+    const data: any = {
+      name: accName, type: accType,
+      current_balance: bal,
+      credit_limit: accLimit ? parseNum(accLimit) : null,
+      closing_day: accClosing ? parseInt(accClosing) : null,
+      due_day: accDue ? parseInt(accDue) : null,
+      is_active: accIsActive,
+    };
+    if (editingAccount) {
+      await supabase.from("financial_accounts").update(data).eq("id", editingAccount.id);
+    }
+    setEditDialogOpen(false);
+    setEditingAccount(null);
+    fetchData();
+  };
+
+  const toggleDefault = async (acc: any) => {
+    // First unset all defaults for this user's accounts of the same type
+    await supabase.from("financial_accounts").update({ is_default: false } as any).eq("user_id", user!.id).eq("type", acc.type);
+    // Then set this one as default
+    await supabase.from("financial_accounts").update({ is_default: !acc.is_default } as any).eq("id", acc.id);
+    fetchData();
+  };
+
+  // Weekly bullet chart data
+  const weeklyBullet = useMemo(() => {
+    const now = new Date();
+    const weekStart = startOfWeek(now, { locale: ptBR });
+    const weekEnd = endOfWeek(now, { locale: ptBR });
+    const weekEntries = entries.filter(e => {
+      const d = new Date(e.entry_date + "T12:00:00");
+      return d >= weekStart && d <= weekEnd;
+    });
+    const rev = weekEntries.filter(e => e.type === "revenue").reduce((s: number, e: any) => s + Number(e.amount), 0);
+    const exp = weekEntries.filter(e => e.type === "expense").reduce((s: number, e: any) => s + Number(e.amount), 0);
+    const balance = rev - exp;
+    const maxVal = Math.max(rev, exp, 1);
+    return { rev, exp, balance, maxVal };
+  }, [entries]);
 
   // Aggregated metrics
   const metrics = useMemo(() => {
@@ -152,7 +252,7 @@ export default function PatrimonioView() {
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
-        {/* Profile filter */}
+        {/* Profile filter + Bullet Chart */}
         <div className="flex items-center gap-2">
           <Button
             variant={profileFilter === "pessoal" ? "default" : "outline"}
@@ -186,6 +286,28 @@ export default function PatrimonioView() {
           >
             <Lock className="h-3 w-3 mr-1" /> Tudo
           </Button>
+
+          {/* Bullet Chart - weekly cash flow */}
+          <div className="ml-auto flex items-center gap-3" style={{ width: 180, height: 40 }}>
+            <div className="flex-1 relative h-full flex flex-col justify-center gap-0.5">
+              <div className="relative h-3 rounded-full bg-muted/30 overflow-hidden">
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full bg-[hsl(var(--success))]"
+                  style={{ width: `${Math.min(100, (weeklyBullet.rev / weeklyBullet.maxVal) * 100)}%` }}
+                />
+                <div
+                  className="absolute top-0 h-full w-[2px] bg-destructive"
+                  style={{ left: `${Math.min(100, (weeklyBullet.exp / weeklyBullet.maxVal) * 100)}%` }}
+                />
+              </div>
+              <span className={cn(
+                "text-[11px] font-bold tabular-nums",
+                weeklyBullet.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive"
+              )}>
+                {brl(weeklyBullet.balance)}
+              </span>
+            </div>
+          </div>
         </div>
 
         {!hasUpgrade && (
@@ -318,12 +440,20 @@ export default function PatrimonioView() {
         <Card className="bg-card">
           <CardContent className="p-3">
             <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
-              <Landmark className="h-3.5 w-3.5 text-primary" /> Contas e Saldos
+              <Landmark className="h-3.5 w-3.5 text-primary" /> Carteiras e Saldos
             </p>
             {accounts.length > 0 ? (
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {accounts.map(acc => (
-                  <div key={acc.id} className="flex items-center gap-3 rounded-lg border border-border/30 p-3">
+                  <div key={acc.id} className="relative flex items-center gap-3 rounded-lg border border-border/30 p-3 cursor-pointer hover:bg-muted/20 transition-colors"
+                    onClick={() => handleAccountClick(acc)}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleDefault(acc); }}
+                      className="absolute top-2 right-2 p-0.5 rounded hover:bg-accent/50 transition-colors"
+                      title="Favoritar como padrão"
+                    >
+                      <Star className={cn("h-3.5 w-3.5", acc.is_default ? "fill-warning text-warning" : "text-muted-foreground/30")} />
+                    </button>
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
                       {ACCOUNT_ICONS[acc.type] || <Wallet className="h-4 w-4" />}
                     </div>
@@ -342,7 +472,7 @@ export default function PatrimonioView() {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground text-center py-4">Nenhuma conta cadastrada. Adicione contas no módulo Finanças.</p>
+              <p className="text-xs text-muted-foreground text-center py-4">Nenhuma carteira cadastrada. Adicione carteiras na Central de Lançamentos.</p>
             )}
           </CardContent>
         </Card>
@@ -365,6 +495,51 @@ export default function PatrimonioView() {
           </Card>
         )}
       </div>
+
+      {/* Account Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Editar Carteira</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-sm">Nome</Label>
+              <Input value={accName} onChange={(e) => setAccName(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-sm">Tipo</Label>
+              <Select value={accType} onValueChange={(v) => setAccType(v as AccountType)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(ACCOUNT_TYPE_LABELS) as [AccountType, string][]).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm">Saldo Atual</Label>
+              <Input value={accBalance} onChange={(e) => setAccBalance(e.target.value)} />
+            </div>
+            {accType === "credit_card" && (
+              <>
+                <div><Label className="text-sm">Limite</Label><Input value={accLimit} onChange={(e) => setAccLimit(e.target.value)} /></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><Label className="text-sm">Dia Fechamento</Label><Input type="number" value={accClosing} onChange={(e) => setAccClosing(e.target.value)} /></div>
+                  <div><Label className="text-sm">Dia Vencimento</Label><Input type="number" value={accDue} onChange={(e) => setAccDue(e.target.value)} /></div>
+                </div>
+              </>
+            )}
+            <div className="flex items-center gap-2">
+              <Checkbox checked={accIsActive} onCheckedChange={(c) => setAccIsActive(!!c)} id="acc-active" />
+              <label htmlFor="acc-active" className="text-sm">Ativa</label>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end pt-3 border-t border-border/20">
+            <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+            <Button size="sm" onClick={saveAccount} className="gap-1.5"><Save className="h-3.5 w-3.5" /> Salvar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </ScrollArea>
   );
 }
