@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Moon, Sun, Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -241,33 +241,44 @@ export default function PreferencesView() {
     fetchCategories();
   };
 
+  const [activeTab, setActiveTab] = useState("general");
+  const tabs = [
+    { key: "general", label: "Geral" },
+    { key: "calendar", label: "Calendário e Tipos" },
+    { key: "categories", label: "Categorias" },
+    { key: "investments", label: "Investimentos" },
+    { key: "data", label: "Dados" },
+  ];
+
   return (
-    <div className="h-full overflow-auto p-6">
-      <div className="mx-auto max-w-3xl space-y-6">
-        <h1 className="text-2xl font-bold">Preferências</h1>
+    <ScrollArea className="h-full">
+      <div className="p-4 space-y-4">
+        {/* Tab buttons - same pattern as other modules */}
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {tabs.map(tab => (
+            <Button key={tab.key} size="sm"
+              variant={activeTab === tab.key ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== tab.key && "text-muted-foreground")}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </Button>
+          ))}
+        </div>
 
-        <Tabs defaultValue="general" className="w-full">
-          <TabsList className="w-full justify-start">
-            <TabsTrigger value="general">Geral</TabsTrigger>
-            <TabsTrigger value="calendar">Calendário</TabsTrigger>
-            <TabsTrigger value="types">Tipos</TabsTrigger>
-            <TabsTrigger value="categories">Categorias</TabsTrigger>
-            <TabsTrigger value="investments">Investimentos</TabsTrigger>
-            <TabsTrigger value="data">Dados</TabsTrigger>
-          </TabsList>
-
-          {/* ===== GERAL ===== */}
-          <TabsContent value="general" className="space-y-6 mt-4">
+        {/* ===== GERAL ===== */}
+        {activeTab === "general" && (
+          <div className="space-y-4 mx-auto max-w-3xl">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  {theme === "dark" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
                   Aparência
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
-                  <Label>Modo Escuro</Label>
+                  <Label className="text-sm">Modo Escuro</Label>
                   <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} />
                 </div>
               </CardContent>
@@ -275,34 +286,34 @@ export default function PreferencesView() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Globe className="h-5 w-5" /> Idioma e Moeda
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Globe className="h-4 w-4" /> Idioma e Moeda
                 </CardTitle>
-                <CardDescription>Configure o idioma e formato monetário</CardDescription>
+                <CardDescription className="text-xs">Configure o idioma e formato monetário</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3">
                 <div>
-                  <Label>Idioma</Label>
+                  <Label className="text-xs">Idioma</Label>
                   <Select value={language} onValueChange={setLanguage}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="mt-1 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {LANGUAGES.map(l => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label>Moeda</Label>
+                  <Label className="text-xs">Moeda</Label>
                   <Select value={currency} onValueChange={setCurrency}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="mt-1 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {CURRENCIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label>Casas Decimais</Label>
+                  <Label className="text-xs">Casas Decimais</Label>
                   <Select value={decimalPlaces} onValueChange={setDecimalPlaces}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="mt-1 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {DECIMAL_OPTIONS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
                     </SelectContent>
@@ -311,52 +322,60 @@ export default function PreferencesView() {
               </CardContent>
             </Card>
 
-            <Button onClick={savePrefs} className="gap-2">
-              <Save className="h-4 w-4" /> Salvar Preferências
-            </Button>
-          </TabsContent>
+            {/* Footer: Excluir left, Cancelar + Salvar right */}
+            <div className="flex items-center gap-2 pt-2">
+              <div className="flex gap-2 ml-auto">
+                <Button variant="ghost" size="sm">Cancelar</Button>
+                <Button size="sm" onClick={savePrefs} className="gap-1.5">
+                  <Save className="h-3.5 w-3.5" /> Salvar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
-          {/* ===== CALENDÁRIO ===== */}
-          <TabsContent value="calendar" className="space-y-6 mt-4">
+        {/* ===== CALENDÁRIO E TIPOS ===== */}
+        {activeTab === "calendar" && (
+          <div className="space-y-4 mx-auto max-w-3xl">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <CalendarDays className="h-5 w-5" /> Configurações do Calendário
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <CalendarDays className="h-4 w-4" /> Configurações do Calendário
                 </CardTitle>
-                <CardDescription>Personalize sua agenda e visualização</CardDescription>
+                <CardDescription className="text-xs">Personalize sua agenda e visualização</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3">
                 <div>
-                  <Label>Início da semana</Label>
+                  <Label className="text-xs">Início da semana</Label>
                   <Select value={weekStart} onValueChange={setWeekStart}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="mt-1 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {WEEK_STARTS.map(w => <SelectItem key={w.value} value={w.value}>{w.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label>Formato de hora</Label>
+                  <Label className="text-xs">Formato de hora</Label>
                   <Select value={timeFormat} onValueChange={setTimeFormat}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="mt-1 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {TIME_FORMATS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label>Visão padrão</Label>
+                  <Label className="text-xs">Visão padrão</Label>
                   <Select value={defaultView} onValueChange={setDefaultView}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="mt-1 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {DEFAULT_VIEWS.map(v => <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label>Intervalo de horários (agenda)</Label>
+                  <Label className="text-xs">Intervalo de horários (agenda)</Label>
                   <Select value={slotDuration} onValueChange={setSlotDuration}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="mt-1 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {SLOT_DURATIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                     </SelectContent>
@@ -364,42 +383,35 @@ export default function PreferencesView() {
                 </div>
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between">
-                    <Label>Mostrar números das semanas</Label>
+                    <Label className="text-sm">Mostrar números das semanas</Label>
                     <Switch checked={showWeekNumbers} onCheckedChange={setShowWeekNumbers} />
                   </div>
                   <div className="flex items-center justify-between">
-                    <Label>Mostrar resumo financeiro</Label>
+                    <Label className="text-sm">Mostrar resumo financeiro</Label>
                     <Switch checked={showFinancials} onCheckedChange={setShowFinancials} />
                   </div>
                   <div className="flex items-center justify-between">
-                    <Label>Mostrar tarefas concluídas</Label>
+                    <Label className="text-sm">Mostrar tarefas concluídas</Label>
                     <Switch checked={showCompleted} onCheckedChange={setShowCompleted} />
                   </div>
                   <div className="flex items-center justify-between">
-                    <Label>Feriados oficiais do Brasil 🇧🇷</Label>
+                    <Label className="text-sm">Feriados oficiais do Brasil 🇧🇷</Label>
                     <Switch checked={showHolidays} onCheckedChange={setShowHolidays} />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Button onClick={savePrefs} className="gap-2">
-              <Save className="h-4 w-4" /> Salvar Preferências
-            </Button>
-          </TabsContent>
-
-          {/* ===== TIPOS DE LANÇAMENTO ===== */}
-          <TabsContent value="types" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <CalendarDays className="h-5 w-5" /> Tipos de Lançamento
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Tag className="h-4 w-4" /> Tipos de Lançamento
                 </CardTitle>
-                <CardDescription>Tipos disponíveis para lançamentos no calendário e seus filtros de visualização.</CardDescription>
+                <CardDescription className="text-xs">Tipos disponíveis para lançamentos no calendário e filtros de visualização.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                {[
+                  {[
                     { label: "Aniversário", color: "#ec4899", desc: "Datas de aniversário com recorrência anual" },
                     { label: "Evento", color: "#3b82f6", desc: "Compromissos e eventos gerais" },
                     { label: "Fluxo de Caixa", color: "#22c55e", desc: "Contas a pagar e receber" },
@@ -411,7 +423,7 @@ export default function PreferencesView() {
                       <span className="text-primary shrink-0">{LAUNCH_TYPE_ICONS[type.label]}</span>
                       <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: type.color }} />
                       <div className="flex-1 min-w-0">
-                        <span className="font-medium">{type.label}</span>
+                        <span className="text-sm font-medium">{type.label}</span>
                         <p className="text-xs text-muted-foreground">{type.desc}</p>
                       </div>
                     </div>
@@ -419,16 +431,166 @@ export default function PreferencesView() {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          {/* ===== INVESTIMENTOS ===== */}
-          <TabsContent value="investments" className="space-y-6 mt-4">
+            <div className="flex items-center gap-2 pt-2">
+              <div className="flex gap-2 ml-auto">
+                <Button variant="ghost" size="sm">Cancelar</Button>
+                <Button size="sm" onClick={savePrefs} className="gap-1.5">
+                  <Save className="h-3.5 w-3.5" /> Salvar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== CATEGORIAS ===== */}
+        {activeTab === "categories" && (
+          <div className="space-y-4 mx-auto max-w-3xl">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <TrendingUp className="h-5 w-5" /> Tipos de Investimentos
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Tag className="h-4 w-4" /> Categorias
                 </CardTitle>
-                <CardDescription>Tipos de ativos disponíveis para cadastro no módulo de investimentos.</CardDescription>
+                <CardDescription className="text-xs">Categorias unificadas para todos os módulos. Clique duas vezes para editar.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {categories.map((cat) => (
+                    <div
+                      key={cat.id}
+                      onClick={() => handleCatRowClick(cat)}
+                      className="flex items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors cursor-pointer select-none"
+                    >
+                      <span className="text-primary shrink-0">
+                        {CATEGORY_ICON_MAP[cat.icon] || CATEGORY_ICON_MAP["briefcase"]}
+                      </span>
+                      <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: cat.color || "#3b82f6" }} />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium">{cat.name}</span>
+                        {cat.budget_amount > 0 && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            Orçamento: R$ {Number(cat.budget_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs shrink-0">
+                        {cat.is_revenue && <span className="rounded bg-[hsl(var(--success))]/10 px-1.5 py-0.5 text-[hsl(var(--success))]">Receita</span>}
+                        {cat.is_expense && <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-destructive">Despesa</span>}
+                        {cat.is_project && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">Projeto</span>}
+                      </div>
+                    </div>
+                  ))}
+                  {categories.length === 0 && (
+                    <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma categoria cadastrada</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Category Dialog */}
+            <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{editingCat ? "Editar Categoria" : "Nova Categoria"}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-xs">Nome</Label>
+                    <Input value={catName} onChange={(e) => setCatName(e.target.value)} className="mt-1" placeholder="Ex: Alimentação" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Ícone</Label>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {CATEGORY_ICON_KEYS.map((key) => (
+                        <button
+                          key={key}
+                          onClick={() => setCatIcon(key)}
+                          className={cn(
+                            "flex h-10 w-10 items-center justify-center rounded-lg border transition-colors",
+                            catIcon === key ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-muted-foreground text-muted-foreground"
+                          )}
+                        >
+                          {CATEGORY_ICON_MAP[key]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Cor</Label>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {CATEGORY_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => setCatColor(color)}
+                          className={cn(
+                            "h-7 w-7 rounded-full border-2 transition-transform",
+                            catColor === color ? "scale-110 border-foreground" : "border-transparent"
+                          )}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Orçamento Mensal</Label>
+                    <div className="relative mt-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        value={catBudget}
+                        onChange={(e) => setCatBudget(e.target.value.replace(/[^0-9.,]/g, ""))}
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-xs">Usar em</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="font-normal text-sm">Receitas</Label>
+                      <Switch checked={catIsRevenue} onCheckedChange={setCatIsRevenue} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label className="font-normal text-sm">Despesas</Label>
+                      <Switch checked={catIsExpense} onCheckedChange={setCatIsExpense} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label className="font-normal text-sm">Projetos</Label>
+                      <Switch checked={catIsProject} onCheckedChange={setCatIsProject} />
+                    </div>
+                  </div>
+                  {/* Standardized footer: Excluir left, Cancelar + Salvar right */}
+                  <div className="flex items-center gap-2 pt-4 border-t border-border/20">
+                    {editingCat && (
+                      <Button variant="destructive" size="sm" className="gap-1.5"
+                        onClick={() => { deleteCat(editingCat.id); setCatDialogOpen(false); }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Excluir
+                      </Button>
+                    )}
+                    <div className="flex gap-2 ml-auto">
+                      <Button variant="ghost" size="sm" onClick={() => setCatDialogOpen(false)}>Cancelar</Button>
+                      <Button size="sm" onClick={saveCat} className="gap-1.5">
+                        <Save className="h-3.5 w-3.5" /> Salvar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
+
+        {/* ===== INVESTIMENTOS ===== */}
+        {activeTab === "investments" && (
+          <div className="space-y-4 mx-auto max-w-3xl">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <TrendingUp className="h-4 w-4" /> Tipos de Investimentos
+                </CardTitle>
+                <CardDescription className="text-xs">Tipos de ativos disponíveis para cadastro no módulo de investimentos.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -454,44 +616,44 @@ export default function PreferencesView() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <TrendingUp className="h-5 w-5" /> Configurações de Cotações
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <TrendingUp className="h-4 w-4" /> Configurações de Cotações
                 </CardTitle>
-                <CardDescription>Configure a atualização automática de preços</CardDescription>
+                <CardDescription className="text-xs">Configure a atualização automática de preços</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label>Atualização automática de preços (cripto)</Label>
+                  <Label className="text-sm">Atualização automática de preços (cripto)</Label>
                   <Switch defaultChecked />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label>Exibir valores em múltiplas moedas</Label>
+                  <Label className="text-sm">Exibir valores em múltiplas moedas</Label>
                   <Switch defaultChecked />
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-          {/* ===== DADOS ===== */}
-          <TabsContent value="data" className="space-y-6 mt-4">
+        {/* ===== DADOS ===== */}
+        {activeTab === "data" && (
+          <div className="space-y-4 mx-auto max-w-3xl">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base text-destructive">
-                  <Database className="h-5 w-5" /> Gerenciamento de Dados
+                <CardTitle className="flex items-center gap-2 text-sm text-destructive">
+                  <Database className="h-4 w-4" /> Gerenciamento de Dados
                 </CardTitle>
-                <CardDescription>Selecione os módulos que deseja limpar. Clique duas vezes para editar. Esta ação é irreversível.</CardDescription>
+                <CardDescription className="text-xs">Selecione os módulos que deseja limpar. Clique duas vezes para editar. Esta ação é irreversível.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Toggle all */}
                 <div className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/20">
                   <div className="flex items-center gap-2">
-                    <Database className="h-5 w-5 text-muted-foreground" />
+                    <Database className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-semibold">Selecionar Todos</span>
                   </div>
                   <Switch checked={allDataToggled} onCheckedChange={toggleAllData} />
                 </div>
 
-                {/* Individual modules */}
                 {DATA_MODULES.map(mod => (
                   <div
                     key={mod.key}
@@ -512,156 +674,19 @@ export default function PreferencesView() {
               </CardContent>
             </Card>
 
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 justify-end">
-              <Button variant="ghost" size="sm" onClick={() => setDataToggles({})}>Cancelar</Button>
+            {/* Footer: Excluir left pattern - here Limpar is destructive */}
+            <div className="flex items-center gap-2 pt-2">
               <Button variant="destructive" size="sm" className="gap-1.5" onClick={handleClearData}
                 disabled={!DATA_MODULES.some(m => dataToggles[m.key])}>
                 <Trash2 className="h-3.5 w-3.5" /> Limpar
               </Button>
+              <div className="flex gap-2 ml-auto">
+                <Button variant="ghost" size="sm" onClick={() => setDataToggles({})}>Cancelar</Button>
+              </div>
             </div>
-          </TabsContent>
-
-          {/* ===== CATEGORIAS ===== */}
-          <TabsContent value="categories" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader>
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Tag className="h-5 w-5" /> Categorias
-                  </CardTitle>
-                  <CardDescription>Categorias unificadas para todos os módulos. Clique duas vezes para editar. Use a Central de Lançamentos para criar novas categorias.</CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {categories.map((cat) => (
-                    <div
-                      key={cat.id}
-                      onClick={() => handleCatRowClick(cat)}
-                      className="flex items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors cursor-pointer select-none"
-                    >
-                      <span className="text-primary shrink-0">
-                        {CATEGORY_ICON_MAP[cat.icon] || CATEGORY_ICON_MAP["briefcase"]}
-                      </span>
-                      <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: cat.color || "#3b82f6" }} />
-                      <div className="flex-1 min-w-0">
-                        <span className="font-medium">{cat.name}</span>
-                        {cat.budget_amount > 0 && (
-                          <span className="ml-2 text-sm text-muted-foreground">
-                            Orçamento: R$ {Number(cat.budget_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs shrink-0">
-                        {cat.is_revenue && <span className="rounded bg-[hsl(var(--success))]/10 px-1.5 py-0.5 text-[hsl(var(--success))]">Receita</span>}
-                        {cat.is_expense && <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-destructive">Despesa</span>}
-                        {cat.is_project && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">Projeto</span>}
-                      </div>
-                    </div>
-                  ))}
-                  {categories.length === 0 && (
-                    <p className="py-8 text-center text-muted-foreground">Nenhuma categoria cadastrada</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Category Dialog */}
-            <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingCat ? "Editar Categoria" : "Nova Categoria"}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Nome</Label>
-                    <Input value={catName} onChange={(e) => setCatName(e.target.value)} className="mt-1" placeholder="Ex: Alimentação" />
-                  </div>
-                  <div>
-                    <Label>Ícone</Label>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {CATEGORY_ICON_KEYS.map((key) => (
-                        <button
-                          key={key}
-                          onClick={() => setCatIcon(key)}
-                          className={cn(
-                            "flex h-10 w-10 items-center justify-center rounded-lg border transition-colors",
-                            catIcon === key ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-muted-foreground text-muted-foreground"
-                          )}
-                        >
-                          {CATEGORY_ICON_MAP[key]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Cor</Label>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {CATEGORY_COLORS.map((color) => (
-                        <button
-                          key={color}
-                          onClick={() => setCatColor(color)}
-                          className={cn(
-                            "h-7 w-7 rounded-full border-2 transition-transform",
-                            catColor === color ? "scale-110 border-foreground" : "border-transparent"
-                          )}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Orçamento Mensal</Label>
-                    <div className="relative mt-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0,00"
-                        value={catBudget}
-                        onChange={(e) => setCatBudget(e.target.value.replace(/[^0-9.,]/g, ""))}
-                        className="pl-9"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <Label>Usar em</Label>
-                    <div className="flex items-center justify-between">
-                      <Label className="font-normal">Receitas</Label>
-                      <Switch checked={catIsRevenue} onCheckedChange={setCatIsRevenue} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label className="font-normal">Despesas</Label>
-                      <Switch checked={catIsExpense} onCheckedChange={setCatIsExpense} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label className="font-normal">Projetos</Label>
-                      <Switch checked={catIsProject} onCheckedChange={setCatIsProject} />
-                    </div>
-                  </div>
-                  {/* Standardized footer */}
-                  <div className="flex items-center gap-2 pt-4 border-t border-border/20">
-                    {editingCat && (
-                      <Button variant="destructive" size="sm" className="gap-1.5"
-                        onClick={() => { deleteCat(editingCat.id); setCatDialogOpen(false); }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Excluir
-                      </Button>
-                    )}
-                    <div className="flex gap-2 ml-auto">
-                      <Button variant="ghost" size="sm" onClick={() => setCatDialogOpen(false)}>Cancelar</Button>
-                      <Button size="sm" onClick={saveCat} className="gap-1.5">
-                        <Save className="h-3.5 w-3.5" /> Salvar
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </div>
-    </div>
+    </ScrollArea>
   );
 }
