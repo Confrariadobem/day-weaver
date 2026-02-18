@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { useModulePreferences } from "@/hooks/useModulePreferences";
 import { useInvestments, useInvestment, useAddInvestment, type Investment } from "@/hooks/useInvestments";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,6 +60,7 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(INVESTMENT_TYPES.map(t => t.value)));
+  const { visibleTabs } = useModulePreferences("investments");
 
   useEffect(() => { onTabChange?.(activeTab); }, [activeTab, onTabChange]);
 
@@ -276,7 +278,7 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
           onClick={() => setActiveTab("dashboard")}>
           <PieChartIcon className="h-3 w-3" /> Dashboard
         </Button>
-        {INVESTMENT_TYPES.map(t => (
+        {INVESTMENT_TYPES.filter(t => visibleTabs.includes(t.value)).map(t => (
           <Button key={t.value} size="sm" variant={activeTab === t.value ? "default" : "ghost"}
             className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== t.value && "text-muted-foreground")}
             onClick={() => setActiveTab(t.value)}>

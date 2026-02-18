@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useModulePreferences } from "@/hooks/useModulePreferences";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,7 @@ const PRIORITY_CONFIG: Record<string, { label: string; icon: React.ReactNode; co
 export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<ProjectTab>("projects");
+  const { visibleTabs } = useModulePreferences("programs");
 
   useEffect(() => { onTabChange?.(activeTab); }, [activeTab, onTabChange]);
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(["programs", "projects", "tasks"]));
@@ -866,7 +868,7 @@ export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (t
               { key: "programs" as ProjectTab, label: "Programas", icon: <FolderKanban className="h-3 w-3" /> },
               { key: "projects" as ProjectTab, label: "Projetos", icon: <Layers className="h-3 w-3" /> },
               { key: "tasks" as ProjectTab, label: "Tarefas", icon: <ListTodo className="h-3 w-3" /> },
-            ]).map(tab => (
+            ]).filter(tab => visibleTabs.includes(tab.key)).map(tab => (
               <Button key={tab.key} size="sm"
                 variant={activeTab === tab.key ? "default" : "ghost"}
                 className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== tab.key && "text-muted-foreground")}

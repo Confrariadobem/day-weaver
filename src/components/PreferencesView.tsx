@@ -5,15 +5,18 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Moon, Sun, Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp, Plus } from "lucide-react";
+import { Moon, Sun, Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp, Plus, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LAUNCH_TYPE_ICONS, DATA_MODULE_ICONS, CATEGORY_ICON_MAP, CATEGORY_ICON_KEYS, INVESTMENT_TYPE_ICONS } from "@/lib/icons";
+import { MODULE_REGISTRY } from "@/config/moduleRegistry";
+import { useModulePreferences } from "@/hooks/useModulePreferences";
 
 const LANGUAGES = [
   { value: "pt-BR", label: "Português (Brasil)" },
@@ -116,9 +119,10 @@ const INVESTMENT_TYPES = [
   { label: "Outros", color: "#6b7280", desc: "Outros tipos de investimento", key: "other" },
 ];
 
-type PrefTab = "calendar" | "categories" | "investments" | "general" | "data";
+type PrefTab = "calendar" | "categories" | "investments" | "general" | "data" | "modules";
 
 const TABS: { key: PrefTab; label: string; icon: React.ReactNode; color: string }[] = [
+  { key: "modules", label: "Módulos", icon: <Layers className="h-3.5 w-3.5" />, color: "#8b5cf6" },
   { key: "calendar", label: "Calendário", icon: <CalendarDays className="h-3.5 w-3.5" />, color: SECTION_COLORS.calendar },
   { key: "categories", label: "Categorias", icon: <Tag className="h-3.5 w-3.5" />, color: SECTION_COLORS.categories },
   { key: "investments", label: "Investimentos", icon: <TrendingUp className="h-3.5 w-3.5" />, color: SECTION_COLORS.investments },
@@ -130,7 +134,8 @@ export default function PreferencesView() {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<PrefTab>("calendar");
+  const [activeTab, setActiveTab] = useState<PrefTab>("modules");
+  const { prefs, setTabEnabled, saving: moduleSaving } = useModulePreferences();
   const [language, setLanguage] = useState("pt-BR");
   const [currency, setCurrency] = useState("BRL");
   const [decimalPlaces, setDecimalPlaces] = useState("2");
@@ -273,6 +278,48 @@ export default function PreferencesView() {
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4 max-w-3xl mx-auto">
+
+          {/* ═══ MÓDULOS ═══ */}
+          {activeTab === "modules" && (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Ative ou desative abas de cada módulo. Abas com cadeado são obrigatórias.
+              </p>
+              {MODULE_REGISTRY.map((mod) => (
+                <Card key={mod.key}>
+                  <CardContent className="p-4 space-y-2">
+                    <h3 className="text-sm font-semibold">{mod.label}</h3>
+                    <div className="space-y-1.5">
+                      {mod.tabs.map((tab) => {
+                        const enabled = prefs[mod.key]?.abas?.includes(tab.key) ?? true;
+                        return (
+                          <div
+                            key={tab.key}
+                            className="flex items-center justify-between rounded-lg border border-border p-2.5 hover:bg-muted/30 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium">{tab.label}</span>
+                              {tab.locked && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">obrigatória</Badge>
+                              )}
+                            </div>
+                            <Switch
+                              checked={enabled}
+                              disabled={tab.locked}
+                              onCheckedChange={(checked) => {
+                                setTabEnabled(mod.key, tab.key, checked);
+                                toast({ title: "Configuração salva — suas abas foram atualizadas" });
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
           {/* ═══ CALENDÁRIO ═══ */}
           {activeTab === "calendar" && (
