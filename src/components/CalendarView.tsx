@@ -103,6 +103,7 @@ export default function CalendarView() {
   const [countdownName, setCountdownName] = useState("");
   const [countdownDate, setCountdownDate] = useState("");
   const [favoriteFilter, setFavoriteFilter] = useState(false);
+  const [finDeleteDialog, setFinDeleteDialog] = useState<{ open: boolean; entry: any | null }>({ open: false, entry: null });
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -355,6 +356,30 @@ export default function CalendarView() {
   };
 
   const openEdit = (item: CalendarItem) => {
+    // Handle financial entries - delete directly from financial_entries
+    if (item.id.startsWith("fin-") && !item.id.startsWith("fin-rec-")) {
+      const finId = item.id.replace("fin-", "");
+      const finEntry = entries.find((e: any) => e.id === finId);
+      if (finEntry) {
+        // Check if it's a recurrent entry (has installment_group with multiple entries)
+        if (finEntry.installment_group) {
+          setFinDeleteDialog({ open: true, entry: finEntry });
+          return;
+        }
+        setFinDeleteDialog({ open: true, entry: finEntry });
+        return;
+      }
+    }
+    // Handle recurrent financial entries
+    if (item.id.startsWith("fin-rec-")) {
+      const parts = item.id.replace("fin-rec-", "").split("-");
+      const finId = parts.slice(0, -1).join("-");
+      const finEntry = entries.find((e: any) => e.id === finId);
+      if (finEntry) {
+        setFinDeleteDialog({ open: true, entry: finEntry });
+        return;
+      }
+    }
     if (item.id.startsWith("task-")) {
       setEditingItem(null);
       setEditDefaultDate(new Date(item.start_time));
@@ -549,7 +574,58 @@ export default function CalendarView() {
 
       <EventEditDialog open={editDialogOpen} onOpenChange={setEditDialogOpen} item={editingItem} defaultDate={editDefaultDate} userId={user?.id || ""} onSaved={fetchData} />
 
-      {/* Search dialog */}
+      {/* Financial entry delete dialog with recurrence options */}
+      <Dialog open={finDeleteDialog.open} onOpenChange={(o) => setFinDeleteDialog(prev => ({ ...prev, open: o }))}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir lançamento financeiro</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {finDeleteDialog.entry?.installment_group
+              ? "Este lançamento faz parte de uma série. O que deseja excluir?"
+              : `Deseja excluir "${finDeleteDialog.entry?.title}"?`
+            }
+          </p>
+          <div className="flex flex-col gap-2 pt-3 border-t border-border/20">
+            {finDeleteDialog.entry?.installment_group ? (
+              <>
+                <Button variant="outline" size="sm" onClick={async () => {
+                  if (!finDeleteDialog.entry) return;
+                  await supabase.from("financial_entries").delete().eq("id", finDeleteDialog.entry.id);
+                  setFinDeleteDialog({ open: false, entry: null });
+                  fetchData();
+                }}>Este lançamento</Button>
+                <Button variant="outline" size="sm" onClick={async () => {
+                  if (!finDeleteDialog.entry) return;
+                  const group = entries.filter((e: any) =>
+                    e.installment_group === finDeleteDialog.entry.installment_group &&
+                    e.installment_number >= finDeleteDialog.entry.installment_number
+                  );
+                  const ids = group.map((e: any) => e.id);
+                  if (ids.length > 0) await supabase.from("financial_entries").delete().in("id", ids);
+                  setFinDeleteDialog({ open: false, entry: null });
+                  fetchData();
+                }}>Este e futuros</Button>
+                <Button variant="destructive" size="sm" onClick={async () => {
+                  if (!finDeleteDialog.entry) return;
+                  await supabase.from("financial_entries").delete().eq("installment_group", finDeleteDialog.entry.installment_group);
+                  setFinDeleteDialog({ open: false, entry: null });
+                  fetchData();
+                }}>Todos os lançamentos</Button>
+              </>
+            ) : (
+              <Button variant="destructive" size="sm" onClick={async () => {
+                if (!finDeleteDialog.entry) return;
+                await supabase.from("financial_entries").delete().eq("id", finDeleteDialog.entry.id);
+                setFinDeleteDialog({ open: false, entry: null });
+                fetchData();
+              }}>Excluir</Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => setFinDeleteDialog({ open: false, entry: null })}>Cancelar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Pesquisar Eventos</DialogTitle></DialogHeader>
