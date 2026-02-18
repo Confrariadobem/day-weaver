@@ -168,6 +168,8 @@ export default function CalendarView() {
     });
 
     // Financial entries as calendar events (auto-generated, read-only visualization)
+    // Track financial entry titles to deduplicate with calendar_events
+    const finEntryTitles = new Set<string>();
     entries.forEach((fe: any) => {
       if (!fe.entry_date) return;
       const isExpense = fe.type === "expense";
@@ -176,14 +178,15 @@ export default function CalendarView() {
       const amount = Number(fe.amount || 0);
       const amountLabel = amount > 0 ? ` R$ ${amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "";
       const color = isInvestment ? "#a855f7" : isExpense ? "#ef4444" : "#22c55e";
-      const recLabel = fe.recurrence_type ? " ↻" : "";
+      finEntryTitles.add(fe.title.replace(/\s*\(\d+\/\d+\)$/, "").trim());
       items.push({
         id: `fin-${fe.id}`,
-        title: `${fe.title}${amountLabel}${recLabel}`,
+        title: `${fe.title}${amountLabel}`,
         start_time: new Date(`${fe.entry_date}T00:00:00`).toISOString(),
         all_day: true,
         color,
         description: fe.project_id ? `[tipo:cashflow] Projeto vinculado` : `[tipo:cashflow]`,
+        recurrence_rule: fe.recurrence_type || null,
         user_id: fe.user_id,
         is_task: false,
         is_cashflow: true,
@@ -192,34 +195,23 @@ export default function CalendarView() {
         is_project: !!fe.project_id,
         is_favorite: false,
       });
-
-      // Generate recurrent entries
-      if (fe.recurrence_type) {
-        const baseDate = new Date(`${fe.entry_date}T00:00:00`);
-        const endDate = fe.recurrence_end_date ? new Date(`${fe.recurrence_end_date}T00:00:00`) : addMonths(baseDate, 12);
-        let nextDate = getNextRecurrence(baseDate, fe.recurrence_type);
-        let idx = 1;
-        while (nextDate <= endDate && idx < 60) {
-          items.push({
-            id: `fin-rec-${fe.id}-${idx}`,
-            title: `↻ ${fe.title}${amountLabel}`,
-            start_time: nextDate.toISOString(),
-            all_day: true,
-            color,
-            description: `[tipo:cashflow] Recorrente`,
-            user_id: fe.user_id,
-            is_task: false,
-            is_cashflow: true,
-            is_finance: true,
-            is_investment: isInvestment,
-            is_project: !!fe.project_id,
-            is_favorite: false,
-          });
-          nextDate = getNextRecurrence(nextDate, fe.recurrence_type);
-          idx++;
-        }
-      }
     });
+
+    // Remove calendar_events that are duplicates of financial entries (created by old logic)
+    // Filter out calendar events whose base title matches a financial entry
+    const filteredCalItems = items.filter(it => {
+      // Only filter calendar_events (not fin- or task- items)
+      if (it.id.startsWith("fin-") || it.id.startsWith("task-") || it.id.startsWith("holiday-") || it.id.startsWith("inv-")) return true;
+      const baseTitle = it.title.replace(/^💰\s*/, "").replace(/\s*\(\d+\/\d+\)$/, "").trim();
+      const desc = it.description || "";
+      // If it's a cashflow-type calendar event AND matches a financial entry title, skip it
+      if (desc.includes("[tipo:cashflow]") || desc.includes("[tipo:bill]") || desc.includes("[tipo:receivable]")) {
+        if (finEntryTitles.has(baseTitle)) return false;
+      }
+      return true;
+    });
+    items.length = 0;
+    items.push(...filteredCalItems);
 
     // Investment events (purchase + next dividend)
     investments.forEach((inv: any) => {
@@ -359,21 +351,6 @@ export default function CalendarView() {
     // Handle financial entries - delete directly from financial_entries
     if (item.id.startsWith("fin-") && !item.id.startsWith("fin-rec-")) {
       const finId = item.id.replace("fin-", "");
-      const finEntry = entries.find((e: any) => e.id === finId);
-      if (finEntry) {
-        // Check if it's a recurrent entry (has installment_group with multiple entries)
-        if (finEntry.installment_group) {
-          setFinDeleteDialog({ open: true, entry: finEntry });
-          return;
-        }
-        setFinDeleteDialog({ open: true, entry: finEntry });
-        return;
-      }
-    }
-    // Handle recurrent financial entries
-    if (item.id.startsWith("fin-rec-")) {
-      const parts = item.id.replace("fin-rec-", "").split("-");
-      const finId = parts.slice(0, -1).join("-");
       const finEntry = entries.find((e: any) => e.id === finId);
       if (finEntry) {
         setFinDeleteDialog({ open: true, entry: finEntry });

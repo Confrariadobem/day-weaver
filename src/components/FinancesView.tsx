@@ -72,6 +72,70 @@ const getNextBusinessDay = (d: Date) => {
   return result;
 };
 
+// Counterpart autocomplete component
+function CounterpartAutocomplete({ value, onChange, entries }: { value: string; onChange: (v: string) => void; entries: any[] }) {
+  const [showSugg, setShowSugg] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const sugRef = useRef<HTMLDivElement>(null);
+
+  const suggestions = useMemo(() => {
+    const cpMap = new Map<string, number>();
+    entries.forEach((e: any) => {
+      if (e.counterpart) {
+        cpMap.set(e.counterpart, (cpMap.get(e.counterpart) || 0) + 1);
+      }
+    });
+    return Array.from(cpMap.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [entries]);
+
+  const filtered = useMemo(() => {
+    if (!value.trim() || value.length < 2) return [];
+    const q = value.toLowerCase();
+    return suggestions.filter(s => s.name.toLowerCase().includes(q) && s.name.toLowerCase() !== q).slice(0, 6);
+  }, [value, suggestions]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (sugRef.current && !sugRef.current.contains(e.target as Node) &&
+          inputRef.current && !inputRef.current.contains(e.target as Node)) {
+        setShowSugg(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div className="relative">
+      <Input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setShowSugg(true); }}
+        onFocus={() => setShowSugg(true)}
+        placeholder="Nome da contraparte"
+        autoComplete="off"
+      />
+      {showSugg && filtered.length > 0 && (
+        <div ref={sugRef} className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-md border border-border bg-popover shadow-md">
+          {filtered.map((s, i) => (
+            <button
+              key={i}
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent/50 text-left"
+              onClick={() => { onChange(s.name); setShowSugg(false); }}
+            >
+              <span className="flex-1 truncate">{s.name}</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">×{s.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FinancesView() {
   const { user } = useAuth();
   const [entries, setEntries] = useState<any[]>([]);
@@ -266,13 +330,6 @@ export default function FinancesView() {
             counterpart: counterpart || null, is_fixed: isFixed,
           }));
         await supabase.from("financial_entries").insert(entriesToInsert);
-        const calEvents = Array.from({ length: count }, (_, i) => ({
-          user_id: user.id, title: `💰 ${title}`,
-          start_time: getNextDate(baseDate, recurrence, i, recurrenceDateMode).toISOString(),
-          all_day: true, color: type === "revenue" ? "#22c55e" : "#ef4444",
-          description: `Lançamento financeiro: ${brl(baseAmount)} (${type === "revenue" ? "Receita" : "Despesa"})`,
-        }));
-        await supabase.from("calendar_events").insert(calEvents);
       } else {
         const numInst = Math.max(1, parseInt(installments) || 1);
         const instGroup = numInst > 1 ? crypto.randomUUID() : null;
@@ -725,10 +782,14 @@ export default function FinancesView() {
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Contraparte (Recebedor / Pagador)</Label>
-            <Input placeholder="Contraparte" value={counterpart} onChange={(e) => setCounterpart(e.target.value)} />
+            <CounterpartAutocomplete
+              value={counterpart}
+              onChange={setCounterpart}
+              entries={entries}
+            />
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative flex-1">
+            <div className="w-[140px]">
               <Label className="text-xs text-muted-foreground">Valor (R$)</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
@@ -737,7 +798,7 @@ export default function FinancesView() {
                   className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               </div>
             </div>
-            <div className="w-[80px]">
+            <div className="flex-1">
               <Label className="text-xs text-muted-foreground">Tipo</Label>
               <Select value={type} onValueChange={(v) => setType(v as "revenue" | "expense")}>
                 <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>

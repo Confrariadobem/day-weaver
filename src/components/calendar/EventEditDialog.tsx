@@ -103,31 +103,18 @@ const INVESTMENT_TYPES_OPTIONS = [
 ];
 
 // Counterpart autocomplete input component
-function CounterpartInput({ value, onChange, allTitles }: { value: string; onChange: (v: string) => void; allTitles: { title: string; count: number }[] }) {
+function CounterpartInput({ value, onChange, counterpartSuggestions }: { value: string; onChange: (v: string) => void; counterpartSuggestions: { name: string; count: number }[] }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const sugRef = useRef<HTMLDivElement>(null);
 
-  // Also fetch counterpart suggestions from financial_entries
-  const [counterparts, setCounterparts] = useState<{ name: string; count: number }[]>([]);
-  
-  useEffect(() => {
-    // Combine allTitles with counterpart data - we use allTitles as fallback
-    // The parent already fetches financial_entries, we just reuse title data as suggestions
-    const cpMap = new Map<string, number>();
-    allTitles.forEach(t => {
-      cpMap.set(t.title, (cpMap.get(t.title) || 0) + t.count);
-    });
-    setCounterparts(Array.from(cpMap.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count));
-  }, [allTitles]);
-
   const filtered = useMemo(() => {
     if (!value.trim() || value.length < 2) return [];
     const q = value.toLowerCase();
-    return counterparts
+    return counterpartSuggestions
       .filter(c => c.name.toLowerCase().includes(q) && c.name.toLowerCase() !== q)
       .slice(0, 6);
-  }, [value, counterparts]);
+  }, [value, counterpartSuggestions]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -216,6 +203,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const titleInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const [allTitles, setAllTitles] = useState<{ title: string; count: number }[]>([]);
+  const [counterpartSuggestions, setCounterpartSuggestions] = useState<{ name: string; count: number }[]>([]);
 
   // Fetch categories, projects, accounts, and past titles
   useEffect(() => {
@@ -247,11 +235,30 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         .map(([title, count]) => ({ title, count }))
         .sort((a, b) => b.count - a.count);
       setAllTitles(sorted);
+
+      // Build counterpart suggestions from financial_entries
+      const cpMap = new Map<string, number>();
+      finRes.data?.forEach((e: any) => {
+        if (e.counterpart) {
+          cpMap.set(e.counterpart, (cpMap.get(e.counterpart) || 0) + 1);
+        }
+      });
+      setCounterpartSuggestions(
+        Array.from(cpMap.entries())
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count)
+      );
     };
     fetchAll();
   }, [userId, open]);
 
+  // Only reset form when dialog OPENS (open transitions from false to true)
+  const prevOpenRef = useRef(false);
   useEffect(() => {
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (!justOpened) return;
+
     if (item) {
       setTitle(item.title);
       const d = new Date(item.start_time);
@@ -283,17 +290,9 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setIsFavorite(false);
       setStartDate(format(d, "yyyy-MM-dd"));
       setEndDate(format(d, "yyyy-MM-dd"));
-      // Pre-fill times from the clicked time slot
-      const h = d.getHours();
-      if (h > 0 && h < 24) {
-        setStartTime(`${String(h).padStart(2, "0")}:00`);
-        setEndTime(`${String(Math.min(h + 1, 23)).padStart(2, "0")}:00`);
-        setAllDay(false);
-      } else {
-        setStartTime("09:00");
-        setEndTime("10:00");
-        setAllDay(true);
-      }
+      setStartTime("09:00");
+      setEndTime("10:00");
+      setAllDay(true);
       setColor("#3b82f6");
       setRecurrence("none");
       setRecurrenceCount("12");
@@ -498,43 +497,45 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         }
       }
 
-      // Create calendar events
-      if (recurrence !== "none") {
-        const calMaxDate = new Date(startDt.getFullYear(), 11, 31);
-        const count = recurrenceIndeterminate ? 999 : Math.max(1, parseInt(recurrenceCount) || 12);
-        const events = Array.from({ length: count }, (_, i) => {
-          const d = new Date(startDt);
-          if (recurrence === "FREQ=DAILY") d.setDate(d.getDate() + i);
-          else if (recurrence === "FREQ=WEEKLY") d.setDate(d.getDate() + i * 7);
-          else if (recurrence === "FREQ=BIWEEKLY") d.setDate(d.getDate() + i * 14);
-          else if (recurrence === "FREQ=MONTHLY") d.setMonth(d.getMonth() + i);
-          else if (recurrence === "FREQ=QUARTERLY") d.setMonth(d.getMonth() + i * 3);
-          else if (recurrence === "FREQ=SEMIANNUAL") d.setMonth(d.getMonth() + i * 6);
-          else if (recurrence === "FREQ=YEARLY") d.setFullYear(d.getFullYear() + i);
-          if (recurrenceDateMode === "first_business_day" && (recurrence === "FREQ=MONTHLY" || recurrence === "FREQ=QUARTERLY" || recurrence === "FREQ=SEMIANNUAL")) {
-            d.setDate(1);
-            while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
-          }
-          if (recurrenceIndeterminate && d > calMaxDate) return null;
-          return {
-            user_id: userId,
-            title: recurrenceIndeterminate ? title : `${title} (${i + 1}/${count})`,
-            start_time: d.toISOString(),
-            end_time: endDt ? (() => { const ed = new Date(d); ed.setHours(endDt.getHours(), endDt.getMinutes()); return ed.toISOString(); })() : null,
+      // Create calendar events - skip for cashflow/investment since CalendarView renders them from financial_entries
+      if (eventType !== "cashflow" && eventType !== "investment") {
+        if (recurrence !== "none") {
+          const calMaxDate = new Date(startDt.getFullYear(), 11, 31);
+          const count = recurrenceIndeterminate ? 999 : Math.max(1, parseInt(recurrenceCount) || 12);
+          const events = Array.from({ length: count }, (_, i) => {
+            const d = new Date(startDt);
+            if (recurrence === "FREQ=DAILY") d.setDate(d.getDate() + i);
+            else if (recurrence === "FREQ=WEEKLY") d.setDate(d.getDate() + i * 7);
+            else if (recurrence === "FREQ=BIWEEKLY") d.setDate(d.getDate() + i * 14);
+            else if (recurrence === "FREQ=MONTHLY") d.setMonth(d.getMonth() + i);
+            else if (recurrence === "FREQ=QUARTERLY") d.setMonth(d.getMonth() + i * 3);
+            else if (recurrence === "FREQ=SEMIANNUAL") d.setMonth(d.getMonth() + i * 6);
+            else if (recurrence === "FREQ=YEARLY") d.setFullYear(d.getFullYear() + i);
+            if (recurrenceDateMode === "first_business_day" && (recurrence === "FREQ=MONTHLY" || recurrence === "FREQ=QUARTERLY" || recurrence === "FREQ=SEMIANNUAL")) {
+              d.setDate(1);
+              while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+            }
+            if (recurrenceIndeterminate && d > calMaxDate) return null;
+            return {
+              user_id: userId,
+              title: recurrenceIndeterminate ? title : `${title} (${i + 1}/${count})`,
+              start_time: d.toISOString(),
+              end_time: endDt ? (() => { const ed = new Date(d); ed.setHours(endDt.getHours(), endDt.getMinutes()); return ed.toISOString(); })() : null,
+              all_day: allDay, description: descWithMeta, color: typeColor,
+              recurrence_rule: recurrence,
+              task_id: i === 0 ? taskId : null,
+            };
+          }).filter(Boolean);
+          await supabase.from("calendar_events").insert(events as any[]);
+        } else {
+          await supabase.from("calendar_events").insert({
+            user_id: userId, title,
+            start_time: startDt.toISOString(),
+            end_time: endDt?.toISOString() || null,
             all_day: allDay, description: descWithMeta, color: typeColor,
-            recurrence_rule: recurrence,
-            task_id: i === 0 ? taskId : null,
-          };
-        }).filter(Boolean);
-        await supabase.from("calendar_events").insert(events as any[]);
-      } else {
-        await supabase.from("calendar_events").insert({
-          user_id: userId, title,
-          start_time: startDt.toISOString(),
-          end_time: endDt?.toISOString() || null,
-          all_day: allDay, description: descWithMeta, color: typeColor,
-          recurrence_rule: null, task_id: taskId,
-        });
+            recurrence_rule: null, task_id: taskId,
+          });
+        }
       }
     }
 
@@ -782,7 +783,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                   </div>
                   <div>
                     <Label className="text-sm">Contraparte (Recebedor / Pagador)</Label>
-                    <CounterpartInput value={counterpart} onChange={setCounterpart} allTitles={allTitles} />
+                    <CounterpartInput value={counterpart} onChange={setCounterpart} counterpartSuggestions={counterpartSuggestions} />
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
