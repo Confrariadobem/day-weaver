@@ -1627,11 +1627,11 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                           const maxV = Math.max(...vals, 0);
                           const minV = Math.min(...vals, 0);
                           const range = maxV - minV || 1;
-                          const zeroOffset = maxV / range; // 0-1 position of zero line
+                          const zeroOffset = maxV / range;
                           return (
                             <linearGradient id="saldoGradFill" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="hsl(142 76% 26%)" stopOpacity={0.6} />
-                              <stop offset={`${Math.max(0, zeroOffset * 100 - 5)}%`} stopColor="hsl(142 76% 46%)" stopOpacity={0.15} />
+                              <stop offset="0%" stopColor="hsl(217 91% 30%)" stopOpacity={0.6} />
+                              <stop offset={`${Math.max(0, zeroOffset * 100 - 5)}%`} stopColor="hsl(217 91% 55%)" stopOpacity={0.15} />
                               <stop offset={`${zeroOffset * 100}%`} stopColor="hsl(var(--muted))" stopOpacity={0.05} />
                               <stop offset={`${Math.min(100, zeroOffset * 100 + 5)}%`} stopColor="hsl(0 72% 51%)" stopOpacity={0.15} />
                               <stop offset="100%" stopColor="hsl(0 72% 35%)" stopOpacity={0.6} />
@@ -1646,7 +1646,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                           const zeroOffset = maxV / range;
                           return (
                             <linearGradient id="saldoGradStroke" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="hsl(142 76% 30%)" />
+                              <stop offset="0%" stopColor="hsl(217 91% 40%)" />
                               <stop offset={`${zeroOffset * 100}%`} stopColor="hsl(var(--muted-foreground))" />
                               <stop offset="100%" stopColor="hsl(0 72% 45%)" />
                             </linearGradient>
