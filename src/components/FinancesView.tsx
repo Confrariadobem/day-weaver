@@ -1614,18 +1614,40 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               </CardContent>
             </Card>
 
-            {/* Monthly balance trend (area chart) */}
+            {/* Monthly balance trend (area chart with gradient) */}
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm">Saldo Mensal — {doarYear}</CardTitle></CardHeader>
               <CardContent>
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={reportChartData}>
+                      <defs>
+                        <linearGradient id="saldoGradientPos" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#15803d" stopOpacity={0.6} />
+                          <stop offset="40%" stopColor="#22c55e" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#22c55e" stopOpacity={0.02} />
+                        </linearGradient>
+                        <linearGradient id="saldoGradientNeg" x1="0" y1="1" x2="0" y2="0">
+                          <stop offset="0%" stopColor="#991b1b" stopOpacity={0.6} />
+                          <stop offset="40%" stopColor="#ef4444" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#ef4444" stopOpacity={0.02} />
+                        </linearGradient>
+                        <linearGradient id="saldoStroke" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#22c55e" />
+                          <stop offset="50%" stopColor="#94a3b8" />
+                          <stop offset="100%" stopColor="#ef4444" />
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
                       <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                      <Area type="monotone" dataKey="saldo" name="Saldo Mensal" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} strokeWidth={2} />
+                      <Area type="monotone" dataKey="saldo" name="Saldo Mensal" stroke="url(#saldoStroke)" strokeWidth={2.5}
+                        fill="url(#saldoGradientPos)" baseLine={0} />
+                      <Area type="monotone" dataKey={(d: any) => d.saldo < 0 ? d.saldo : 0} name="" stroke="none"
+                        fill="url(#saldoGradientNeg)" baseLine={0} />
+                      {/* Zero reference line */}
+                      <CartesianGrid horizontal={false} vertical={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -1652,21 +1674,49 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               </CardContent>
             </Card>
 
-            {/* Pie charts */}
+            {/* Pie charts - modern donut with separated segments */}
             <div className="grid grid-cols-2 gap-4">
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Categorias — Despesas</CardTitle></CardHeader>
                 <CardContent>
                   {categoryPieData.length > 0 ? (
-                    <div className="h-[220px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={categoryPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} style={{ fontSize: 10 }}>
-                            {categoryPieData.map((d, i) => <Cell key={d.name} fill={d.color || CHART_COLORS[i % CHART_COLORS.length]} />)}
-                          </Pie>
-                          <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                        </PieChart>
-                      </ResponsiveContainer>
+                    <div className="flex items-center gap-4">
+                      <div className="h-[200px] w-[200px] shrink-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <defs>
+                              {categoryPieData.map((d, i) => (
+                                <linearGradient key={`exp-grad-${i}`} id={`expPieGrad${i}`} x1="0" y1="0" x2="1" y2="1">
+                                  <stop offset="0%" stopColor={d.color || CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={1} />
+                                  <stop offset="100%" stopColor={d.color || CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.7} />
+                                </linearGradient>
+                              ))}
+                              <filter id="pieShadow">
+                                <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.25" />
+                              </filter>
+                            </defs>
+                            <Pie data={categoryPieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                              outerRadius={80} innerRadius={40} paddingAngle={3} cornerRadius={4}
+                              stroke="hsl(0 0% 8%)" strokeWidth={2} style={{ filter: "url(#pieShadow)" }}>
+                              {categoryPieData.map((d, i) => <Cell key={d.name} fill={`url(#expPieGrad${i})`} />)}
+                            </Pie>
+                            <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        {categoryPieData.map((d, i) => {
+                          const total = categoryPieData.reduce((s, x) => s + x.value, 0);
+                          const pct = total > 0 ? ((d.value / total) * 100).toFixed(1) : "0";
+                          return (
+                            <div key={d.name} className="flex items-center gap-2 text-xs">
+                              <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color || CHART_COLORS[i % CHART_COLORS.length] }} />
+                              <span className="text-muted-foreground truncate flex-1">{d.name}</span>
+                              <span className="font-medium">{pct}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   ) : <p className="text-xs text-muted-foreground text-center py-8">Sem dados</p>}
                 </CardContent>
@@ -1675,15 +1725,40 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Categorias — Receitas</CardTitle></CardHeader>
                 <CardContent>
                   {revenuePieData.length > 0 ? (
-                    <div className="h-[220px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={revenuePieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} style={{ fontSize: 10 }}>
-                            {revenuePieData.map((d, i) => <Cell key={d.name} fill={d.color || CHART_COLORS[i % CHART_COLORS.length]} />)}
-                          </Pie>
-                          <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                        </PieChart>
-                      </ResponsiveContainer>
+                    <div className="flex items-center gap-4">
+                      <div className="h-[200px] w-[200px] shrink-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <defs>
+                              {revenuePieData.map((d, i) => (
+                                <linearGradient key={`rev-grad-${i}`} id={`revPieGrad${i}`} x1="0" y1="0" x2="1" y2="1">
+                                  <stop offset="0%" stopColor={d.color || CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={1} />
+                                  <stop offset="100%" stopColor={d.color || CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.7} />
+                                </linearGradient>
+                              ))}
+                            </defs>
+                            <Pie data={revenuePieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                              outerRadius={80} innerRadius={40} paddingAngle={3} cornerRadius={4}
+                              stroke="hsl(0 0% 8%)" strokeWidth={2} style={{ filter: "url(#pieShadow)" }}>
+                              {revenuePieData.map((d, i) => <Cell key={d.name} fill={`url(#revPieGrad${i})`} />)}
+                            </Pie>
+                            <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        {revenuePieData.map((d, i) => {
+                          const total = revenuePieData.reduce((s, x) => s + x.value, 0);
+                          const pct = total > 0 ? ((d.value / total) * 100).toFixed(1) : "0";
+                          return (
+                            <div key={d.name} className="flex items-center gap-2 text-xs">
+                              <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color || CHART_COLORS[i % CHART_COLORS.length] }} />
+                              <span className="text-muted-foreground truncate flex-1">{d.name}</span>
+                              <span className="font-medium">{pct}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   ) : <p className="text-xs text-muted-foreground text-center py-8">Sem dados</p>}
                 </CardContent>

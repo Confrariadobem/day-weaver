@@ -255,36 +255,36 @@ export default function PatrimonioView() {
         {/* Profile filter + Bullet Chart */}
         <div className="flex items-center gap-2">
           <Button
-            variant={profileFilter === "pessoal" ? "default" : "outline"}
+            variant={profileFilter === "pessoal" ? "default" : "ghost"}
             size="sm"
             onClick={() => setProfileFilter("pessoal")}
-            className="h-8 text-xs"
+            className={cn("h-7 text-xs px-3 rounded-full", profileFilter !== "pessoal" && "text-muted-foreground")}
           >
             Pessoal
           </Button>
           <Button
-            variant={profileFilter === "profissional" ? "default" : "outline"}
+            variant={profileFilter === "profissional" ? "default" : "ghost"}
             size="sm"
             onClick={() => {
               if (!hasUpgrade) return;
               setProfileFilter("profissional");
             }}
-            className={cn("h-8 text-xs", !hasUpgrade && "opacity-50")}
+            className={cn("h-7 text-xs px-3 rounded-full gap-1.5", profileFilter !== "profissional" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
             disabled={!hasUpgrade}
           >
-            <Lock className="h-3 w-3 mr-1" /> Profissional
+            <Lock className="h-3 w-3" /> Profissional
           </Button>
           <Button
-            variant={profileFilter === "tudo" ? "default" : "outline"}
+            variant={profileFilter === "tudo" ? "default" : "ghost"}
             size="sm"
             onClick={() => {
               if (!hasUpgrade) return;
               setProfileFilter("tudo");
             }}
-            className={cn("h-8 text-xs", !hasUpgrade && "opacity-50")}
+            className={cn("h-7 text-xs px-3 rounded-full gap-1.5", profileFilter !== "tudo" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
             disabled={!hasUpgrade}
           >
-            <Lock className="h-3 w-3 mr-1" /> Tudo
+            <Lock className="h-3 w-3" /> Tudo
           </Button>
 
           {/* Bullet Chart - weekly cash flow */}
@@ -397,19 +397,34 @@ export default function PatrimonioView() {
               </p>
               {metrics.allocation.filter(a => a.value > 0).length > 0 ? (
                 <div className="flex items-center gap-4">
-                  <ResponsiveContainer width={140} height={140}>
+                  <ResponsiveContainer width={160} height={160}>
                     <PieChart>
+                      <defs>
+                        {metrics.allocation.filter(a => a.value > 0).map((a, i) => (
+                          <linearGradient key={`ag-${i}`} id={`allocGrad${i}`} x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor={a.color} stopOpacity={1} />
+                            <stop offset="100%" stopColor={a.color} stopOpacity={0.7} />
+                          </linearGradient>
+                        ))}
+                        <filter id="allocShadow">
+                          <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.25" />
+                        </filter>
+                      </defs>
                       <Pie
                         data={metrics.allocation.filter(a => a.value > 0)}
                         dataKey="value"
                         cx="50%"
                         cy="50%"
-                        outerRadius={60}
-                        innerRadius={30}
-                        strokeWidth={1}
+                        outerRadius={65}
+                        innerRadius={32}
+                        paddingAngle={3}
+                        cornerRadius={4}
+                        stroke="hsl(0 0% 8%)"
+                        strokeWidth={2}
+                        style={{ filter: "url(#allocShadow)" }}
                       >
                         {metrics.allocation.filter(a => a.value > 0).map((a, i) => (
-                          <Cell key={i} fill={a.color} />
+                          <Cell key={i} fill={`url(#allocGrad${i})`} />
                         ))}
                       </Pie>
                       <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
