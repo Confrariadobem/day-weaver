@@ -47,9 +47,11 @@ const PRIORITY_CONFIG: Record<string, { label: string; icon: React.ReactNode; co
   low: { label: "Baixa", icon: <Flag className="h-3 w-3" />, color: "text-[hsl(var(--success))]" },
 };
 
-export default function ProgramsProjectsView() {
+export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<ProjectTab>("projects");
+
+  useEffect(() => { onTabChange?.(activeTab); }, [activeTab, onTabChange]);
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(["programs", "projects", "tasks"]));
   const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Tables<"tasks">[]>([]);

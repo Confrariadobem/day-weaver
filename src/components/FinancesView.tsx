@@ -136,7 +136,7 @@ function CounterpartAutocomplete({ value, onChange, entries }: { value: string; 
   );
 }
 
-export default function FinancesView() {
+export default function FinancesView({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { user } = useAuth();
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<DBTables<"projects">[]>([]);
@@ -147,6 +147,8 @@ export default function FinancesView() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<any | null>(null);
   const [viewTab, setViewTab] = useState<ViewTab>("previsao");
+  
+  useEffect(() => { onTabChange?.(viewTab); }, [viewTab, onTabChange]);
   const [customPeriodEnabled, setCustomPeriodEnabled] = useState(false);
   const [customStart, setCustomStart] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEnd, setCustomEnd] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
