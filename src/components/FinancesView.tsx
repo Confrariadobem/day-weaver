@@ -717,111 +717,158 @@ export default function FinancesView() {
     <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>{editingEntry ? "Editar fluxo de caixa" : "Novo lançamento"}</DialogTitle></DialogHeader>
       <div className="space-y-3">
-        <Input placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <Input placeholder="Contraparte (Recebedor / Pagador)" value={counterpart} onChange={(e) => setCounterpart(e.target.value)} />
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
-            <Input type="text" inputMode="decimal" placeholder="0,00" value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
-              className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+        {/* Identification group */}
+        <div className="rounded-lg border border-border/30 p-3 space-y-3">
+          <div>
+            <Label className="text-xs text-muted-foreground">Título</Label>
+            <Input placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
-          <Select value={type} onValueChange={(v) => setType(v as "revenue" | "expense")}>
-            <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="revenue">🟢 Receita</SelectItem>
-              <SelectItem value="expense">🔴 Despesa</SelectItem>
-            </SelectContent>
-          </Select>
-          {!editingEntry && recurrence === "none" && (
-            <Input type="number" placeholder="Parcelas" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="w-[90px] text-xs" />
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 mb-1">
-          <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday-fin" />
-          <Label htmlFor="allday-fin" className="text-sm">Dia inteiro</Label>
-        </div>
-        <div>
-          <Label className="text-xs text-muted-foreground">Data de vencimento</Label>
-          <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
-        </div>
-        {!editingEntry && (
-          <div className="rounded-lg border border-border/30 p-3 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Repeat className="h-3.5 w-3.5" /> Recorrência
+          <div>
+            <Label className="text-xs text-muted-foreground">Contraparte (Recebedor / Pagador)</Label>
+            <Input placeholder="Contraparte" value={counterpart} onChange={(e) => setCounterpart(e.target.value)} />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Label className="text-xs text-muted-foreground">Valor (R$)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
+                <Input type="text" inputMode="decimal" placeholder="0,00" value={amount}
+                  onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
+                  className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Select value={recurrence} onValueChange={(v) => setRecurrence(v as RecurrenceType)}>
+            <div className="w-[80px]">
+              <Label className="text-xs text-muted-foreground">Tipo</Label>
+              <Select value={type} onValueChange={(v) => setType(v as "revenue" | "expense")}>
                 <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Nenhuma</SelectItem>
-                  <SelectItem value="daily">Diária</SelectItem>
-                  <SelectItem value="weekly">Semanal</SelectItem>
-                  <SelectItem value="biweekly">Quinzenal</SelectItem>
-                  <SelectItem value="monthly">Mensal</SelectItem>
-                  <SelectItem value="quarterly">Trimestral</SelectItem>
-                  <SelectItem value="semiannual">Semestral</SelectItem>
-                  <SelectItem value="yearly">Anual</SelectItem>
+                  <SelectItem value="revenue">🟢 Receita</SelectItem>
+                  <SelectItem value="expense">🔴 Despesa</SelectItem>
                 </SelectContent>
               </Select>
-              {recurrence !== "none" && (
-                <Input type="number" placeholder="Quantidade" min="1" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} className="text-xs" />
-              )}
             </div>
-            {recurrence === "monthly" && (
-              <div className="mt-2">
-                <Label className="text-xs text-muted-foreground mb-1">Repetir na:</Label>
-                <Select value={recurrenceDateMode} onValueChange={(v) => setRecurrenceDateMode(v as RecurrenceDateMode)}>
-                  <SelectTrigger className="text-xs h-8"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="same_date">Mesma data</SelectItem>
-                    <SelectItem value="first_business_day">Primeiro dia útil do mês</SelectItem>
-                  </SelectContent>
-                </Select>
+            {!editingEntry && recurrence === "none" && (
+              <div className="w-[90px]">
+                <Label className="text-xs text-muted-foreground">Qtde. / Parcelas</Label>
+                <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="text-xs" />
               </div>
             )}
           </div>
-        )}
-        <Select value={categoryId} onValueChange={setCategoryId}>
-          <SelectTrigger><SelectValue placeholder="Categoria (opcional)" /></SelectTrigger>
-          <SelectContent>
-            {sortedFinCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={projectId} onValueChange={setProjectId}>
-          <SelectTrigger><SelectValue placeholder="Projeto (opcional)" /></SelectTrigger>
-          <SelectContent>
-            {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        </div>
+
+        {/* Dates & Scheduling group */}
+        <div className="rounded-lg border border-border/30 p-3 space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <Label className="text-xs text-muted-foreground">Vencimento</Label>
+              <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
+            </div>
+            <div className="flex items-center gap-1.5 pt-4">
+              <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday-fin" />
+              <Label htmlFor="allday-fin" className="text-sm whitespace-nowrap">Dia inteiro</Label>
+            </div>
+          </div>
+          {!editingEntry && (
+            <>
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Repeat className="h-3.5 w-3.5" /> Recorrência
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={recurrence} onValueChange={(v) => setRecurrence(v as RecurrenceType)}>
+                  <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma</SelectItem>
+                    <SelectItem value="daily">Diária</SelectItem>
+                    <SelectItem value="weekly">Semanal</SelectItem>
+                    <SelectItem value="biweekly">Quinzenal</SelectItem>
+                    <SelectItem value="monthly">Mensal</SelectItem>
+                    <SelectItem value="quarterly">Trimestral</SelectItem>
+                    <SelectItem value="semiannual">Semestral</SelectItem>
+                    <SelectItem value="yearly">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+                {recurrence !== "none" && (
+                  <Input type="number" placeholder="Quantidade" min="1" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} className="text-xs" />
+                )}
+              </div>
+              {recurrence === "monthly" && (
+                <div className="mt-2">
+                  <Label className="text-xs text-muted-foreground mb-1">Repetir na:</Label>
+                  <Select value={recurrenceDateMode} onValueChange={(v) => setRecurrenceDateMode(v as RecurrenceDateMode)}>
+                    <SelectTrigger className="text-xs h-8"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="same_date">Mesma data</SelectItem>
+                      <SelectItem value="first_business_day">Primeiro dia útil do mês</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Classification group */}
+        <div className="rounded-lg border border-border/30 p-3 space-y-2">
+          <div>
+            <Label className="text-xs text-muted-foreground">Categoria</Label>
+            <Select value={categoryId} onValueChange={setCategoryId}>
+              <SelectTrigger><SelectValue placeholder="Categoria (opcional)" /></SelectTrigger>
+              <SelectContent>
+                {sortedFinCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Projeto</Label>
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger><SelectValue placeholder="Projeto (opcional)" /></SelectTrigger>
+              <SelectContent>
+                {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Payment group */}
         <div className="rounded-lg border border-border/30 p-3 space-y-2">
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <Wallet className="h-3.5 w-3.5" /> Pagamento {isPaid && <span className="text-destructive">*</span>}
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Select value={accountId} onValueChange={setAccountId}>
-              <SelectTrigger className={cn("text-xs", isPaid && !accountId && "border-destructive")}><SelectValue placeholder={isPaid ? "Conta (obrigatório)" : "Conta (opcional)"} /></SelectTrigger>
-              <SelectContent>
-                {accounts.filter(a => a.is_active).map(a => (
-                  <SelectItem key={a.id} value={a.id}>{ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon} {a.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-              <SelectTrigger className={cn("text-xs", isPaid && !paymentMethod && "border-destructive")}><SelectValue placeholder={isPaid ? "Forma Pgto (obrigatório)" : "Forma Pgto"} /></SelectTrigger>
-              <SelectContent>
-                {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div>
+              <Label className="text-xs text-muted-foreground">Carteira</Label>
+              <Select value={accountId} onValueChange={setAccountId}>
+                <SelectTrigger className={cn("text-xs", isPaid && !accountId && "border-destructive")}><SelectValue placeholder={isPaid ? "Conta (obrigatório)" : "Conta (opcional)"} /></SelectTrigger>
+                <SelectContent>
+                  {accounts.filter(a => a.is_active).map(a => (
+                    <SelectItem key={a.id} value={a.id}>
+                      <span className="flex items-center gap-1.5">
+                        {ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon}
+                        {a.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Forma Pgto</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger className={cn("text-xs", isPaid && !paymentMethod && "border-destructive")}><SelectValue placeholder={isPaid ? "Forma Pgto (obrigatório)" : "Forma Pgto"} /></SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid" />
-              <label htmlFor="is-paid" className="text-xs cursor-pointer">Marcar como pago</label>
-            </div>
-            <div className="flex items-center gap-2">
               <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="is-fixed" />
               <label htmlFor="is-fixed" className="text-xs cursor-pointer">Conta fixa</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid" />
+              <label htmlFor="is-paid" className="text-xs cursor-pointer">Baixar conta</label>
             </div>
           </div>
         </div>
@@ -1044,6 +1091,7 @@ export default function FinancesView() {
                     </th>
                     <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("entry_date")}>Data <SortIcon field="entry_date" /></th>
                     <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("title")}>Título <SortIcon field="title" /></th>
+                    <th className="text-left py-2 px-2">Contraparte</th>
                     <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("category")}>Categoria <SortIcon field="category" /></th>
                     <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("type")}>Tipo <SortIcon field="type" /></th>
                     <th className="text-right py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("amount")}>Valor <SortIcon field="amount" /></th>
@@ -1054,7 +1102,7 @@ export default function FinancesView() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={9} className="text-center text-muted-foreground/40 py-12">Sem lançamentos pendentes</td></tr>
+                    <tr><td colSpan={10} className="text-center text-muted-foreground/40 py-12">Sem lançamentos pendentes</td></tr>
                   )}
                   {filtered.map((e, idx) => {
                     const cat = categories.find(c => c.id === e.category_id);
@@ -1086,6 +1134,7 @@ export default function FinancesView() {
                         <td className="py-2.5 px-2">
                           <span>{e.title}</span>
                         </td>
+                        <td className="py-2.5 px-2 text-muted-foreground/60 truncate max-w-[120px]">{e.counterpart || "—"}</td>
                         <td className="py-2.5 px-2 text-muted-foreground/60">{cat?.name || "—"}</td>
                         <td className="py-2.5 px-2">
                           <span className={cn("text-xs font-medium", e.type === "revenue" ? "text-success" : "text-destructive")}>

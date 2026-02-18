@@ -102,6 +102,73 @@ const INVESTMENT_TYPES_OPTIONS = [
   { value: "other", label: "Outros" },
 ];
 
+// Counterpart autocomplete input component
+function CounterpartInput({ value, onChange, allTitles }: { value: string; onChange: (v: string) => void; allTitles: { title: string; count: number }[] }) {
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const sugRef = useRef<HTMLDivElement>(null);
+
+  // Also fetch counterpart suggestions from financial_entries
+  const [counterparts, setCounterparts] = useState<{ name: string; count: number }[]>([]);
+  
+  useEffect(() => {
+    // Combine allTitles with counterpart data - we use allTitles as fallback
+    // The parent already fetches financial_entries, we just reuse title data as suggestions
+    const cpMap = new Map<string, number>();
+    allTitles.forEach(t => {
+      cpMap.set(t.title, (cpMap.get(t.title) || 0) + t.count);
+    });
+    setCounterparts(Array.from(cpMap.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count));
+  }, [allTitles]);
+
+  const filtered = useMemo(() => {
+    if (!value.trim() || value.length < 2) return [];
+    const q = value.toLowerCase();
+    return counterparts
+      .filter(c => c.name.toLowerCase().includes(q) && c.name.toLowerCase() !== q)
+      .slice(0, 6);
+  }, [value, counterparts]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (sugRef.current && !sugRef.current.contains(e.target as Node) &&
+          inputRef.current && !inputRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div className="relative">
+      <Input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setShowSuggestions(true); }}
+        onFocus={() => setShowSuggestions(true)}
+        placeholder="Nome da contraparte"
+        autoComplete="off"
+      />
+      {showSuggestions && filtered.length > 0 && (
+        <div ref={sugRef} className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-md border border-border bg-popover shadow-md">
+          {filtered.map((s, i) => (
+            <button
+              key={i}
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent/50 text-left"
+              onClick={() => { onChange(s.name); setShowSuggestions(false); }}
+            >
+              <span className="flex-1 truncate">{s.name}</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">×{s.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EventEditDialog({ open, onOpenChange, item, defaultDate, userId, onSaved, defaultEventType }: EventEditDialogProps) {
   const [eventType, setEventType] = useState<EventType>("event");
   const [title, setTitle] = useState("");
@@ -623,14 +690,16 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                     </div>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsFavorite(!isFavorite)}
-                  className="shrink-0 p-1 rounded hover:bg-accent/50 transition-colors"
-                  title="Favoritar"
-                >
-                  <Star className={cn("h-5 w-5", isFavorite ? "fill-warning text-warning" : "text-muted-foreground")} />
-                </button>
+                {eventType !== "cashflow" && (
+                  <button
+                    type="button"
+                    onClick={() => setIsFavorite(!isFavorite)}
+                    className="shrink-0 p-1 rounded hover:bg-accent/50 transition-colors"
+                    title="Favoritar"
+                  >
+                    <Star className={cn("h-5 w-5", isFavorite ? "fill-warning text-warning" : "text-muted-foreground")} />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -713,8 +782,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                   </div>
                   <div>
                     <Label className="text-sm">Contraparte (Recebedor / Pagador)</Label>
-                    <Input placeholder="Nome da contraparte" value={counterpart}
-                      onChange={(e) => setCounterpart(e.target.value)} />
+                    <CounterpartInput value={counterpart} onChange={setCounterpart} allTitles={allTitles} />
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
@@ -723,8 +791,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                         onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
                     </div>
                     {!item && recurrence === "none" && (
-                      <div className="w-[90px]">
-                        <Label className="text-sm">Parcelas</Label>
+                      <div className="w-[100px]">
+                        <Label className="text-sm">Qtde. / Parcelas</Label>
                         <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="text-xs" />
                       </div>
                     )}
@@ -753,12 +821,12 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                      <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid-central" />
-                      <label htmlFor="is-paid-central" className="text-xs cursor-pointer">Marcar como pago</label>
-                    </div>
-                    <div className="flex items-center gap-2">
                       <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="is-fixed-central" />
                       <label htmlFor="is-fixed-central" className="text-xs cursor-pointer">Conta fixa</label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid-central" />
+                      <label htmlFor="is-paid-central" className="text-xs cursor-pointer">Baixar conta</label>
                     </div>
                   </div>
                 </div>
@@ -840,35 +908,37 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 </div>
               )}
 
-              {/* ─── Dates group ─── */}
+              {/* ─── Dates & Scheduling group ─── */}
               <div className="space-y-3 rounded-lg border border-border/30 p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
-                  <Label htmlFor="allday" className="text-sm">Dia inteiro</Label>
-                </div>
-
-                {allDay ? (
-                  <div>
-                    <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Data de vencimento</Label>
-                    <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Data de vencimento</Label>
+                <div className="flex items-center gap-3">
+                  {allDay ? (
+                    <div className="flex-1">
+                      <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Vencimento</Label>
                       <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-sm flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Hora início</Label>
-                        <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-                      </div>
-                      <div>
-                        <Label className="text-sm">Hora término</Label>
-                        <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                      </div>
+                  ) : (
+                    <div className="flex-1">
+                      <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Vencimento</Label>
+                      <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                     </div>
-                  </>
+                  )}
+                  <div className="flex items-center gap-1.5 pt-5">
+                    <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
+                    <Label htmlFor="allday" className="text-sm whitespace-nowrap">Dia inteiro</Label>
+                  </div>
+                </div>
+
+                {!allDay && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-sm flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Hora início</Label>
+                      <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Hora término</Label>
+                      <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                    </div>
+                  </div>
                 )}
 
                 <div>
@@ -937,10 +1007,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                     )}
                   </>
                 )}
-              </div>
 
-              {/* ─── Lembrete ─── */}
-              <div className="space-y-3 rounded-lg border border-border/30 p-3">
+                {/* Lembrete - inside dates group */}
                 <div>
                   <Label className="text-sm flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Lembrete</Label>
                   <Select value={reminder} onValueChange={setReminder}>
