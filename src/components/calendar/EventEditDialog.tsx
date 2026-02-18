@@ -138,6 +138,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const [accountId, setAccountId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [isPaid, setIsPaid] = useState(false);
+  const [isFixed, setIsFixed] = useState(false);
+  const [counterpart, setCounterpart] = useState("");
   const [installments, setInstallments] = useState("1");
   const [accounts, setAccounts] = useState<any[]>([]);
 
@@ -243,6 +245,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setAccountId("");
       setPaymentMethod("");
       setIsPaid(false);
+      setIsFixed(false);
+      setCounterpart("");
       setInstallments("1");
     }
   }, [item, defaultDate, open, defaultEventType]);
@@ -362,6 +366,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 installment_group: group, installment_number: i + 1, total_installments: recurrenceIndeterminate ? 0 : count,
                 account_id: accountId || null, payment_method: paymentMethod || null,
                 is_paid: i === 0 ? isPaid : false,
+                counterpart: counterpart || null, is_fixed: isFixed,
                 recurrence_type: recurrence.replace("FREQ=", "").toLowerCase(),
               };
             }).filter(Boolean);
@@ -379,6 +384,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 installment_group: instGroup, installment_number: i + 1, total_installments: numInst,
                 account_id: accountId || null, payment_method: paymentMethod || null,
                 is_paid: i === 0 ? isPaid : false,
+                counterpart: counterpart || null, is_fixed: isFixed,
               };
             });
             await supabase.from("financial_entries").insert(entriesToInsert);
@@ -706,16 +712,23 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                     ><TrendingUp className="h-3.5 w-3.5 inline mr-1" />Receber</button>
                   </div>
                   <div>
-                    <Label className="text-sm">Valor (R$)</Label>
-                    <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
-                      onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
+                    <Label className="text-sm">Contraparte (Recebedor / Pagador)</Label>
+                    <Input placeholder="Nome da contraparte" value={counterpart}
+                      onChange={(e) => setCounterpart(e.target.value)} />
                   </div>
-                  {!item && recurrence === "none" && (
-                    <div>
-                      <Label className="text-sm">Parcelas</Label>
-                      <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} />
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <Label className="text-sm">Valor (R$)</Label>
+                      <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
+                        onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
                     </div>
-                  )}
+                    {!item && recurrence === "none" && (
+                      <div className="w-[90px]">
+                        <Label className="text-sm">Parcelas</Label>
+                        <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="text-xs" />
+                      </div>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label className="text-sm">Carteira</Label>
@@ -738,9 +751,15 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                       </Select>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid-central" />
-                    <label htmlFor="is-paid-central" className="text-xs cursor-pointer">Marcar como pago</label>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid-central" />
+                      <label htmlFor="is-paid-central" className="text-xs cursor-pointer">Marcar como pago</label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="is-fixed-central" />
+                      <label htmlFor="is-fixed-central" className="text-xs cursor-pointer">Conta fixa</label>
+                    </div>
                   </div>
                 </div>
               )}
@@ -829,20 +848,14 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 </div>
 
                 {allDay ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Data início</Label>
-                      <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Data fim</Label>
-                      <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-                    </div>
+                  <div>
+                    <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Data de vencimento</Label>
+                    <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                   </div>
                 ) : (
                   <>
                     <div>
-                      <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Data de início</Label>
+                      <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Data de vencimento</Label>
                       <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                     </div>
                     <div className="grid grid-cols-2 gap-2">

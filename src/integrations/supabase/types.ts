@@ -117,6 +117,7 @@ export type Database = {
           id: string
           initial_balance: number
           is_active: boolean | null
+          is_default: boolean | null
           name: string
           type: string
           updated_at: string
@@ -132,6 +133,7 @@ export type Database = {
           id?: string
           initial_balance?: number
           is_active?: boolean | null
+          is_default?: boolean | null
           name: string
           type?: string
           updated_at?: string
@@ -147,6 +149,7 @@ export type Database = {
           id?: string
           initial_balance?: number
           is_active?: boolean | null
+          is_default?: boolean | null
           name?: string
           type?: string
           updated_at?: string
@@ -159,12 +162,14 @@ export type Database = {
           account_id: string | null
           amount: number
           category_id: string | null
+          counterpart: string | null
           created_at: string
           entry_date: string
           id: string
           installment_group: string | null
           installment_number: number | null
           investment_id: string | null
+          is_fixed: boolean | null
           is_paid: boolean | null
           payment_date: string | null
           payment_method: string | null
@@ -180,12 +185,14 @@ export type Database = {
           account_id?: string | null
           amount: number
           category_id?: string | null
+          counterpart?: string | null
           created_at?: string
           entry_date?: string
           id?: string
           installment_group?: string | null
           installment_number?: number | null
           investment_id?: string | null
+          is_fixed?: boolean | null
           is_paid?: boolean | null
           payment_date?: string | null
           payment_method?: string | null
@@ -201,12 +208,14 @@ export type Database = {
           account_id?: string | null
           amount?: number
           category_id?: string | null
+          counterpart?: string | null
           created_at?: string
           entry_date?: string
           id?: string
           installment_group?: string | null
           installment_number?: number | null
           investment_id?: string | null
+          is_fixed?: boolean | null
           is_paid?: boolean | null
           payment_date?: string | null
           payment_method?: string | null
