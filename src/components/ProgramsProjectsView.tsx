@@ -855,69 +855,6 @@ export default function ProgramsProjectsView() {
     <>
       <ScrollArea className="h-full">
         <div className="p-4 space-y-4">
-          {/* Filter buttons */}
-          <div className="flex items-center gap-2 overflow-x-auto">
-            <Button size="sm"
-              variant={filterStatus === "programs" ? "default" : "ghost"}
-              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "programs" && "text-muted-foreground")}
-              onClick={() => setFilterStatus("programs")}
-            >
-              <FolderKanban className="h-3 w-3" /> Programas
-            </Button>
-            <Button size="sm"
-              variant={filterStatus === "projects" ? "default" : "ghost"}
-              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "projects" && "text-muted-foreground")}
-              onClick={() => setFilterStatus("projects")}
-            >
-              <Layers className="h-3 w-3" /> Projeto
-            </Button>
-            <Button size="sm"
-              variant={filterStatus === "tasks" ? "default" : "ghost"}
-              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "tasks" && "text-muted-foreground")}
-              onClick={() => setFilterStatus("tasks")}
-            >
-              <ListTodo className="h-3 w-3" /> Tarefas
-            </Button>
-            <Button size="sm"
-              variant={filterStatus === "all" ? "default" : "ghost"}
-              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "all" && "text-muted-foreground")}
-              onClick={() => setFilterStatus("all")}
-            >
-              Todos
-            </Button>
-            <div className="ml-auto flex items-center gap-3">
-              {/* Bullet Chart - budget vs cost */}
-              <div className="flex items-center gap-3" style={{ width: 180, height: 40 }}>
-                <div className="flex-1 relative h-full flex flex-col justify-center gap-0.5">
-                  <div className="relative h-3 rounded-full bg-muted/30 overflow-hidden">
-                    <div
-                      className="absolute left-0 top-0 h-full rounded-full bg-[hsl(var(--success))]"
-                      style={{ width: `${kpis.totalBudget > 0 ? Math.min(100, ((kpis.totalBudget - kpis.totalCost) / kpis.totalBudget) * 100) : 0}%` }}
-                    />
-                    <div
-                      className="absolute top-0 h-full w-[2px] bg-destructive"
-                      style={{ left: `${kpis.totalBudget > 0 ? Math.min(100, (kpis.totalCost / kpis.totalBudget) * 100) : 0}%` }}
-                    />
-                  </div>
-                  <span className={cn(
-                    "text-[11px] font-bold tabular-nums",
-                    kpis.totalBudget >= kpis.totalCost ? "text-[hsl(var(--success))]" : "text-destructive"
-                  )}>
-                    {brl(kpis.totalBudget - kpis.totalCost)} disp.
-                  </span>
-                </div>
-              </div>
-              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setProgramDialogOpen(true)}>
-                <Plus className="h-3 w-3" /> Programa
-              </Button>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)}
-                  className="h-7 pl-8 text-xs w-40" />
-              </div>
-            </div>
-          </div>
-
           {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <Card className="bg-card">
@@ -970,6 +907,45 @@ export default function ProgramsProjectsView() {
                 </p>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Filter buttons - below indicators */}
+          <div className="flex items-center gap-2 overflow-x-auto">
+            <Button size="sm"
+              variant={filterStatus === "programs" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "programs" && "text-muted-foreground")}
+              onClick={() => setFilterStatus("programs")}
+            >
+              <FolderKanban className="h-3 w-3" /> Programas
+            </Button>
+            <Button size="sm"
+              variant={filterStatus === "projects" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "projects" && "text-muted-foreground")}
+              onClick={() => setFilterStatus("projects")}
+            >
+              <Layers className="h-3 w-3" /> Projeto
+            </Button>
+            <Button size="sm"
+              variant={filterStatus === "tasks" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "tasks" && "text-muted-foreground")}
+              onClick={() => setFilterStatus("tasks")}
+            >
+              <ListTodo className="h-3 w-3" /> Tarefas
+            </Button>
+            <Button size="sm"
+              variant={filterStatus === "all" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", filterStatus !== "all" && "text-muted-foreground")}
+              onClick={() => setFilterStatus("all")}
+            >
+              Todos
+            </Button>
+            <div className="ml-auto">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)}
+                  className="h-7 pl-8 text-xs w-40" />
+              </div>
+            </div>
           </div>
 
           {/* Project cards grouped by program */}

@@ -235,7 +235,7 @@ export default function FinancesView() {
   const handleRowClick = (entry: any) => {
     const now = Date.now();
     if (lastClickRef.current?.id === entry.id && now - lastClickRef.current.time < 400) {
-      if (entry.installment_group && entry.total_installments > 1) {
+      if ((entry.installment_group && entry.total_installments > 1) || entry.recurrence_type) {
         setRecurrenceEditDialog({ entry, mode: null });
       } else {
         openEditDialog(entry);
@@ -789,7 +789,7 @@ export default function FinancesView() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-[140px]">
+            <div className="flex-1">
               <Label className="text-xs text-muted-foreground">Valor (R$)</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
@@ -968,63 +968,6 @@ export default function FinancesView() {
             {tab.icon} {tab.label}
           </Button>
         ))}
-
-        {/* Action buttons - top right */}
-        <div className="flex items-center gap-1 ml-auto">
-          <Tooltip delayDuration={200}>
-            <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                onClick={() => {
-                  const input = document.createElement("input");
-                  input.type = "file"; input.accept = ".csv";
-                  input.onchange = async (ev: any) => {
-                    const file = ev.target.files?.[0];
-                    if (!file || !user) return;
-                    const text = await file.text();
-                    const lines = text.split("\n").filter(Boolean);
-                    if (lines.length < 2) return;
-                    const rows = lines.slice(1).map(line => {
-                      const cols = line.split(",").map(c => c.replace(/"/g, "").trim());
-                      return {
-                        user_id: user.id, entry_date: cols[0] || format(new Date(), "yyyy-MM-dd"),
-                        title: cols[1] || "Importado", type: cols[2]?.toLowerCase().includes("receita") ? "revenue" as const : "expense" as const,
-                        amount: parseFloat(cols[cols.length - 1]) || 0, is_paid: false,
-                      };
-                    }).filter(r => r.amount > 0);
-                    if (rows.length > 0) {
-                      await supabase.from("financial_entries").insert(rows);
-                      fetchData();
-                    }
-                  };
-                  input.click();
-                }}
-              >
-                <FileDown className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Importar CSV</TooltipContent>
-          </Tooltip>
-          <Tooltip delayDuration={200}>
-            <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                onClick={handleExportCSV}
-              >
-                <FileUp className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Exportar CSV</TooltipContent>
-          </Tooltip>
-          <Tooltip delayDuration={200}>
-            <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                onClick={handlePrint}
-              >
-                <Printer className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Imprimir</TooltipContent>
-          </Tooltip>
-        </div>
       </div>
 
       {/* KPI Cards - Patrimônio pattern */}
@@ -1069,21 +1012,10 @@ export default function FinancesView() {
         {/* ============ FLUXO DE CAIXA ============ */}
         {viewTab === "previsao" && (
           <>
-            {/* Search bar */}
-            <div className="mb-2">
-              <Input
-                placeholder="Pesquisar lançamentos por título ou categoria..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 text-sm bg-transparent border-0 border-b border-border/30 rounded-none focus-visible:ring-0 focus-visible:border-primary/40 placeholder:text-muted-foreground/40"
-              />
-            </div>
-
-            {/* Quick filters + custom period toggle + bulk actions */}
+            {/* Quick filters + search + bulk actions */}
             <div className="mb-3 flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 flex-wrap">
                 {([
-                  { key: "all" as CashFlowFilter, label: "Todos" },
                   { key: "payable" as CashFlowFilter, label: "A Pagar" },
                   { key: "receivable" as CashFlowFilter, label: "A Receber" },
                   { key: "pending" as CashFlowFilter, label: "Pendentes" },
@@ -1094,6 +1026,13 @@ export default function FinancesView() {
                     onClick={() => setCashFlowFilter(f.key)}
                   >{f.label}</Button>
                 ))}
+
+                {/* Todos before Período */}
+                <Button size="sm"
+                  variant={cashFlowFilter === "all" ? "default" : "ghost"}
+                  className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", cashFlowFilter !== "all" && "text-muted-foreground hover:text-foreground")}
+                  onClick={() => setCashFlowFilter("all")}
+                >Todos</Button>
 
                 {/* Custom period toggle */}
                 <Button size="sm"
@@ -1121,7 +1060,6 @@ export default function FinancesView() {
                       className="h-7 px-2.5 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
                       onClick={async () => {
                         const ids = Array.from(selectedIds);
-                        // Batch delete for speed
                         await supabase.from("financial_entries").delete().in("id", ids);
                         setSelectedIds(new Set());
                         fetchData();
@@ -1129,9 +1067,77 @@ export default function FinancesView() {
                     ><Trash2 className="h-3 w-3" /> Excluir</Button>
                   </>
                 )}
+                {/* Import/Export/Print next to delete */}
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        const input = document.createElement("input");
+                        input.type = "file"; input.accept = ".csv";
+                        input.onchange = async (ev: any) => {
+                          const file = ev.target.files?.[0];
+                          if (!file || !user) return;
+                          const text = await file.text();
+                          const lines = text.split("\n").filter(Boolean);
+                          if (lines.length < 2) return;
+                          const rows = lines.slice(1).map(line => {
+                            const cols = line.split(",").map(c => c.replace(/"/g, "").trim());
+                            return {
+                              user_id: user.id, entry_date: cols[0] || format(new Date(), "yyyy-MM-dd"),
+                              title: cols[1] || "Importado", type: cols[2]?.toLowerCase().includes("receita") ? "revenue" as const : "expense" as const,
+                              amount: parseFloat(cols[cols.length - 1]) || 0, is_paid: false,
+                            };
+                          }).filter(r => r.amount > 0);
+                          if (rows.length > 0) {
+                            await supabase.from("financial_entries").insert(rows);
+                            fetchData();
+                          }
+                        };
+                        input.click();
+                      }}
+                    >
+                      <FileDown className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Importar CSV</TooltipContent>
+                </Tooltip>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      onClick={handleExportCSV}
+                    >
+                      <FileUp className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Exportar CSV</TooltipContent>
+                </Tooltip>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      onClick={handlePrint}
+                    >
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Imprimir</TooltipContent>
+                </Tooltip>
+
                 <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
                   {renderEntryDialog()}
                 </Dialog>
+              </div>
+            </div>
+
+            {/* Search bar - matching projects/investments style */}
+            <div className="mb-3">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar lançamentos..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-7 pl-8 text-xs w-56"
+                />
               </div>
             </div>
 

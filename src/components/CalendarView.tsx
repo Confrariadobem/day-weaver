@@ -436,28 +436,6 @@ export default function CalendarView() {
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-        {/* Bullet Chart - weekly cash flow */}
-        <div className="flex items-center gap-3 mr-2" style={{ width: 180, height: 40 }}>
-          <div className="flex-1 relative h-full flex flex-col justify-center gap-0.5">
-            <div className="relative h-3 rounded-full bg-muted/30 overflow-hidden">
-              <div
-                className="absolute left-0 top-0 h-full rounded-full bg-[hsl(var(--success))]"
-                style={{ width: `${Math.min(100, (viewFinSummary.rev / maxFinVal) * 100)}%` }}
-              />
-              <div
-                className="absolute top-0 h-full w-[2px] bg-destructive"
-                style={{ left: `${Math.min(100, (viewFinSummary.exp / maxFinVal) * 100)}%` }}
-              />
-            </div>
-            <span className={cn(
-              "text-[11px] font-bold tabular-nums",
-              viewFinSummary.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive"
-            )}>
-              {brl(viewFinSummary.balance)}
-            </span>
-          </div>
-        </div>
-
         <div className="ml-auto flex items-center gap-2">
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => nav(-1)}>
