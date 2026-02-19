@@ -321,6 +321,7 @@ export type Database = {
           display_name: string | null
           id: string
           language: string | null
+          module_preferences: Json | null
           theme_preference: string | null
           updated_at: string
           user_id: string
@@ -333,6 +334,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           language?: string | null
+          module_preferences?: Json | null
           theme_preference?: string | null
           updated_at?: string
           user_id: string
@@ -345,6 +347,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           language?: string | null
+          module_preferences?: Json | null
           theme_preference?: string | null
           updated_at?: string
           user_id?: string

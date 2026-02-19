@@ -12,10 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Moon, Sun, Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp, Plus, Layers } from "lucide-react";
+import { Moon, Sun, Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp, Plus, DollarSign, FolderKanban, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LAUNCH_TYPE_ICONS, DATA_MODULE_ICONS, CATEGORY_ICON_MAP, CATEGORY_ICON_KEYS, INVESTMENT_TYPE_ICONS } from "@/lib/icons";
-import { MODULE_REGISTRY } from "@/config/moduleRegistry";
+import { MODULE_REGISTRY, getModuleDef } from "@/config/moduleRegistry";
 import { useModulePreferences } from "@/hooks/useModulePreferences";
 
 const LANGUAGES = [
@@ -85,6 +85,8 @@ const SECTION_COLORS: Record<string, string> = {
   calendar: CALENDAR_PALETTE.events,
   categories: CALENDAR_PALETTE.cashflow,
   investments: CALENDAR_PALETTE.investments,
+  finances: CALENDAR_PALETTE.cashflow,
+  projects: CALENDAR_PALETTE.projects,
   data: "#ef4444",
   general: CALENDAR_PALETTE.events,
 };
@@ -119,22 +121,97 @@ const INVESTMENT_TYPES = [
   { label: "Outros", color: "#6b7280", desc: "Outros tipos de investimento", key: "other" },
 ];
 
-type PrefTab = "calendar" | "categories" | "investments" | "general" | "data" | "modules";
+// Calendar view modes mapped to module tabs
+const CALENDAR_VIEWS = [
+  { key: "monthly", label: "Mensal", desc: "Visualização mensal do calendário", locked: true },
+  { key: "today", label: "Diário", desc: "Visualização do dia atual" },
+  { key: "3days", label: "3 Dias", desc: "Visualização de três dias" },
+  { key: "weekly", label: "Semanal", desc: "Visualização semanal completa" },
+  { key: "yearly", label: "Anual", desc: "Visualização anual resumida" },
+];
+
+// Finance tabs
+const FINANCE_TABS = [
+  { key: "previsao", label: "Fluxo de Caixa", desc: "Previsão de receitas e despesas", locked: true },
+  { key: "indicadores", label: "Indicadores", desc: "Gráficos e indicadores financeiros" },
+  { key: "doar", label: "DOAR", desc: "Demonstração de Origens e Aplicações" },
+];
+
+// Project tabs
+const PROJECT_TABS = [
+  { key: "projects", label: "Projetos", desc: "Lista de projetos pessoais e profissionais", locked: true },
+  { key: "dashboard", label: "Dashboard", desc: "Visão geral e métricas de projetos" },
+  { key: "programs", label: "Programas", desc: "Agrupamento de projetos em programas" },
+  { key: "tasks", label: "Tarefas", desc: "Tarefas avulsas e vinculadas a projetos" },
+];
+
+type PrefTab = "calendar" | "categories" | "investments" | "finances" | "projects" | "general" | "data";
 
 const TABS: { key: PrefTab; label: string; icon: React.ReactNode; color: string }[] = [
-  { key: "modules", label: "Módulos", icon: <Layers className="h-3.5 w-3.5" />, color: "#8b5cf6" },
   { key: "calendar", label: "Calendário", icon: <CalendarDays className="h-3.5 w-3.5" />, color: SECTION_COLORS.calendar },
   { key: "categories", label: "Categorias", icon: <Tag className="h-3.5 w-3.5" />, color: SECTION_COLORS.categories },
+  { key: "finances", label: "Finanças", icon: <DollarSign className="h-3.5 w-3.5" />, color: SECTION_COLORS.finances },
   { key: "investments", label: "Investimentos", icon: <TrendingUp className="h-3.5 w-3.5" />, color: SECTION_COLORS.investments },
+  { key: "projects", label: "Projetos", icon: <FolderKanban className="h-3.5 w-3.5" />, color: SECTION_COLORS.projects },
   { key: "general", label: "Geral", icon: <Globe className="h-3.5 w-3.5" />, color: SECTION_COLORS.general },
   { key: "data", label: "Dados", icon: <Database className="h-3.5 w-3.5" />, color: SECTION_COLORS.data },
 ];
+
+/** Reusable row with optional toggle switch */
+function ToggleRow({
+  icon,
+  iconColor,
+  colorDot,
+  label,
+  desc,
+  enabled,
+  locked,
+  onToggle,
+  onDoubleClick,
+}: {
+  icon?: React.ReactNode;
+  iconColor?: string;
+  colorDot?: string;
+  label: string;
+  desc?: string;
+  enabled?: boolean;
+  locked?: boolean;
+  onToggle?: (checked: boolean) => void;
+  onDoubleClick?: () => void;
+}) {
+  return (
+    <div
+      onDoubleClick={onDoubleClick}
+      className="flex items-center gap-3 rounded-lg border border-border/40 p-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none"
+    >
+      {icon && <span className="shrink-0" style={{ color: iconColor }}>{icon}</span>}
+      {colorDot && <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: colorDot }} />}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-medium">{label}</p>
+          {locked && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-border/40">obrigatória</Badge>
+          )}
+        </div>
+        {desc && <p className="text-[11px] text-muted-foreground">{desc}</p>}
+      </div>
+      {onToggle !== undefined && (
+        <Switch
+          checked={enabled}
+          disabled={locked}
+          onCheckedChange={onToggle}
+          onClick={(e) => e.stopPropagation()}
+        />
+      )}
+    </div>
+  );
+}
 
 export default function PreferencesView() {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<PrefTab>("modules");
+  const [activeTab, setActiveTab] = useState<PrefTab>("calendar");
   const { prefs, setTabEnabled, saving: moduleSaving } = useModulePreferences();
   const [language, setLanguage] = useState("pt-BR");
   const [currency, setCurrency] = useState("BRL");
@@ -163,7 +240,6 @@ export default function PreferencesView() {
   const [dataEditDialog, setDataEditDialog] = useState<{ open: boolean; key: string; label: string } | null>(null);
   const [calEditDialog, setCalEditDialog] = useState<{ open: boolean; label: string; color: string } | null>(null);
   const [invEditDialog, setInvEditDialog] = useState<{ open: boolean; label: string; color: string } | null>(null);
-
 
   useEffect(() => {
     if (!user) return;
@@ -258,6 +334,20 @@ export default function PreferencesView() {
     fetchCategories();
   };
 
+  const handleModuleToggle = (moduleKey: string, tabKey: string, checked: boolean) => {
+    setTabEnabled(moduleKey, tabKey, checked);
+    toast({ title: "Configuração salva — suas abas foram atualizadas" });
+  };
+
+  const isTabOn = (moduleKey: string, tabKey: string) => {
+    return prefs[moduleKey]?.abas?.includes(tabKey) ?? true;
+  };
+
+  const isTabLocked = (moduleKey: string, tabKey: string) => {
+    const mod = getModuleDef(moduleKey);
+    return mod?.tabs.find(t => t.key === tabKey)?.locked ?? false;
+  };
+
   return (
     <div className="flex h-full flex-col">
       {/* Tab bar */}
@@ -279,69 +369,44 @@ export default function PreferencesView() {
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4 max-w-3xl mx-auto">
 
-          {/* ═══ MÓDULOS ═══ */}
-          {activeTab === "modules" && (
-            <div className="space-y-4">
-              <p className="text-xs text-muted-foreground">
-                Ative ou desative abas de cada módulo. Abas com cadeado são obrigatórias.
-              </p>
-              {MODULE_REGISTRY.map((mod) => (
-                <Card key={mod.key}>
-                  <CardContent className="p-4 space-y-2">
-                    <h3 className="text-sm font-semibold">{mod.label}</h3>
-                    <div className="space-y-1.5">
-                      {mod.tabs.map((tab) => {
-                        const enabled = prefs[mod.key]?.abas?.includes(tab.key) ?? true;
-                        return (
-                          <div
-                            key={tab.key}
-                            className="flex items-center justify-between rounded-lg border border-border p-2.5 hover:bg-muted/30 transition-colors"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium">{tab.label}</span>
-                              {tab.locked && (
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">obrigatória</Badge>
-                              )}
-                            </div>
-                            <Switch
-                              checked={enabled}
-                              disabled={tab.locked}
-                              onCheckedChange={(checked) => {
-                                setTabEnabled(mod.key, tab.key, checked);
-                                toast({ title: "Configuração salva — suas abas foram atualizadas" });
-                              }}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-
           {/* ═══ CALENDÁRIO ═══ */}
           {activeTab === "calendar" && (
             <div className="space-y-3">
+              {/* Tipos de lançamento */}
+              <p className="text-xs text-muted-foreground">Tipos de lançamento do calendário. Clique duas vezes para editar.</p>
               <div className="space-y-1.5">
                 {LAUNCH_TYPES.map((type) => (
-                  <div
+                  <ToggleRow
                     key={type.label}
+                    icon={LAUNCH_TYPE_ICONS[type.label]}
+                    iconColor={type.color}
+                    colorDot={type.color}
+                    label={type.label}
+                    desc={type.desc}
                     onDoubleClick={() => setCalEditDialog({ open: true, label: type.label, color: type.color })}
-                    className="flex items-center gap-3 rounded-lg border border-border p-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none"
-                  >
-                    <span className="shrink-0" style={{ color: type.color }}>{LAUNCH_TYPE_ICONS[type.label]}</span>
-                    <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: type.color }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium">{type.label}</p>
-                      <p className="text-[11px] text-muted-foreground">{type.desc}</p>
-                    </div>
-                  </div>
+                  />
                 ))}
               </div>
 
-              <Card>
+              {/* Visualizações (module tabs) */}
+              <p className="text-xs text-muted-foreground pt-2">Visualizações disponíveis no calendário.</p>
+              <div className="space-y-1.5">
+                {CALENDAR_VIEWS.map((view) => (
+                  <ToggleRow
+                    key={view.key}
+                    icon={<Eye className="h-5 w-5" />}
+                    iconColor="hsl(var(--muted-foreground))"
+                    label={view.label}
+                    desc={view.desc}
+                    enabled={isTabOn("calendar", view.key)}
+                    locked={view.locked}
+                    onToggle={(checked) => handleModuleToggle("calendar", view.key, checked)}
+                  />
+                ))}
+              </div>
+
+              {/* Settings */}
+              <Card className="border-border/40">
                 <CardContent className="p-4 space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -410,7 +475,7 @@ export default function PreferencesView() {
                   <div
                     key={cat.id}
                     onDoubleClick={() => openEditCat(cat)}
-                    className="flex items-center gap-3 rounded-lg border border-border p-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none"
+                    className="flex items-center gap-3 rounded-lg border border-border/40 p-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none"
                   >
                     <span className="shrink-0" style={{ color: cat.color || "#3b82f6" }}>
                       {CATEGORY_ICON_MAP[cat.icon] || CATEGORY_ICON_MAP["briefcase"]}
@@ -437,30 +502,60 @@ export default function PreferencesView() {
             </div>
           )}
 
+          {/* ═══ FINANÇAS ═══ */}
+          {activeTab === "finances" && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">Abas e configurações do módulo financeiro.</p>
+              <div className="space-y-1.5">
+                {FINANCE_TABS.map((tab) => (
+                  <ToggleRow
+                    key={tab.key}
+                    icon={<DollarSign className="h-5 w-5" />}
+                    iconColor={SECTION_COLORS.finances}
+                    label={tab.label}
+                    desc={tab.desc}
+                    enabled={isTabOn("finances", tab.key)}
+                    locked={tab.locked}
+                    onToggle={(checked) => handleModuleToggle("finances", tab.key, checked)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ═══ INVESTIMENTOS ═══ */}
           {activeTab === "investments" && (
             <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">Tipos de ativos disponíveis e configurações de cotações automáticas.</p>
+              <p className="text-xs text-muted-foreground">Tipos de ativos e configurações. Clique duas vezes para editar.</p>
               <div className="space-y-1.5">
+                {/* Dashboard tab (locked) */}
+                <ToggleRow
+                  icon={<TrendingUp className="h-5 w-5" />}
+                  iconColor={SECTION_COLORS.investments}
+                  label="Dashboard"
+                  desc="Visão geral e métricas dos investimentos"
+                  enabled={isTabOn("investments", "dashboard")}
+                  locked={isTabLocked("investments", "dashboard")}
+                  onToggle={(checked) => handleModuleToggle("investments", "dashboard", checked)}
+                />
+                {/* Investment types with toggles */}
                 {INVESTMENT_TYPES.map((type) => (
-                  <div
+                  <ToggleRow
                     key={type.key}
+                    icon={INVESTMENT_TYPE_ICONS[type.key] || <TrendingUp className="h-5 w-5" />}
+                    iconColor={type.color}
+                    colorDot={type.color}
+                    label={type.label}
+                    desc={type.desc}
+                    enabled={isTabOn("investments", type.key)}
+                    locked={isTabLocked("investments", type.key)}
+                    onToggle={(checked) => handleModuleToggle("investments", type.key, checked)}
                     onDoubleClick={() => setInvEditDialog({ open: true, label: type.label, color: type.color })}
-                    className="flex items-center gap-3 rounded-lg border border-border p-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none"
-                  >
-                    <span className="shrink-0" style={{ color: type.color }}>
-                      {INVESTMENT_TYPE_ICONS[type.key] || <TrendingUp className="h-5 w-5" />}
-                    </span>
-                    <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: type.color }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium">{type.label}</p>
-                      <p className="text-[11px] text-muted-foreground">{type.desc}</p>
-                    </div>
-                  </div>
+                  />
                 ))}
               </div>
 
-              <Card>
+              <Card className="border-border/40">
                 <CardContent className="p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs">Atualização automática de preços (cripto)</Label>
@@ -475,11 +570,32 @@ export default function PreferencesView() {
             </div>
           )}
 
+          {/* ═══ PROJETOS ═══ */}
+          {activeTab === "projects" && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">Abas e configurações do módulo de projetos.</p>
+              <div className="space-y-1.5">
+                {PROJECT_TABS.map((tab) => (
+                  <ToggleRow
+                    key={tab.key}
+                    icon={<FolderKanban className="h-5 w-5" />}
+                    iconColor={SECTION_COLORS.projects}
+                    label={tab.label}
+                    desc={tab.desc}
+                    enabled={isTabOn("programs", tab.key)}
+                    locked={tab.locked}
+                    onToggle={(checked) => handleModuleToggle("programs", tab.key, checked)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ═══ GERAL ═══ */}
           {activeTab === "general" && (
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">Aparência, idioma, moeda e formato numérico.</p>
-              <Card>
+              <Card className="border-border/40">
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs flex items-center gap-2">
@@ -531,7 +647,7 @@ export default function PreferencesView() {
               <p className="text-xs text-muted-foreground">Selecione os módulos que deseja limpar. Clique duas vezes para editar. Esta ação é irreversível.</p>
 
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between rounded-lg border border-border p-2.5 bg-muted/20">
+                <div className="flex items-center justify-between rounded-lg border border-border/40 p-2.5 bg-muted/20">
                   <div className="flex items-center gap-2">
                     <Database className="h-4 w-4 text-muted-foreground" />
                     <span className="text-xs font-semibold">Selecionar Todos</span>
@@ -540,24 +656,16 @@ export default function PreferencesView() {
                 </div>
 
                 {DATA_MODULES.map(mod => (
-                  <div
+                  <ToggleRow
                     key={mod.key}
+                    icon={DATA_MODULE_ICONS[mod.key]}
+                    iconColor={CALENDAR_PALETTE.events}
+                    label={mod.label}
+                    desc={mod.desc}
+                    enabled={!!dataToggles[mod.key]}
+                    onToggle={() => setDataToggles(prev => ({ ...prev, [mod.key]: !prev[mod.key] }))}
                     onDoubleClick={() => setDataEditDialog({ open: true, key: mod.key, label: mod.label })}
-                    className="flex items-center justify-between rounded-lg border border-border p-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none"
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span style={{ color: CALENDAR_PALETTE.events }}>{DATA_MODULE_ICONS[mod.key]}</span>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium">{mod.label}</p>
-                        <p className="text-[11px] text-muted-foreground">{mod.desc}</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={!!dataToggles[mod.key]}
-                      onCheckedChange={() => setDataToggles(prev => ({ ...prev, [mod.key]: !prev[mod.key] }))}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </div>
+                  />
                 ))}
               </div>
 
@@ -592,7 +700,7 @@ export default function PreferencesView() {
                 {CATEGORY_ICON_KEYS.map((key) => (
                   <button key={key} onClick={() => setCatIcon(key)}
                     className={cn("flex h-9 w-9 items-center justify-center rounded-lg border transition-colors",
-                      catIcon === key ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-muted-foreground text-muted-foreground"
+                      catIcon === key ? "border-primary bg-primary/10 text-primary" : "border-border/40 hover:border-muted-foreground text-muted-foreground"
                     )}>{CATEGORY_ICON_MAP[key]}</button>
                 ))}
               </div>
