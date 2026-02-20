@@ -106,12 +106,43 @@ export type Database = {
         }
         Relationships: []
       }
+      cost_centers: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       financial_accounts: {
         Row: {
           closing_day: number | null
           color: string | null
           created_at: string
           credit_limit: number | null
+          currency: string | null
           current_balance: number
           due_day: number | null
           id: string
@@ -128,6 +159,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           credit_limit?: number | null
+          currency?: string | null
           current_balance?: number
           due_day?: number | null
           id?: string
@@ -144,6 +176,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           credit_limit?: number | null
+          currency?: string | null
           current_balance?: number
           due_day?: number | null
           id?: string
@@ -162,9 +195,11 @@ export type Database = {
           account_id: string | null
           amount: number
           category_id: string | null
+          cost_center_id: string | null
           counterpart: string | null
           created_at: string
           entry_date: string
+          has_split: boolean | null
           id: string
           installment_group: string | null
           installment_number: number | null
@@ -185,9 +220,11 @@ export type Database = {
           account_id?: string | null
           amount: number
           category_id?: string | null
+          cost_center_id?: string | null
           counterpart?: string | null
           created_at?: string
           entry_date?: string
+          has_split?: boolean | null
           id?: string
           installment_group?: string | null
           installment_number?: number | null
@@ -208,9 +245,11 @@ export type Database = {
           account_id?: string | null
           amount?: number
           category_id?: string | null
+          cost_center_id?: string | null
           counterpart?: string | null
           created_at?: string
           entry_date?: string
+          has_split?: boolean | null
           id?: string
           installment_group?: string | null
           installment_number?: number | null
@@ -311,6 +350,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      payment_splits: {
+        Row: {
+          account_id: string | null
+          amount: number
+          created_at: string
+          entry_id: string
+          id: string
+          notes: string | null
+          paid_at: string | null
+          payment_method: string | null
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          created_at?: string
+          entry_id: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          created_at?: string
+          entry_id?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_splits_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "financial_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_splits_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "financial_entries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash, Star, Wallet, Repeat, Cake, CalendarDays, TrendingUp, FolderKanban, CircleDollarSign, Building2, Plus, X, SplitSquareVertical, Receipt } from "lucide-react";
+import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash, Star, Wallet, Repeat, Cake, CalendarDays, TrendingUp, FolderKanban, CircleDollarSign, Building2, Plus, X, SplitSquareVertical, Receipt, Home, Car } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -45,24 +45,28 @@ interface EventEditDialogProps {
   defaultEventType?: EventType;
 }
 
-type EventType = "birthday" | "event" | "cashflow" | "investment" | "project" | "patrimonio" | "programa";
+type EventType = "birthday" | "event" | "cashflow" | "investment" | "carteira" | "patrimonio" | "programa" | "project" | "centro_custo";
 
 const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
   birthday: <Cake className="h-3.5 w-3.5" />,
-  event: <CalendarDays className="h-3.5 w-3.5" />,
+  carteira: <Wallet className="h-3.5 w-3.5" />,
   cashflow: <CircleDollarSign className="h-3.5 w-3.5" />,
+  centro_custo: <Tag className="h-3.5 w-3.5" />,
+  event: <CalendarDays className="h-3.5 w-3.5" />,
   investment: <TrendingUp className="h-3.5 w-3.5" />,
-  patrimonio: <Building2 className="h-3.5 w-3.5" />,
+  patrimonio: <Home className="h-3.5 w-3.5" />,
   programa: <FolderKanban className="h-3.5 w-3.5" />,
   project: <FolderKanban className="h-3.5 w-3.5" />,
 };
 
 const EVENT_TYPES_UNSORTED: { value: EventType; label: string; color: string }[] = [
   { value: "birthday", label: "Aniversário", color: "#ec4899" },
-  { value: "event", label: "Evento", color: "#3b82f6" },
+  { value: "carteira", label: "Carteira", color: "#8b5cf6" },
   { value: "cashflow", label: "Fluxo de Caixa", color: "#22c55e" },
+  { value: "centro_custo", label: "Centro de Custo", color: "#06b6d4" },
+  { value: "event", label: "Evento", color: "#3b82f6" },
   { value: "investment", label: "Investimento", color: "#d4a017" },
-  { value: "patrimonio", label: "Patrimônio", color: "#8b5cf6" },
+  { value: "patrimonio", label: "Patrimônio", color: "#f97316" },
   { value: "programa", label: "Programa", color: "#06b6d4" },
   { value: "project", label: "Projeto", color: "#eab308" },
 ];
@@ -114,12 +118,21 @@ const ACCOUNT_TYPES = [
   { value: "wallet", label: "Carteira Digital" },
 ].sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
 
+const PATRIMONIO_TYPES = [
+  { value: "imovel", label: "Imóvel" },
+  { value: "veiculo", label: "Veículo" },
+  { value: "terreno", label: "Terreno" },
+  { value: "outro", label: "Outro" },
+].sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+
 interface SplitLine {
   id: string;
   accountId: string;
   paymentMethod: string;
   amount: string;
 }
+
+const CC_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
 // Counterpart autocomplete input component
 function CounterpartInput({ value, onChange, counterpartSuggestions }: { value: string; onChange: (v: string) => void; counterpartSuggestions: { name: string; count: number }[] }) {
@@ -175,6 +188,30 @@ function CounterpartInput({ value, onChange, counterpartSuggestions }: { value: 
   );
 }
 
+/** Clearable Select wrapper - allows user to clear value */
+function ClearableSelect({ value, onValueChange, placeholder, children }: {
+  value: string;
+  onValueChange: (v: string) => void;
+  placeholder: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <Select value={value} onValueChange={onValueChange}>
+        <SelectTrigger>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__clear__">
+            <span className="text-muted-foreground italic">Nenhum</span>
+          </SelectItem>
+          {children}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export default function EventEditDialog({ open, onOpenChange, item, defaultDate, userId, onSaved, defaultEventType }: EventEditDialogProps) {
   const [eventType, setEventType] = useState<EventType>("event");
   const [title, setTitle] = useState("");
@@ -222,11 +259,22 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [splitLines, setSplitLines] = useState<SplitLine[]>([]);
 
-  // Patrimonio: new account creation
+  // Carteira: new account creation
   const [newAccName, setNewAccName] = useState("");
   const [newAccType, setNewAccType] = useState("bank_account");
   const [newAccCurrency, setNewAccCurrency] = useState("BRL");
   const [newAccBalance, setNewAccBalance] = useState("");
+
+  // Patrimônio: real estate, cars, etc.
+  const [patrimonioName, setPatrimonioName] = useState("");
+  const [patrimonioType, setPatrimonioType] = useState("imovel");
+  const [patrimonioValue, setPatrimonioValue] = useState("");
+  const [patrimonioDesc, setPatrimonioDesc] = useState("");
+
+  // Centro de Custo creation
+  const [ccName, setCcName] = useState("");
+  const [ccDesc, setCcDesc] = useState("");
+  const [ccColor, setCcColor] = useState("#3b82f6");
 
   // Autocomplete state
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -352,6 +400,13 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setNewAccType("bank_account");
       setNewAccCurrency("BRL");
       setNewAccBalance("");
+      setPatrimonioName("");
+      setPatrimonioType("imovel");
+      setPatrimonioValue("");
+      setPatrimonioDesc("");
+      setCcName("");
+      setCcDesc("");
+      setCcColor("#3b82f6");
     }
   }, [item, defaultDate, open, defaultEventType]);
 
@@ -404,8 +459,28 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
     setSplitLines(prev => prev.filter(l => l.id !== id));
   };
 
+  // Helper to handle clearable select changes
+  const handleClearableChange = (setter: (v: string) => void) => (v: string) => {
+    setter(v === "__clear__" ? "" : v);
+  };
+
   const handleSave = async () => {
-    if (!title.trim()) return;
+    // Centro de Custo creation
+    if (eventType === "centro_custo") {
+      if (!ccName.trim()) return;
+      await supabase.from("cost_centers" as any).insert({
+        user_id: userId,
+        name: ccName.trim(),
+        description: ccDesc || null,
+        color: ccColor,
+        is_active: true,
+      });
+      onSaved();
+      onOpenChange(false);
+      return;
+    }
+
+    if (!title.trim() && eventType !== "carteira" && eventType !== "patrimonio") return;
     const startDt = allDay
       ? new Date(`${startDate}T00:00:00`)
       : new Date(`${startDate}T${startTime}:00`);
@@ -457,8 +532,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         });
       }
 
-      // Patrimônio: create a new financial account (wallet)
-      if (eventType === "patrimonio" && newAccName.trim()) {
+      // Carteira: create a new financial account (wallet)
+      if (eventType === "carteira" && newAccName.trim()) {
         const bal = parseNum(newAccBalance);
         await supabase.from("financial_accounts").insert({
           user_id: userId,
@@ -469,6 +544,19 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           initial_balance: bal,
           is_active: true,
         } as any);
+      }
+
+      // Patrimônio: create asset record (stored as description-tagged entry for now)
+      if (eventType === "patrimonio" && patrimonioName.trim()) {
+        // Store patrimonio as a calendar event with metadata
+        await supabase.from("calendar_events").insert({
+          user_id: userId,
+          title: patrimonioName.trim(),
+          start_time: new Date().toISOString(),
+          all_day: true,
+          description: `[tipo:patrimonio] [patri_type:${patrimonioType}] [patri_value:${patrimonioValue}] ${patrimonioDesc}`.trim(),
+          color: typeColor,
+        });
       }
 
       // For cashflow, create a financial entry with all fields
@@ -521,7 +609,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             }).filter(Boolean);
             const { data: insertedEntries } = await supabase.from("financial_entries").insert(entriesToInsert as any[]).select("id");
             
-            // Create split records for the first entry if split is enabled
             if (splitEnabled && splitLines.length > 0 && insertedEntries?.[0]) {
               const splits = splitLines.map(l => ({
                 entry_id: insertedEntries[0].id,
@@ -547,7 +634,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             });
             const { data: insertedEntries } = await supabase.from("financial_entries").insert(entriesToInsert).select("id");
             
-            // Create split records if enabled
             if (splitEnabled && splitLines.length > 0 && insertedEntries?.[0]) {
               const splits = splitLines.map(l => ({
                 entry_id: insertedEntries[0].id,
@@ -603,8 +689,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         }
       }
 
-      // Create calendar events - skip for cashflow/investment/patrimonio
-      if (eventType !== "cashflow" && eventType !== "investment" && eventType !== "patrimonio") {
+      // Create calendar events - skip for cashflow/investment/carteira/patrimonio
+      if (eventType !== "cashflow" && eventType !== "investment" && eventType !== "carteira" && eventType !== "patrimonio") {
         if (recurrence !== "none") {
           const calMaxDate = new Date(startDt.getFullYear(), 11, 31);
           const count = recurrenceIndeterminate ? 999 : Math.max(1, parseInt(recurrenceCount) || 12);
@@ -770,6 +856,11 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
     return item ? `Editar ${typeLabel.toLowerCase()}` : "Central de Lançamentos";
   };
 
+  // Types that show the main title/description/classification fields
+  const showMainFields = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo";
+  // Types that show dates/scheduling
+  const showDates = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo";
+
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -806,65 +897,99 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </div>
           )}
 
-          {/* ─── PRIMARY GROUP: Título, Descrição, Centro de Custo, Categoria, Projeto ─── */}
-          <div className="space-y-3 rounded-lg border border-border/30 p-3">
-            <div>
-              <Label className="text-sm">Título</Label>
-              <div className="flex gap-2 items-center relative">
-                <div className="flex-1 relative">
-                  <Input
-                    ref={titleInputRef}
-                    value={title}
-                    onChange={(e) => { setTitle(e.target.value); setShowSuggestions(true); }}
-                    onFocus={() => setShowSuggestions(true)}
-                    placeholder="Nome do lançamento"
-                    autoComplete="off"
-                  />
-                  {showSuggestions && filteredSuggestions.length > 0 && (
-                    <div
-                      ref={suggestionsRef}
-                      className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-md border border-border bg-popover shadow-md"
-                    >
-                      {filteredSuggestions.map((s, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent/50 text-left"
-                          onClick={() => { setTitle(s.title); setShowSuggestions(false); }}
-                        >
-                          <span className="flex-1 truncate">{s.title}</span>
-                          <span className="text-[10px] text-muted-foreground shrink-0">×{s.count}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+          {/* ─── CENTRO DE CUSTO CREATION ─── */}
+          {eventType === "centro_custo" && (
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <p className="text-xs text-muted-foreground">Criar novo centro de custo.</p>
+              <div>
+                <Label className="text-sm">Nome</Label>
+                <Input value={ccName} onChange={(e) => setCcName(e.target.value)} placeholder="Ex: TI, Marketing..." />
+              </div>
+              <div>
+                <Label className="text-sm">Descrição</Label>
+                <Input value={ccDesc} onChange={(e) => setCcDesc(e.target.value)} placeholder="Opcional" />
+              </div>
+              <div>
+                <Label className="text-sm">Cor</Label>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {CC_COLORS.map((c) => (
+                    <button key={c} onClick={() => setCcColor(c)}
+                      className={cn("h-6 w-6 rounded-full border-2 transition-transform",
+                        ccColor === c ? "scale-110 border-foreground" : "border-transparent"
+                      )} style={{ backgroundColor: c }} />
+                  ))}
                 </div>
-                {eventType !== "cashflow" && (
-                  <button
-                    type="button"
-                    onClick={() => setIsFavorite(!isFavorite)}
-                    className="shrink-0 p-1 rounded hover:bg-accent/50 transition-colors"
-                    title="Favoritar"
-                  >
-                    <Star className={cn("h-5 w-5", isFavorite ? "fill-warning text-warning" : "text-muted-foreground")} />
-                  </button>
-                )}
               </div>
             </div>
+          )}
 
-            <div>
-              <Label className="text-sm">Descrição</Label>
-              <Textarea value={displayDescription} onChange={(e) => setDescription(e.target.value)}
-                placeholder="Opcional" rows={2} className="resize-none" />
-            </div>
-
-            {/* Centro de Custo - above Categoria */}
-            {(eventType === "cashflow" || eventType === "investment" || eventType === "project") && costCenters.length > 0 && (
+          {/* ─── PRIMARY GROUP: Título, Descrição, Categoria, Centro de Custo, Projeto ─── */}
+          {showMainFields && (
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
               <div>
-                <Label className="text-sm">Centro de Custo</Label>
-                <Select value={costCenterId} onValueChange={setCostCenterId}>
-                  <SelectTrigger><SelectValue placeholder="Selecionar centro de custo" /></SelectTrigger>
-                  <SelectContent>
+                <Label className="text-sm">Título</Label>
+                <div className="flex gap-2 items-center relative">
+                  <div className="flex-1 relative">
+                    <Input
+                      ref={titleInputRef}
+                      value={title}
+                      onChange={(e) => { setTitle(e.target.value); setShowSuggestions(true); }}
+                      onFocus={() => setShowSuggestions(true)}
+                      placeholder="Nome do lançamento"
+                      autoComplete="off"
+                    />
+                    {showSuggestions && filteredSuggestions.length > 0 && (
+                      <div
+                        ref={suggestionsRef}
+                        className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-md border border-border bg-popover shadow-md"
+                      >
+                        {filteredSuggestions.map((s, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent/50 text-left"
+                            onClick={() => { setTitle(s.title); setShowSuggestions(false); }}
+                          >
+                            <span className="flex-1 truncate">{s.title}</span>
+                            <span className="text-[10px] text-muted-foreground shrink-0">×{s.count}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {eventType !== "cashflow" && (
+                    <button
+                      type="button"
+                      onClick={() => setIsFavorite(!isFavorite)}
+                      className="shrink-0 p-1 rounded hover:bg-accent/50 transition-colors"
+                      title="Favoritar"
+                    >
+                      <Star className={cn("h-5 w-5", isFavorite ? "fill-warning text-warning" : "text-muted-foreground")} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm">Descrição</Label>
+                <Textarea value={displayDescription} onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Opcional" rows={2} className="resize-none" />
+              </div>
+
+              <div>
+                <Label className="text-sm">Categoria</Label>
+                <ClearableSelect value={categoryId} onValueChange={handleClearableChange(setCategoryId)} placeholder="Selecionar categoria">
+                  {categories.sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </ClearableSelect>
+              </div>
+
+              {/* Centro de Custo - below Categoria, above Projeto */}
+              {(eventType === "cashflow" || eventType === "investment" || eventType === "project") && (
+                <div>
+                  <Label className="text-sm">Centro de Custo</Label>
+                  <ClearableSelect value={costCenterId} onValueChange={handleClearableChange(setCostCenterId)} placeholder="Selecionar centro de custo">
                     {costCenters.map((cc: any) => (
                       <SelectItem key={cc.id} value={cc.id}>
                         <span className="flex items-center gap-2">
@@ -873,37 +998,22 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                         </span>
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+                  </ClearableSelect>
+                </div>
+              )}
 
-            <div>
-              <Label className="text-sm">Categoria</Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger><SelectValue placeholder="Selecionar categoria" /></SelectTrigger>
-                <SelectContent>
-                  {categories.sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {(eventType === "project" || eventType === "event" || eventType === "cashflow") && (
-              <div>
-                <Label className="text-sm">{eventType === "project" ? "Programa" : "Projeto"}</Label>
-                <Select value={projectId} onValueChange={setProjectId}>
-                  <SelectTrigger><SelectValue placeholder={eventType === "project" ? "Selecionar programa (opcional)" : "Selecionar projeto (opcional)"} /></SelectTrigger>
-                  <SelectContent>
+              {(eventType === "project" || eventType === "event" || eventType === "cashflow") && (
+                <div>
+                  <Label className="text-sm">{eventType === "project" ? "Programa" : "Projeto"}</Label>
+                  <ClearableSelect value={projectId} onValueChange={handleClearableChange(setProjectId)} placeholder={eventType === "project" ? "Selecionar programa" : "Selecionar projeto"}>
                     {projects.map(p => (
                       <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
+                  </ClearableSelect>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ─── CASHFLOW FIELDS ─── */}
           {eventType === "cashflow" && (
@@ -945,38 +1055,39 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-sm">Carteira</Label>
-                    <Select value={accountId} onValueChange={setAccountId}>
-                      <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                      <SelectContent>
-                        {accounts.map((a: any) => (
-                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <ClearableSelect value={accountId} onValueChange={handleClearableChange(setAccountId)} placeholder="Selecionar">
+                      {accounts.map((a: any) => (
+                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                      ))}
+                    </ClearableSelect>
                   </div>
                   <div>
                     <Label className="text-sm">Forma Pgto</Label>
-                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                      <SelectContent>
-                        {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <ClearableSelect value={paymentMethod} onValueChange={handleClearableChange(setPaymentMethod)} placeholder="Selecionar">
+                      {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    </ClearableSelect>
                   </div>
                 </div>
               )}
 
-              {/* Split Payment Toggle */}
-              <div className="flex items-center gap-2 pt-1">
-                <Checkbox checked={splitEnabled} onCheckedChange={(c) => {
-                  const val = !!c;
-                  setSplitEnabled(val);
-                  if (val && splitLines.length === 0) addSplitLine();
-                }} id="split-toggle" />
-                <label htmlFor="split-toggle" className="text-xs cursor-pointer flex items-center gap-1.5">
-                  <SplitSquareVertical className="h-3.5 w-3.5" />
-                  Pagamento com múltiplas fontes
-                </label>
+              {/* Three checkboxes in one line */}
+              <div className="flex items-center gap-4 pt-1">
+                <div className="flex items-center gap-2">
+                  <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="is-fixed-central" />
+                  <label htmlFor="is-fixed-central" className="text-xs cursor-pointer">Conta fixa</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox checked={splitEnabled} onCheckedChange={(c) => {
+                    const val = !!c;
+                    setSplitEnabled(val);
+                    if (val && splitLines.length === 0) addSplitLine();
+                  }} id="split-toggle" />
+                  <label htmlFor="split-toggle" className="text-xs cursor-pointer">Múltiplas carteiras</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid-central" />
+                  <label htmlFor="is-paid-central" className="text-xs cursor-pointer">Baixar conta</label>
+                </div>
               </div>
 
               {/* Split Lines */}
@@ -1046,17 +1157,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                   )}
                 </div>
               )}
-
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="is-fixed-central" />
-                  <label htmlFor="is-fixed-central" className="text-xs cursor-pointer">Conta fixa</label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid-central" />
-                  <label htmlFor="is-paid-central" className="text-xs cursor-pointer">Baixar conta</label>
-                </div>
-              </div>
             </div>
           )}
 
@@ -1082,10 +1182,10 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </div>
           )}
 
-          {/* Patrimônio: create wallet/account */}
-          {eventType === "patrimonio" && (
+          {/* Carteira: create wallet/account */}
+          {eventType === "carteira" && (
             <div className="space-y-3 rounded-lg border border-border/30 p-3">
-              <p className="text-xs text-muted-foreground">Criar nova carteira ou conta no patrimônio.</p>
+              <p className="text-xs text-muted-foreground">Criar nova carteira ou conta.</p>
               <div>
                 <Label className="text-sm">Nome da Carteira</Label>
                 <Input value={newAccName} onChange={(e) => setNewAccName(e.target.value)} placeholder="Ex: Nubank, Itaú..." />
@@ -1121,6 +1221,40 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </div>
           )}
 
+          {/* Patrimônio: imóveis, carros, etc. */}
+          {eventType === "patrimonio" && (
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <p className="text-xs text-muted-foreground">Registrar um bem patrimonial (imóvel, veículo, etc.).</p>
+              <div>
+                <Label className="text-sm">Nome do Bem</Label>
+                <Input value={patrimonioName} onChange={(e) => setPatrimonioName(e.target.value)} placeholder="Ex: Apartamento Centro, Honda Civic..." />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-sm">Tipo</Label>
+                  <Select value={patrimonioType} onValueChange={setPatrimonioType}>
+                    <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PATRIMONIO_TYPES.map(t => (
+                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm">Valor Estimado (R$)</Label>
+                  <Input type="text" inputMode="decimal" placeholder="0,00" value={patrimonioValue}
+                    onChange={(e) => setPatrimonioValue(e.target.value.replace(/[^0-9.,]/g, ""))} />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Descrição</Label>
+                <Textarea value={patrimonioDesc} onChange={(e) => setPatrimonioDesc(e.target.value)}
+                  placeholder="Detalhes adicionais (opcional)" rows={2} className="resize-none" />
+              </div>
+            </div>
+          )}
+
           {/* Project priority */}
           {eventType === "project" && (
             <div className="space-y-3 rounded-lg border border-border/30 p-3">
@@ -1140,7 +1274,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           )}
 
           {/* ─── Dates & Scheduling group ─── */}
-          {eventType !== "patrimonio" && (
+          {showDates && (
             <div className="space-y-3 rounded-lg border border-border/30 p-3">
               <div className="flex items-center gap-3">
                 <div className="flex-1">
@@ -1245,46 +1379,39 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
               </div>
             </div>
           )}
-        </div>
 
-        <div className="flex items-center gap-2 pt-4 border-t border-border/20">
-          {item && (
-            <Button variant="destructive" size="sm" onClick={handleDelete} className="gap-1.5">
-              <Trash2 className="h-3.5 w-3.5" /> Excluir
-            </Button>
-          )}
-          <div className="flex gap-2 ml-auto">
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button size="sm" onClick={handleSave} className="gap-1.5">
-              <Save className="h-3.5 w-3.5" /> Salvar
-            </Button>
+          {/* ─── ACTION FOOTER ─── */}
+          <div className="flex items-center gap-2 pt-2 border-t border-border/20">
+            {item && (
+              <Button variant="destructive" size="sm" className="gap-1.5" onClick={handleDelete}>
+                <Trash2 className="h-3.5 w-3.5" /> Excluir
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Cancelar</Button>
+              <Button size="sm" className="gap-1.5" onClick={handleSave}>
+                <Save className="h-3.5 w-3.5" /> Salvar
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
     </Dialog>
 
-    {/* Delete recurring event confirmation */}
+    {/* Delete recurring confirmation dialog */}
     <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Excluir evento recorrente</DialogTitle>
+          <DialogTitle className="text-sm">Excluir evento recorrente</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          Este evento faz parte de uma série recorrente. O que deseja excluir?
-        </p>
-        <div className="flex flex-col gap-2 pt-3 border-t border-border/20">
-          <Button variant="outline" size="sm" onClick={handleDeleteSingle}>
-            Este evento
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleDeleteFutureAndThis}>
-            Este e eventos futuros
-          </Button>
-          <Button variant="destructive" size="sm" onClick={handleDeleteAll}>
-            Todos os eventos
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(false)}>
-            Cancelar
-          </Button>
+        <div className="space-y-3 pt-2">
+          <p className="text-sm text-muted-foreground">Como deseja excluir este evento recorrente?</p>
+          <div className="flex flex-col gap-2">
+            <Button variant="outline" size="sm" onClick={handleDeleteSingle}>Apenas este</Button>
+            <Button variant="outline" size="sm" onClick={handleDeleteFutureAndThis}>Este e futuros</Button>
+            <Button variant="destructive" size="sm" onClick={handleDeleteAll}>Todos</Button>
+          </div>
+          <Button variant="ghost" size="sm" className="w-full" onClick={() => setDeleteConfirmOpen(false)}>Cancelar</Button>
         </div>
       </DialogContent>
     </Dialog>
