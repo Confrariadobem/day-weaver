@@ -291,12 +291,7 @@ function FinancesPrefsTab({
 
       {/* Centro de Custos */}
       <div className="pt-2">
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">Centros de Custo. Clique duas vezes para editar.</p>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openNewCc}>
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+        <p className="text-xs text-muted-foreground">Centros de Custo. Use a Central de Lançamentos para adicionar. Clique duas vezes para editar.</p>
         <div className="space-y-1.5 mt-1.5">
           {costCenters.map((cc: any) => (
             <ToggleRow

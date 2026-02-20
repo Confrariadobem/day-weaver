@@ -143,6 +143,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   const [projects, setProjects] = useState<DBTables<"projects">[]>([]);
   const [categories, setCategories] = useState<DBTables<"categories">[]>([]);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [costCenters, setCostCenters] = useState<any[]>([]);
   const [sortField, setSortField] = useState<SortField>("entry_date");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -203,16 +204,18 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [entRes, projRes, catRes, accRes] = await Promise.all([
+    const [entRes, projRes, catRes, accRes, ccRes] = await Promise.all([
       supabase.from("financial_entries").select("*").eq("user_id", user.id).order("entry_date", { ascending: false }),
       supabase.from("projects").select("*").eq("user_id", user.id),
       supabase.from("categories").select("*").eq("user_id", user.id),
       supabase.from("financial_accounts").select("*").eq("user_id", user.id).order("name"),
+      supabase.from("cost_centers" as any).select("*").eq("user_id", user.id).eq("is_active", true).order("name"),
     ]);
     if (entRes.data) setEntries(entRes.data);
     if (projRes.data) setProjects(projRes.data);
     if (catRes.data) setCategories(catRes.data);
     if (accRes.data) setAccounts(accRes.data as FinancialAccount[]);
+    if (ccRes.data) setCostCenters(ccRes.data as any[]);
   }, [user]);
 
   useEffect(() => {
@@ -876,18 +879,39 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         <div className="rounded-lg border border-border/30 p-3 space-y-2">
           <div>
             <Label className="text-xs text-muted-foreground">Categoria</Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
+            <Select value={categoryId} onValueChange={(v) => setCategoryId(v === "__clear__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Categoria (opcional)" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="__clear__"><span className="text-muted-foreground italic">Nenhum</span></SelectItem>
                 {sortedFinCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div>
+            <Label className="text-xs text-muted-foreground">Centro de Custo</Label>
+            <Select value={(editingEntry as any)?.cost_center_id || ""} onValueChange={(v) => {
+              if (editingEntry) setEditingEntry({ ...editingEntry, cost_center_id: v === "__clear__" ? null : v });
+            }}>
+              <SelectTrigger><SelectValue placeholder="Centro de custo (opcional)" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__clear__"><span className="text-muted-foreground italic">Nenhum</span></SelectItem>
+                {costCenters.map((cc: any) => (
+                  <SelectItem key={cc.id} value={cc.id}>
+                    <span className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color }} />
+                      {cc.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <Label className="text-xs text-muted-foreground">Projeto</Label>
-            <Select value={projectId} onValueChange={setProjectId}>
+            <Select value={projectId} onValueChange={(v) => setProjectId(v === "__clear__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Projeto (opcional)" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="__clear__"><span className="text-muted-foreground italic">Nenhum</span></SelectItem>
                 {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -1158,6 +1182,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                     <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("title")}>Título <SortIcon field="title" /></th>
                     <th className="text-left py-2 px-2">Contraparte</th>
                     <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("category")}>Categoria <SortIcon field="category" /></th>
+                    <th className="text-left py-2 px-2">C. Custo</th>
                     <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("type")}>Tipo <SortIcon field="type" /></th>
                     <th className="text-right py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("amount")}>Valor <SortIcon field="amount" /></th>
                     <th className="text-right py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("balance")}>Saldo <SortIcon field="balance" /></th>
@@ -1201,6 +1226,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                         </td>
                         <td className="py-2.5 px-2 text-muted-foreground/60 truncate max-w-[120px]">{e.counterpart || "—"}</td>
                         <td className="py-2.5 px-2 text-muted-foreground/60">{cat?.name || "—"}</td>
+                        <td className="py-2.5 px-2 text-muted-foreground/60 text-xs">{e.cost_center_id ? "●" : "—"}</td>
                         <td className="py-2.5 px-2">
                           <span className={cn("text-xs font-medium", e.type === "revenue" ? "text-success" : "text-destructive")}>
                             {e.type === "revenue" ? "Receita" : "Despesa"}
