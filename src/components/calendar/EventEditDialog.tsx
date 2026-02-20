@@ -6,7 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash, Star, Wallet, Repeat, Cake, CalendarDays, TrendingUp, FolderKanban, CircleDollarSign, Building2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash, Star, Wallet, Repeat, Cake, CalendarDays, TrendingUp, FolderKanban, CircleDollarSign, Building2, Plus, X, SplitSquareVertical, Receipt } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -55,15 +57,16 @@ const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
   project: <FolderKanban className="h-3.5 w-3.5" />,
 };
 
-const EVENT_TYPES: { value: EventType; label: string; color: string }[] = [
+const EVENT_TYPES_UNSORTED: { value: EventType; label: string; color: string }[] = [
   { value: "birthday", label: "Aniversário", color: "#ec4899" },
-  { value: "cashflow", label: "Fluxo de caixa", color: "#22c55e" },
   { value: "event", label: "Evento", color: "#3b82f6" },
+  { value: "cashflow", label: "Fluxo de Caixa", color: "#22c55e" },
   { value: "investment", label: "Investimento", color: "#d4a017" },
   { value: "patrimonio", label: "Patrimônio", color: "#8b5cf6" },
   { value: "programa", label: "Programa", color: "#06b6d4" },
   { value: "project", label: "Projeto", color: "#eab308" },
 ];
+const EVENT_TYPES = [...EVENT_TYPES_UNSORTED].sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
 
 type RecurrenceDateMode = "same_date" | "first_business_day";
 
@@ -89,7 +92,7 @@ const REMINDER_OPTIONS = [
   { value: "10080", label: "1 semana antes" },
 ];
 
-const PAYMENT_METHODS = ["Débito", "Crédito", "PIX", "Boleto", "Transferência", "Dinheiro", "Crypto"];
+const PAYMENT_METHODS = ["Boleto", "Crédito", "Crypto", "Débito", "Dinheiro", "PIX", "Transferência"];
 
 const WEEKDAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
@@ -100,7 +103,23 @@ const INVESTMENT_TYPES_OPTIONS = [
   { value: "fii", label: "FIIs" },
   { value: "fixed_income", label: "Renda Fixa" },
   { value: "other", label: "Outros" },
-];
+].sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+
+const ACCOUNT_TYPES = [
+  { value: "bank_account", label: "Conta Bancária" },
+  { value: "cash", label: "Dinheiro" },
+  { value: "credit_card", label: "Cartão de Crédito" },
+  { value: "crypto", label: "Criptoativos" },
+  { value: "investment", label: "Investimento" },
+  { value: "wallet", label: "Carteira Digital" },
+].sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+
+interface SplitLine {
+  id: string;
+  accountId: string;
+  paymentMethod: string;
+  amount: string;
+}
 
 // Counterpart autocomplete input component
 function CounterpartInput({ value, onChange, counterpartSuggestions }: { value: string; onChange: (v: string) => void; counterpartSuggestions: { name: string; count: number }[] }) {
@@ -183,9 +202,11 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
   // Primary group fields
   const [categoryId, setCategoryId] = useState("");
+  const [costCenterId, setCostCenterId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [programId, setProgramId] = useState("");
   const [categories, setCategories] = useState<any[]>([]);
+  const [costCenters, setCostCenters] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
 
   // Cashflow extra fields
@@ -197,29 +218,40 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const [installments, setInstallments] = useState("1");
   const [accounts, setAccounts] = useState<any[]>([]);
 
+  // Split payment
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [splitLines, setSplitLines] = useState<SplitLine[]>([]);
+
+  // Patrimonio: new account creation
+  const [newAccName, setNewAccName] = useState("");
+  const [newAccType, setNewAccType] = useState("bank_account");
+  const [newAccCurrency, setNewAccCurrency] = useState("BRL");
+  const [newAccBalance, setNewAccBalance] = useState("");
+
   // Autocomplete state
-  const [titleSuggestions, setTitleSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const [allTitles, setAllTitles] = useState<{ title: string; count: number }[]>([]);
   const [counterpartSuggestions, setCounterpartSuggestions] = useState<{ name: string; count: number }[]>([]);
 
-  // Fetch categories, projects, accounts, and past titles
+  // Fetch categories, projects, accounts, cost centers, and past titles
   useEffect(() => {
     if (!userId || !open) return;
     const fetchAll = async () => {
-      const [catRes, projRes, accRes, evtRes, taskRes, finRes] = await Promise.all([
+      const [catRes, projRes, accRes, evtRes, taskRes, finRes, ccRes] = await Promise.all([
         supabase.from("categories").select("*").eq("user_id", userId).order("name"),
         supabase.from("projects").select("*").eq("user_id", userId).order("name"),
         supabase.from("financial_accounts").select("*").eq("user_id", userId).eq("is_active", true).order("name"),
         supabase.from("calendar_events").select("title").eq("user_id", userId),
         supabase.from("tasks").select("title").eq("user_id", userId),
-        supabase.from("financial_entries").select("title").eq("user_id", userId),
+        supabase.from("financial_entries").select("title, counterpart").eq("user_id", userId),
+        supabase.from("cost_centers" as any).select("*").eq("user_id", userId).eq("is_active", true).order("name"),
       ]);
       if (catRes.data) setCategories(catRes.data);
       if (projRes.data) setProjects(projRes.data);
       if (accRes.data) setAccounts(accRes.data);
+      if (ccRes.data) setCostCenters(ccRes.data as any[]);
 
       const titleMap = new Map<string, number>();
       const addTitles = (data: { title: string }[] | null) => {
@@ -236,9 +268,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         .sort((a, b) => b.count - a.count);
       setAllTitles(sorted);
 
-      // Build counterpart suggestions from financial_entries
       const cpMap = new Map<string, number>();
-      finRes.data?.forEach((e: any) => {
+      (finRes.data as any[])?.forEach((e: any) => {
         if (e.counterpart) {
           cpMap.set(e.counterpart, (cpMap.get(e.counterpart) || 0) + 1);
         }
@@ -252,7 +283,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
     fetchAll();
   }, [userId, open]);
 
-  // Only reset form when dialog OPENS (open transitions from false to true)
+  // Only reset form when dialog OPENS
   const prevOpenRef = useRef(false);
   useEffect(() => {
     const justOpened = open && !prevOpenRef.current;
@@ -306,6 +337,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setCashflowDirection("expense");
       setInvestmentType("stock");
       setCategoryId("");
+      setCostCenterId("");
       setProjectId("");
       setProgramId("");
       setAccountId("");
@@ -314,6 +346,12 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setIsFixed(false);
       setCounterpart("");
       setInstallments("1");
+      setSplitEnabled(false);
+      setSplitLines([]);
+      setNewAccName("");
+      setNewAccType("bank_account");
+      setNewAccCurrency("BRL");
+      setNewAccBalance("");
     }
   }, [item, defaultDate, open, defaultEventType]);
 
@@ -341,6 +379,30 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   };
 
   const displayDescription = item ? cleanDescription(description) : description;
+
+  // Split helpers
+  const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
+  const totalAmount = parseNum(billAmount);
+  const splitTotal = splitLines.reduce((s, l) => s + parseNum(l.amount), 0);
+  const splitRemaining = totalAmount - splitTotal;
+  const splitPct = totalAmount > 0 ? (splitTotal / totalAmount) * 100 : 0;
+
+  const addSplitLine = () => {
+    setSplitLines(prev => [...prev, {
+      id: crypto.randomUUID(),
+      accountId: "",
+      paymentMethod: "",
+      amount: splitRemaining > 0 ? splitRemaining.toFixed(2).replace(".", ",") : "",
+    }]);
+  };
+
+  const updateSplitLine = (id: string, field: keyof SplitLine, value: string) => {
+    setSplitLines(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l));
+  };
+
+  const removeSplitLine = (id: string) => {
+    setSplitLines(prev => prev.filter(l => l.id !== id));
+  };
 
   const handleSave = async () => {
     if (!title.trim()) return;
@@ -389,22 +451,46 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         if (data) taskId = data.id;
       }
 
-      // For programa, create a program record
       if (eventType === "programa") {
         await supabase.from("programs").insert({
           user_id: userId, name: title, description: displayDescription || null,
         });
       }
 
+      // Patrimônio: create a new financial account (wallet)
+      if (eventType === "patrimonio" && newAccName.trim()) {
+        const bal = parseNum(newAccBalance);
+        await supabase.from("financial_accounts").insert({
+          user_id: userId,
+          name: newAccName.trim(),
+          type: newAccType,
+          currency: newAccCurrency,
+          current_balance: bal,
+          initial_balance: bal,
+          is_active: true,
+        } as any);
+      }
+
       // For cashflow, create a financial entry with all fields
       if (eventType === "cashflow" && billAmount) {
-        const amount = parseFloat(billAmount.replace(/\./g, "").replace(",", ".")) || 0;
+        const amount = parseNum(billAmount);
         if (amount > 0) {
           const numInst = Math.max(1, parseInt(installments) || 1);
           const instGroup = numInst > 1 ? crypto.randomUUID() : null;
-          // Limit indeterminate recurrence to Dec 31 of current year
           const maxDateLimit = new Date(startDt.getFullYear(), 11, 31);
           const effectiveCount = recurrence !== "none" ? (recurrenceIndeterminate ? 999 : Math.max(1, parseInt(recurrenceCount) || 12)) : numInst;
+
+          const baseEntry: any = {
+            user_id: userId,
+            category_id: categoryId || null,
+            project_id: projectId || null,
+            cost_center_id: costCenterId || null,
+            account_id: splitEnabled ? null : (accountId || null),
+            payment_method: splitEnabled ? null : (paymentMethod || null),
+            counterpart: counterpart || null,
+            is_fixed: isFixed,
+            has_split: splitEnabled && splitLines.length > 0,
+          };
 
           if (recurrence !== "none") {
             const count = effectiveCount;
@@ -422,45 +508,63 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 d.setDate(1);
                 while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
               }
-              // Stop if past Dec 31 for indeterminate recurrence
               if (recurrenceIndeterminate && d > maxDateLimit) return null;
               return {
-                user_id: userId, title: recurrenceIndeterminate ? title : `${title} (${i + 1}/${count})`,
+                ...baseEntry,
+                title: recurrenceIndeterminate ? title : `${title} (${i + 1}/${count})`,
                 amount, type: cashflowDirection,
-                category_id: categoryId || null, project_id: projectId || null,
                 entry_date: format(d, "yyyy-MM-dd"),
                 installment_group: group, installment_number: i + 1, total_installments: recurrenceIndeterminate ? 0 : count,
-                account_id: accountId || null, payment_method: paymentMethod || null,
                 is_paid: i === 0 ? isPaid : false,
-                counterpart: counterpart || null, is_fixed: isFixed,
                 recurrence_type: recurrence.replace("FREQ=", "").toLowerCase(),
               };
             }).filter(Boolean);
-            await supabase.from("financial_entries").insert(entriesToInsert as any[]);
+            const { data: insertedEntries } = await supabase.from("financial_entries").insert(entriesToInsert as any[]).select("id");
+            
+            // Create split records for the first entry if split is enabled
+            if (splitEnabled && splitLines.length > 0 && insertedEntries?.[0]) {
+              const splits = splitLines.map(l => ({
+                entry_id: insertedEntries[0].id,
+                user_id: userId,
+                account_id: l.accountId || null,
+                payment_method: l.paymentMethod || null,
+                amount: parseNum(l.amount),
+              }));
+              await supabase.from("payment_splits" as any).insert(splits);
+            }
           } else {
             const entriesToInsert = Array.from({ length: numInst }, (_, i) => {
               const d = new Date(startDt);
               d.setMonth(d.getMonth() + i);
               return {
-                user_id: userId,
+                ...baseEntry,
                 title: numInst > 1 ? `${title} (${i + 1}/${numInst})` : title,
                 amount: amount / numInst, type: cashflowDirection,
-                category_id: categoryId || null, project_id: projectId || null,
                 entry_date: format(d, "yyyy-MM-dd"),
                 installment_group: instGroup, installment_number: i + 1, total_installments: numInst,
-                account_id: accountId || null, payment_method: paymentMethod || null,
                 is_paid: i === 0 ? isPaid : false,
-                counterpart: counterpart || null, is_fixed: isFixed,
               };
             });
-            await supabase.from("financial_entries").insert(entriesToInsert);
+            const { data: insertedEntries } = await supabase.from("financial_entries").insert(entriesToInsert).select("id");
+            
+            // Create split records if enabled
+            if (splitEnabled && splitLines.length > 0 && insertedEntries?.[0]) {
+              const splits = splitLines.map(l => ({
+                entry_id: insertedEntries[0].id,
+                user_id: userId,
+                account_id: l.accountId || null,
+                payment_method: l.paymentMethod || null,
+                amount: parseNum(l.amount),
+              }));
+              await supabase.from("payment_splits" as any).insert(splits);
+            }
           }
         }
       }
 
-      // For investment, create a financial entry with type "investment"
+      // For investment, create a financial entry
       if (eventType === "investment" && billAmount) {
-        const amount = parseFloat(billAmount.replace(/\./g, "").replace(",", ".")) || 0;
+        const amount = parseNum(billAmount);
         if (amount > 0) {
           const maxDateLimitInv = new Date(startDt.getFullYear(), 11, 31);
           const effectiveCount = recurrence !== "none" ? (recurrenceIndeterminate ? 999 : Math.max(1, parseInt(recurrenceCount) || 12)) : 1;
@@ -481,6 +585,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 user_id: userId, title: recurrenceIndeterminate ? title : `${title} (${i + 1}/${effectiveCount})`,
                 amount, type: "investment" as const,
                 category_id: categoryId || null, project_id: projectId || null,
+                cost_center_id: costCenterId || null,
                 entry_date: format(d, "yyyy-MM-dd"),
                 installment_group: group, installment_number: i + 1, total_installments: recurrenceIndeterminate ? 0 : effectiveCount,
                 is_paid: false,
@@ -491,14 +596,15 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             await supabase.from("financial_entries").insert({
               user_id: userId, title, amount, type: "investment",
               category_id: categoryId || null, project_id: projectId || null,
+              cost_center_id: costCenterId || null,
               entry_date: format(startDt, "yyyy-MM-dd"), is_paid: false,
-            });
+            } as any);
           }
         }
       }
 
-      // Create calendar events - skip for cashflow/investment since CalendarView renders them from financial_entries
-      if (eventType !== "cashflow" && eventType !== "investment") {
+      // Create calendar events - skip for cashflow/investment/patrimonio
+      if (eventType !== "cashflow" && eventType !== "investment" && eventType !== "patrimonio") {
         if (recurrence !== "none") {
           const calMaxDate = new Date(startDt.getFullYear(), 11, 31);
           const count = recurrenceIndeterminate ? 999 : Math.max(1, parseInt(recurrenceCount) || 12);
@@ -539,15 +645,31 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       }
     }
 
-    // Update account balance if paid
-    if (isPaid && accountId && eventType === "cashflow" && billAmount) {
-      const amount = parseFloat(billAmount.replace(/\./g, "").replace(",", ".")) || 0;
+    // Update account balance if paid (only for non-split)
+    if (isPaid && !splitEnabled && accountId && eventType === "cashflow" && billAmount) {
+      const amount = parseNum(billAmount);
       const account = accounts.find((a: any) => a.id === accountId);
       if (account) {
         const delta = cashflowDirection === "revenue" ? amount : -amount;
         await supabase.from("financial_accounts").update({
           current_balance: account.current_balance + delta,
         }).eq("id", accountId);
+      }
+    }
+
+    // Update account balances for split payments
+    if (isPaid && splitEnabled && splitLines.length > 0 && eventType === "cashflow") {
+      for (const line of splitLines) {
+        if (line.accountId) {
+          const amount = parseNum(line.amount);
+          const account = accounts.find((a: any) => a.id === line.accountId);
+          if (account && amount > 0) {
+            const delta = cashflowDirection === "revenue" ? amount : -amount;
+            await supabase.from("financial_accounts").update({
+              current_balance: account.current_balance + delta,
+            }).eq("id", line.accountId);
+          }
+        }
       }
     }
 
@@ -592,7 +714,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         await supabase.from("calendar_events").delete().in("id", ids);
       }
     }
-    // Also delete related financial entries from this date forward
     const { data: finEntries } = await supabase.from("financial_entries")
       .select("id, title, entry_date")
       .eq("user_id", item.user_id)
@@ -658,7 +779,34 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* ─── PRIMARY GROUP: Título, Descrição, Categoria, Projeto ─── */}
+          {/* ─── TYPE SELECTOR (Dropdown) ─── */}
+          {!item && (
+            <div className="space-y-2 rounded-lg border border-border/30 p-3">
+              <Label className="text-sm text-muted-foreground">Tipo de lançamento</Label>
+              <Select value={eventType} onValueChange={(v) => handleTypeChange(v as EventType)}>
+                <SelectTrigger>
+                  <SelectValue>
+                    <span className="flex items-center gap-2">
+                      {EVENT_TYPE_ICONS[eventType]}
+                      {EVENT_TYPES.find(t => t.value === eventType)?.label}
+                    </span>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {EVENT_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      <span className="flex items-center gap-2">
+                        <span style={{ color: t.color }}>{EVENT_TYPE_ICONS[t.value]}</span>
+                        {t.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* ─── PRIMARY GROUP: Título, Descrição, Centro de Custo, Categoria, Projeto ─── */}
           <div className="space-y-3 rounded-lg border border-border/30 p-3">
             <div>
               <Label className="text-sm">Título</Label>
@@ -710,6 +858,26 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 placeholder="Opcional" rows={2} className="resize-none" />
             </div>
 
+            {/* Centro de Custo - above Categoria */}
+            {(eventType === "cashflow" || eventType === "investment" || eventType === "project") && costCenters.length > 0 && (
+              <div>
+                <Label className="text-sm">Centro de Custo</Label>
+                <Select value={costCenterId} onValueChange={setCostCenterId}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar centro de custo" /></SelectTrigger>
+                  <SelectContent>
+                    {costCenters.map((cc: any) => (
+                      <SelectItem key={cc.id} value={cc.id}>
+                        <span className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color }} />
+                          {cc.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div>
               <Label className="text-sm">Categoria</Label>
               <Select value={categoryId} onValueChange={setCategoryId}>
@@ -737,150 +905,48 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             )}
           </div>
 
-          {/* ─── SECONDARY GROUP: Type selector ─── */}
-          {!item && (
-            <div className="space-y-2 rounded-lg border border-border/30 p-3">
-              <Label className="text-sm text-muted-foreground">Tipo de lançamento</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {EVENT_TYPES.map((t) => (
-                  <button
-                    key={t.value}
-                    onClick={() => handleTypeChange(t.value)}
-                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
-                      eventType === t.value
-                        ? "text-white shadow-sm"
-                        : "bg-muted text-muted-foreground hover:text-foreground"
-                    }`}
-                    style={eventType === t.value ? { backgroundColor: t.color } : {}}
-                  >
-                    {EVENT_TYPE_ICONS[t.value]}
-                    <span>{t.label}</span>
-                  </button>
-                ))}
+          {/* ─── CASHFLOW FIELDS ─── */}
+          {eventType === "cashflow" && (
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCashflowDirection("expense")}
+                  className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
+                    cashflowDirection === "expense" ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"
+                  )}
+                ><CircleDollarSign className="h-3.5 w-3.5 inline mr-1" />Pagar</button>
+                <button
+                  onClick={() => setCashflowDirection("revenue")}
+                  className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
+                    cashflowDirection === "revenue" ? "bg-[hsl(var(--success))] text-white" : "bg-muted text-muted-foreground"
+                  )}
+                ><TrendingUp className="h-3.5 w-3.5 inline mr-1" />Receber</button>
               </div>
-            </div>
-          )}
-
-          {/* ─── TERTIARY GROUP: Type-specific fields ─── */}
-          {(item || true) && (
-            <>
-              {/* Cashflow: direction + amount + payment fields */}
-              {eventType === "cashflow" && (
-                <div className="space-y-3 rounded-lg border border-border/30 p-3">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setCashflowDirection("expense")}
-                      className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
-                        cashflowDirection === "expense" ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"
-                      )}
-                    ><CircleDollarSign className="h-3.5 w-3.5 inline mr-1" />Pagar</button>
-                    <button
-                      onClick={() => setCashflowDirection("revenue")}
-                      className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
-                        cashflowDirection === "revenue" ? "bg-[hsl(var(--success))] text-white" : "bg-muted text-muted-foreground"
-                      )}
-                    ><TrendingUp className="h-3.5 w-3.5 inline mr-1" />Receber</button>
-                  </div>
-                  <div>
-                    <Label className="text-sm">Contraparte (Recebedor / Pagador)</Label>
-                    <CounterpartInput value={counterpart} onChange={setCounterpart} counterpartSuggestions={counterpartSuggestions} />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <Label className="text-sm">Valor (R$)</Label>
-                      <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
-                        onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
-                    </div>
-                    {!item && recurrence === "none" && (
-                      <div className="w-[100px]">
-                        <Label className="text-sm">Qtde. / Parcelas</Label>
-                        <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="text-xs" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-sm">Carteira</Label>
-                      <Select value={accountId} onValueChange={setAccountId}>
-                        <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                        <SelectContent>
-                          {accounts.map((a: any) => (
-                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-sm">Forma Pgto</Label>
-                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                        <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                        <SelectContent>
-                          {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="is-fixed-central" />
-                      <label htmlFor="is-fixed-central" className="text-xs cursor-pointer">Conta fixa</label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid-central" />
-                      <label htmlFor="is-paid-central" className="text-xs cursor-pointer">Baixar conta</label>
-                    </div>
-                  </div>
+              <div>
+                <Label className="text-sm">Contraparte (Recebedor / Pagador)</Label>
+                <CounterpartInput value={counterpart} onChange={setCounterpart} counterpartSuggestions={counterpartSuggestions} />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <Label className="text-sm">Valor (R$)</Label>
+                  <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
+                    onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
                 </div>
-              )}
+                {!item && recurrence === "none" && (
+                  <div className="w-[100px]">
+                    <Label className="text-sm">Parcelas</Label>
+                    <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="text-xs" />
+                  </div>
+                )}
+              </div>
 
-              {/* Investment: type + amount */}
-              {eventType === "investment" && (
-                <div className="space-y-3 rounded-lg border border-border/30 p-3">
-                  <div>
-                    <Label className="text-sm">Tipo de Investimento</Label>
-                    <Select value={investmentType} onValueChange={setInvestmentType}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {INVESTMENT_TYPES_OPTIONS.map(t => (
-                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-sm">Valor (R$)</Label>
-                    <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
-                      onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
-                  </div>
-                </div>
-              )}
-
-              {/* Patrimônio fields */}
-              {eventType === "patrimonio" && (
-                <div className="space-y-3 rounded-lg border border-border/30 p-3">
-                  <div>
-                    <Label className="text-sm">Valor (R$)</Label>
-                    <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
-                      onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setCashflowDirection("revenue")}
-                      className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
-                        cashflowDirection === "revenue" ? "bg-[hsl(var(--success))] text-white" : "bg-muted text-muted-foreground"
-                      )}
-                    >Entrada</button>
-                    <button
-                      onClick={() => setCashflowDirection("expense")}
-                      className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
-                        cashflowDirection === "expense" ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"
-                      )}
-                    >Saída</button>
-                  </div>
+              {/* Single-source payment fields (hidden when split is enabled) */}
+              {!splitEnabled && (
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-sm">Carteira</Label>
                     <Select value={accountId} onValueChange={setAccountId}>
-                      <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar conta" /></SelectTrigger>
+                      <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
                       <SelectContent>
                         {accounts.map((a: any) => (
                           <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
@@ -888,141 +954,296 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-              )}
-
-              {/* Project priority */}
-              {eventType === "project" && (
-                <div className="space-y-3 rounded-lg border border-border/30 p-3">
                   <div>
-                    <Label className="text-sm flex items-center gap-1.5"><Tag className="h-3.5 w-3.5" /> Prioridade</Label>
-                    <Select value={priority} onValueChange={setPriority}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Label className="text-sm">Forma Pgto</Label>
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <SelectTrigger className="text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="low">🟢 Baixa</SelectItem>
-                        <SelectItem value="medium">🟡 Média</SelectItem>
-                        <SelectItem value="high">🔴 Alta</SelectItem>
-                        <SelectItem value="urgent">🔥 Urgente</SelectItem>
+                        {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
               )}
 
-              {/* ─── Dates & Scheduling group ─── */}
-              <div className="space-y-3 rounded-lg border border-border/30 p-3">
-                <div className="flex items-center gap-3">
-                  {allDay ? (
-                    <div className="flex-1">
-                      <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Vencimento</Label>
-                      <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              {/* Split Payment Toggle */}
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox checked={splitEnabled} onCheckedChange={(c) => {
+                  const val = !!c;
+                  setSplitEnabled(val);
+                  if (val && splitLines.length === 0) addSplitLine();
+                }} id="split-toggle" />
+                <label htmlFor="split-toggle" className="text-xs cursor-pointer flex items-center gap-1.5">
+                  <SplitSquareVertical className="h-3.5 w-3.5" />
+                  Pagamento com múltiplas fontes
+                </label>
+              </div>
+
+              {/* Split Lines */}
+              {splitEnabled && (
+                <div className="space-y-2 rounded-md border border-border/30 p-2.5 bg-muted/10">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium flex items-center gap-1.5">
+                      <Receipt className="h-3.5 w-3.5" /> Fontes de pagamento
+                    </span>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={addSplitLine}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+
+                  {splitLines.map((line, idx) => (
+                    <div key={line.id} className="space-y-1.5 rounded border border-border/20 p-2 bg-background">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-muted-foreground font-medium">Fonte {idx + 1}</span>
+                        <button onClick={() => removeSplitLine(line.id)} className="text-muted-foreground hover:text-destructive">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <Select value={line.accountId} onValueChange={(v) => updateSplitLine(line.id, "accountId", v)}>
+                          <SelectTrigger className="text-xs h-8"><SelectValue placeholder="Carteira" /></SelectTrigger>
+                          <SelectContent>
+                            {accounts.map((a: any) => (
+                              <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select value={line.paymentMethod} onValueChange={(v) => updateSplitLine(line.id, "paymentMethod", v)}>
+                          <SelectTrigger className="text-xs h-8"><SelectValue placeholder="Forma" /></SelectTrigger>
+                          <SelectContent>
+                            {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Input
+                          type="text" inputMode="decimal" placeholder="0,00"
+                          value={line.amount}
+                          onChange={(e) => updateSplitLine(line.id, "amount", e.target.value.replace(/[^0-9.,]/g, ""))}
+                          className="text-xs h-8"
+                        />
+                      </div>
                     </div>
-                  ) : (
-                    <div className="flex-1">
-                      <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Vencimento</Label>
-                      <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  ))}
+
+                  {/* Progress bar */}
+                  {totalAmount > 0 && (
+                    <div className="space-y-1 pt-1">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-muted-foreground">
+                          {splitPct.toFixed(0)}% alocado
+                        </span>
+                        <span className={cn("font-medium",
+                          splitRemaining > 0.01 ? "text-warning" : splitRemaining < -0.01 ? "text-destructive" : "text-[hsl(var(--success))]"
+                        )}>
+                          {splitRemaining > 0.01 ? `Faltam R$ ${splitRemaining.toFixed(2)}` :
+                           splitRemaining < -0.01 ? `Excede R$ ${Math.abs(splitRemaining).toFixed(2)}` :
+                           "✓ 100% alocado"}
+                        </span>
+                      </div>
+                      <Progress value={Math.min(100, splitPct)} className="h-1.5" />
                     </div>
                   )}
-                  <div className="flex items-center gap-1.5 pt-5">
-                    <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
-                    <Label htmlFor="allday" className="text-sm whitespace-nowrap">Dia inteiro</Label>
-                  </div>
                 </div>
+              )}
 
-                {!allDay && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-sm flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Hora início</Label>
-                      <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Hora término</Label>
-                      <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                    </div>
-                  </div>
-                )}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="is-fixed-central" />
+                  <label htmlFor="is-fixed-central" className="text-xs cursor-pointer">Conta fixa</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid-central" />
+                  <label htmlFor="is-paid-central" className="text-xs cursor-pointer">Baixar conta</label>
+                </div>
+              </div>
+            </div>
+          )}
 
+          {/* Investment: type + amount */}
+          {eventType === "investment" && (
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <div>
+                <Label className="text-sm">Tipo de Investimento</Label>
+                <Select value={investmentType} onValueChange={setInvestmentType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {INVESTMENT_TYPES_OPTIONS.map(t => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Valor (R$)</Label>
+                <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
+                  onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
+              </div>
+            </div>
+          )}
+
+          {/* Patrimônio: create wallet/account */}
+          {eventType === "patrimonio" && (
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <p className="text-xs text-muted-foreground">Criar nova carteira ou conta no patrimônio.</p>
+              <div>
+                <Label className="text-sm">Nome da Carteira</Label>
+                <Input value={newAccName} onChange={(e) => setNewAccName(e.target.value)} placeholder="Ex: Nubank, Itaú..." />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="text-sm flex items-center gap-1.5"><Repeat className="h-3.5 w-3.5" /> Recorrência</Label>
-                  <Select value={recurrence} onValueChange={setRecurrence}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Label className="text-sm">Tipo</Label>
+                  <Select value={newAccType} onValueChange={setNewAccType}>
+                    <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {RECURRENCE_OPTIONS.map((r) => (
-                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                      {ACCOUNT_TYPES.map(t => (
+                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Weekly day selector */}
-                {recurrence === "FREQ=WEEKLY" && (
-                  <div>
-                    <Label className="text-sm mb-1.5 block">Dias da semana</Label>
-                    <div className="flex gap-1">
-                      {WEEKDAY_LABELS.map((label, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => toggleWeeklyDay(idx)}
-                          className={cn(
-                            "h-8 w-8 rounded-full text-xs font-medium transition-colors",
-                            weeklyDays.includes(idx)
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground hover:bg-accent"
-                          )}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {recurrence !== "none" && !item && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={recurrenceIndeterminate}
-                        onCheckedChange={(c) => setRecurrenceIndeterminate(!!c)}
-                        id="rec-indeterminate"
-                      />
-                      <Label htmlFor="rec-indeterminate" className="text-sm">Indeterminada</Label>
-                    </div>
-                    {!recurrenceIndeterminate && (
-                      <div>
-                        <Label className="text-sm flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Quantidade</Label>
-                        <Input type="number" min="1" max="365" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} />
-                      </div>
-                    )}
-                    {(recurrence === "FREQ=MONTHLY" || recurrence === "FREQ=QUARTERLY" || recurrence === "FREQ=SEMIANNUAL") && (
-                      <div>
-                        <Label className="text-sm">Repetir na:</Label>
-                        <Select value={recurrenceDateMode} onValueChange={(v) => setRecurrenceDateMode(v as RecurrenceDateMode)}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="same_date">Mesma data</SelectItem>
-                            <SelectItem value="first_business_day">Primeiro dia útil do mês</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Lembrete - inside dates group */}
                 <div>
-                  <Label className="text-sm flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Lembrete</Label>
-                  <Select value={reminder} onValueChange={setReminder}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Label className="text-sm">Moeda</Label>
+                  <Select value={newAccCurrency} onValueChange={setNewAccCurrency}>
+                    <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {REMINDER_OPTIONS.map((r) => (
-                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                      ))}
+                      <SelectItem value="BRL">R$ (Real)</SelectItem>
+                      <SelectItem value="USD">US$ (Dólar)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-            </>
+              <div>
+                <Label className="text-sm">Saldo Inicial ({newAccCurrency === "USD" ? "US$" : "R$"})</Label>
+                <Input type="text" inputMode="decimal" placeholder="0,00" value={newAccBalance}
+                  onChange={(e) => setNewAccBalance(e.target.value.replace(/[^0-9.,]/g, ""))} />
+              </div>
+            </div>
+          )}
+
+          {/* Project priority */}
+          {eventType === "project" && (
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <div>
+                <Label className="text-sm flex items-center gap-1.5"><Tag className="h-3.5 w-3.5" /> Prioridade</Label>
+                <Select value={priority} onValueChange={setPriority}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">🟢 Baixa</SelectItem>
+                    <SelectItem value="medium">🟡 Média</SelectItem>
+                    <SelectItem value="high">🔴 Alta</SelectItem>
+                    <SelectItem value="urgent">🔥 Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* ─── Dates & Scheduling group ─── */}
+          {eventType !== "patrimonio" && (
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Vencimento</Label>
+                  <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                </div>
+                <div className="flex items-center gap-1.5 pt-5">
+                  <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
+                  <Label htmlFor="allday" className="text-sm whitespace-nowrap">Dia inteiro</Label>
+                </div>
+              </div>
+
+              {!allDay && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-sm flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Hora início</Label>
+                    <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Hora término</Label>
+                    <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <Label className="text-sm flex items-center gap-1.5"><Repeat className="h-3.5 w-3.5" /> Recorrência</Label>
+                <Select value={recurrence} onValueChange={setRecurrence}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {RECURRENCE_OPTIONS.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {recurrence === "FREQ=WEEKLY" && (
+                <div>
+                  <Label className="text-sm mb-1.5 block">Dias da semana</Label>
+                  <div className="flex gap-1">
+                    {WEEKDAY_LABELS.map((label, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => toggleWeeklyDay(idx)}
+                        className={cn(
+                          "h-8 w-8 rounded-full text-xs font-medium transition-colors",
+                          weeklyDays.includes(idx)
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-accent"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {recurrence !== "none" && !item && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={recurrenceIndeterminate}
+                      onCheckedChange={(c) => setRecurrenceIndeterminate(!!c)}
+                      id="rec-indeterminate"
+                    />
+                    <Label htmlFor="rec-indeterminate" className="text-sm">Indeterminada</Label>
+                  </div>
+                  {!recurrenceIndeterminate && (
+                    <div>
+                      <Label className="text-sm flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Quantidade</Label>
+                      <Input type="number" min="1" max="365" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} />
+                    </div>
+                  )}
+                  {(recurrence === "FREQ=MONTHLY" || recurrence === "FREQ=QUARTERLY" || recurrence === "FREQ=SEMIANNUAL") && (
+                    <div>
+                      <Label className="text-sm">Repetir na:</Label>
+                      <Select value={recurrenceDateMode} onValueChange={(v) => setRecurrenceDateMode(v as RecurrenceDateMode)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="same_date">Mesma data</SelectItem>
+                          <SelectItem value="first_business_day">Primeiro dia útil do mês</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div>
+                <Label className="text-sm flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Lembrete</Label>
+                <Select value={reminder} onValueChange={setReminder}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {REMINDER_OPTIONS.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           )}
         </div>
 

@@ -207,6 +207,157 @@ function ToggleRow({
   );
 }
 
+/** Finanças preferences sub-tab with cost centers management */
+function FinancesPrefsTab({
+  isTabOn,
+  isTabLocked,
+  handleModuleToggle,
+  user,
+}: {
+  isTabOn: (mod: string, tab: string) => boolean;
+  isTabLocked: (mod: string, tab: string) => boolean;
+  handleModuleToggle: (mod: string, tab: string, checked: boolean) => void;
+  user: any;
+}) {
+  const { toast } = useToast();
+  const [costCenters, setCostCenters] = useState<any[]>([]);
+  const [ccDialogOpen, setCcDialogOpen] = useState(false);
+  const [editingCc, setEditingCc] = useState<any>(null);
+  const [ccName, setCcName] = useState("");
+  const [ccDesc, setCcDesc] = useState("");
+  const [ccColor, setCcColor] = useState("#3b82f6");
+
+  const CC_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
+
+  useEffect(() => {
+    if (!user) return;
+    fetchCostCenters();
+  }, [user]);
+
+  const fetchCostCenters = async () => {
+    if (!user) return;
+    const { data } = await supabase.from("cost_centers" as any).select("*").eq("user_id", user.id).order("name");
+    if (data) setCostCenters(data as any[]);
+  };
+
+  const openNewCc = () => {
+    setEditingCc(null); setCcName(""); setCcDesc(""); setCcColor("#3b82f6");
+    setCcDialogOpen(true);
+  };
+
+  const openEditCc = (cc: any) => {
+    setEditingCc(cc); setCcName(cc.name); setCcDesc(cc.description || ""); setCcColor(cc.color || "#3b82f6");
+    setCcDialogOpen(true);
+  };
+
+  const saveCc = async () => {
+    if (!ccName.trim() || !user) return;
+    const payload: any = { name: ccName.trim(), description: ccDesc || null, color: ccColor, user_id: user.id, is_active: true };
+    if (editingCc) {
+      await supabase.from("cost_centers" as any).update(payload).eq("id", editingCc.id);
+    } else {
+      await supabase.from("cost_centers" as any).insert(payload);
+    }
+    setCcDialogOpen(false);
+    fetchCostCenters();
+    toast({ title: "Centro de custo salvo!" });
+  };
+
+  const deleteCc = async () => {
+    if (!editingCc) return;
+    await supabase.from("cost_centers" as any).delete().eq("id", editingCc.id);
+    setCcDialogOpen(false);
+    fetchCostCenters();
+    toast({ title: "Centro de custo excluído" });
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">Abas e configurações do módulo financeiro.</p>
+      <div className="space-y-1.5">
+        {FINANCE_TABS.map((tab) => (
+          <ToggleRow
+            key={tab.key}
+            icon={<DollarSign className="h-5 w-5" />}
+            iconColor={SECTION_COLORS.finances}
+            label={tab.label}
+            desc={tab.desc}
+            enabled={isTabOn("finances", tab.key)}
+            locked={tab.locked}
+            onToggle={(checked) => handleModuleToggle("finances", tab.key, checked)}
+          />
+        ))}
+      </div>
+
+      {/* Centro de Custos */}
+      <div className="pt-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">Centros de Custo. Clique duas vezes para editar.</p>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openNewCc}>
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <div className="space-y-1.5 mt-1.5">
+          {costCenters.map((cc: any) => (
+            <ToggleRow
+              key={cc.id}
+              colorDot={cc.color}
+              label={cc.name}
+              desc={cc.description || "Sem descrição"}
+              onDoubleClick={() => openEditCc(cc)}
+            />
+          ))}
+          {costCenters.length === 0 && (
+            <p className="py-4 text-center text-xs text-muted-foreground">Nenhum centro de custo cadastrado</p>
+          )}
+        </div>
+      </div>
+
+      {/* Cost Center Dialog */}
+      <Dialog open={ccDialogOpen} onOpenChange={setCcDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-sm">{editingCc ? "Editar Centro de Custo" : "Novo Centro de Custo"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-xs">Nome</Label>
+              <Input value={ccName} onChange={(e) => setCcName(e.target.value)} className="mt-1 text-xs" placeholder="Ex: TI, Marketing..." />
+            </div>
+            <div>
+              <Label className="text-xs">Descrição</Label>
+              <Input value={ccDesc} onChange={(e) => setCcDesc(e.target.value)} className="mt-1 text-xs" placeholder="Opcional" />
+            </div>
+            <div>
+              <Label className="text-xs">Cor</Label>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {CC_COLORS.map((color) => (
+                  <button key={color} onClick={() => setCcColor(color)}
+                    className={cn("h-6 w-6 rounded-full border-2 transition-transform",
+                      ccColor === color ? "scale-110 border-foreground" : "border-transparent"
+                    )} style={{ backgroundColor: color }} />
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-4 border-t border-border/20">
+              {editingCc && (
+                <Button variant="destructive" size="sm" className="gap-1.5 text-xs" onClick={deleteCc}>
+                  <Trash2 className="h-3.5 w-3.5" /> Excluir
+                </Button>
+              )}
+              <div className="flex gap-2 ml-auto">
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setCcDialogOpen(false)}>Cancelar</Button>
+                <Button size="sm" className="text-xs gap-1.5" onClick={saveCc} disabled={!ccName.trim()}>
+                  <Save className="h-3.5 w-3.5" /> Salvar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 export default function PreferencesView() {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -504,23 +655,12 @@ export default function PreferencesView() {
 
           {/* ═══ FINANÇAS ═══ */}
           {activeTab === "finances" && (
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">Abas e configurações do módulo financeiro.</p>
-              <div className="space-y-1.5">
-                {FINANCE_TABS.map((tab) => (
-                  <ToggleRow
-                    key={tab.key}
-                    icon={<DollarSign className="h-5 w-5" />}
-                    iconColor={SECTION_COLORS.finances}
-                    label={tab.label}
-                    desc={tab.desc}
-                    enabled={isTabOn("finances", tab.key)}
-                    locked={tab.locked}
-                    onToggle={(checked) => handleModuleToggle("finances", tab.key, checked)}
-                  />
-                ))}
-              </div>
-            </div>
+            <FinancesPrefsTab
+              isTabOn={isTabOn}
+              isTabLocked={isTabLocked}
+              handleModuleToggle={handleModuleToggle}
+              user={user}
+            />
           )}
 
           {/* ═══ INVESTIMENTOS ═══ */}
