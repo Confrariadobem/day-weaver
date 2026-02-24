@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Save,
@@ -190,6 +191,18 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   const [counterpart, setCounterpart] = useState("");
   const [isFixed, setIsFixed] = useState(false);
   const [allDay, setAllDay] = useState(true);
+  const [costCenterId, setCostCenterId] = useState("");
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [splitLines, setSplitLines] = useState<{ id: string; accountId: string; paymentMethod: string; amount: string }[]>([]);
+
+  const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
+  const splitTotal = splitLines.reduce((s, l) => s + parseNum(l.amount), 0);
+  const totalAmountNum = parseNum(amount);
+  const splitRemaining = totalAmountNum - splitTotal;
+  const splitPct = totalAmountNum > 0 ? (splitTotal / totalAmountNum) * 100 : 0;
+  const addSplitLine = () => setSplitLines(prev => [...prev, { id: crypto.randomUUID(), accountId: "", paymentMethod: "", amount: splitRemaining > 0 ? splitRemaining.toFixed(2).replace(".", ",") : "" }]);
+  const updateSplitLine = (id: string, field: string, value: string) => setSplitLines(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l));
+  const removeSplitLine = (id: string) => setSplitLines(prev => prev.filter(l => l.id !== id));
 
   // Account form state
   const [accName, setAccName] = useState("");
@@ -230,7 +243,8 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     setEntryDate(format(new Date(), "yyyy-MM-dd")); setType("expense");
     setRecurrence("none"); setRecurrenceCount("12"); setRecurrenceDateMode("same_date");
     setEditingEntry(null); setAccountId(""); setPaymentMethod(""); setIsPaid(false);
-    setCounterpart(""); setIsFixed(false); setAllDay(true);
+    setCounterpart(""); setIsFixed(false); setAllDay(true); setCostCenterId("");
+    setSplitEnabled(false); setSplitLines([]);
   };
 
   const resetAccForm = () => {
@@ -253,12 +267,13 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     }
   };
 
-  const openEditDialog = (entry: any) => {
+  const openEditDialog = async (entry: any) => {
     setEditingEntry(entry);
     setTitle(entry.title.replace(/\s*\(\d+\/\d+\)$/, ""));
     setAmount(String(entry.amount));
     setType(entry.type as "revenue" | "expense");
     setCategoryId(entry.category_id || "");
+    setCostCenterId(entry.cost_center_id || "");
     setProjectId(entry.project_id || "");
     setEntryDate(entry.entry_date);
     setAccountId(entry.account_id || "");
@@ -268,6 +283,21 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     setIsFixed(entry.is_fixed || false);
     setInstallments("1");
     setRecurrence("none");
+    // Load existing splits
+    if (entry.has_split) {
+      const { data: splits } = await supabase.from("payment_splits" as any).select("*").eq("entry_id", entry.id);
+      if (splits && splits.length > 0) {
+        setSplitEnabled(true);
+        setSplitLines((splits as any[]).map((s: any) => ({
+          id: s.id, accountId: s.account_id || "", paymentMethod: s.payment_method || "",
+          amount: String(s.amount),
+        })));
+      } else {
+        setSplitEnabled(false); setSplitLines([]);
+      }
+    } else {
+      setSplitEnabled(false); setSplitLines([]);
+    }
     setDialogOpen(true);
   };
 
@@ -292,16 +322,20 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
 
   const createOrUpdateEntry = async () => {
     if (!title.trim() || !amount || !user) return;
-    if (isPaid && (!accountId || !paymentMethod)) return;
+    if (isPaid && !splitEnabled && (!accountId || !paymentMethod)) return;
 
     if (editingEntry) {
       const updateData: any = {
         title, amount: parseFloat(amount), type,
         category_id: categoryId || null, project_id: projectId || null,
-        entry_date: entryDate, account_id: accountId || null,
-        payment_method: paymentMethod || null, is_paid: isPaid,
+        cost_center_id: costCenterId || null,
+        entry_date: entryDate,
+        account_id: splitEnabled ? null : (accountId || null),
+        payment_method: splitEnabled ? null : (paymentMethod || null),
+        is_paid: isPaid,
         payment_date: isPaid ? format(new Date(), "yyyy-MM-dd") : null,
         counterpart: counterpart || null, is_fixed: isFixed,
+        has_split: splitEnabled && splitLines.length > 0,
       };
       if (recurrenceEditDialog.mode === "all" && editingEntry.installment_group) {
         const allGroup = entries.filter(
@@ -318,6 +352,18 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       } else {
         await supabase.from("financial_entries").update(updateData).eq("id", editingEntry.id);
       }
+      // Update splits for edited entry
+      if (editingEntry && !recurrenceEditDialog.mode) {
+        await supabase.from("payment_splits" as any).delete().eq("entry_id", editingEntry.id);
+        if (splitEnabled && splitLines.length > 0) {
+          const splits = splitLines.map(l => ({
+            entry_id: editingEntry.id, user_id: user.id,
+            account_id: l.accountId || null, payment_method: l.paymentMethod || null,
+            amount: parseNum(l.amount),
+          }));
+          await supabase.from("payment_splits" as any).insert(splits);
+        }
+      }
     } else {
       const baseAmount = parseFloat(amount);
       const baseDate = new Date(entryDate);
@@ -330,13 +376,24 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             title: `${title} (${i + 1}/${count})`,
             amount: baseAmount, type,
             category_id: categoryId || null, project_id: projectId || null,
+            cost_center_id: costCenterId || null,
             entry_date: format(getNextDate(baseDate, recurrence, i, recurrenceDateMode), "yyyy-MM-dd"),
             installment_group: group, installment_number: i + 1, total_installments: count,
-            account_id: accountId || null, payment_method: paymentMethod || null,
+            account_id: splitEnabled ? null : (accountId || null),
+            payment_method: splitEnabled ? null : (paymentMethod || null),
             is_paid: i === 0 ? isPaid : false,
             counterpart: counterpart || null, is_fixed: isFixed,
+            has_split: splitEnabled && splitLines.length > 0,
           }));
-        await supabase.from("financial_entries").insert(entriesToInsert);
+        const { data: inserted } = await supabase.from("financial_entries").insert(entriesToInsert).select("id");
+        if (splitEnabled && splitLines.length > 0 && inserted?.[0]) {
+          const splits = splitLines.map(l => ({
+            entry_id: inserted[0].id, user_id: user.id,
+            account_id: l.accountId || null, payment_method: l.paymentMethod || null,
+            amount: parseNum(l.amount),
+          }));
+          await supabase.from("payment_splits" as any).insert(splits);
+        }
       } else {
         const numInst = Math.max(1, parseInt(installments) || 1);
         const instGroup = numInst > 1 ? crypto.randomUUID() : null;
@@ -345,23 +402,50 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             title: numInst > 1 ? `${title} (${i + 1}/${numInst})` : title,
             amount: baseAmount / numInst, type,
             category_id: categoryId || null, project_id: projectId || null,
+            cost_center_id: costCenterId || null,
             entry_date: format(addMonths(baseDate, i), "yyyy-MM-dd"),
             installment_group: instGroup, installment_number: i + 1, total_installments: numInst,
-            account_id: accountId || null, payment_method: paymentMethod || null,
+            account_id: splitEnabled ? null : (accountId || null),
+            payment_method: splitEnabled ? null : (paymentMethod || null),
             is_paid: i === 0 ? isPaid : false,
             counterpart: counterpart || null, is_fixed: isFixed,
+            has_split: splitEnabled && splitLines.length > 0,
           }));
-        await supabase.from("financial_entries").insert(entriesToInsert);
+        const { data: inserted } = await supabase.from("financial_entries").insert(entriesToInsert).select("id");
+        if (splitEnabled && splitLines.length > 0 && inserted?.[0]) {
+          const splits = splitLines.map(l => ({
+            entry_id: inserted[0].id, user_id: user.id,
+            account_id: l.accountId || null, payment_method: l.paymentMethod || null,
+            amount: parseNum(l.amount),
+          }));
+          await supabase.from("payment_splits" as any).insert(splits);
+        }
       }
     }
 
-    if (isPaid && accountId) {
+    if (isPaid && !splitEnabled && accountId) {
       const account = accounts.find(a => a.id === accountId);
       if (account) {
         const delta = type === "revenue" ? parseFloat(amount) : -parseFloat(amount);
         await supabase.from("financial_accounts").update({
           current_balance: account.current_balance + delta,
         }).eq("id", accountId);
+      }
+    }
+
+    // Update balances for split payments
+    if (isPaid && splitEnabled && splitLines.length > 0) {
+      for (const line of splitLines) {
+        if (line.accountId) {
+          const amt = parseNum(line.amount);
+          const account = accounts.find(a => a.id === line.accountId);
+          if (account && amt > 0) {
+            const delta = type === "revenue" ? amt : -amt;
+            await supabase.from("financial_accounts").update({
+              current_balance: account.current_balance + delta,
+            }).eq("id", line.accountId);
+          }
+        }
       }
     }
 
@@ -399,7 +483,6 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   // Helper to parse date-only strings without timezone issues
   const parseEntryDate = (d: string) => new Date(d + "T12:00:00");
 
-  const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
 
   const saveAccount = async () => {
     if (!accName.trim() || !user) return;
@@ -889,9 +972,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Centro de Custo</Label>
-            <Select value={(editingEntry as any)?.cost_center_id || ""} onValueChange={(v) => {
-              if (editingEntry) setEditingEntry({ ...editingEntry, cost_center_id: v === "__clear__" ? null : v });
-            }}>
+            <Select value={costCenterId} onValueChange={(v) => setCostCenterId(v === "__clear__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Centro de custo (opcional)" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__clear__"><span className="text-muted-foreground italic">Nenhum</span></SelectItem>
@@ -923,43 +1004,110 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <Wallet className="h-3.5 w-3.5" /> Pagamento {isPaid && <span className="text-destructive">*</span>}
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-xs text-muted-foreground">Carteira</Label>
-              <Select value={accountId} onValueChange={setAccountId}>
-                <SelectTrigger className={cn("text-xs", isPaid && !accountId && "border-destructive")}><SelectValue placeholder={isPaid ? "Conta (obrigatório)" : "Conta (opcional)"} /></SelectTrigger>
-                <SelectContent>
-                  {accounts.filter(a => a.is_active).map(a => (
-                    <SelectItem key={a.id} value={a.id}>
-                      <span className="flex items-center gap-1.5">
-                        {ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon}
-                        {a.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {!splitEnabled && (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">Carteira</Label>
+                <Select value={accountId} onValueChange={setAccountId}>
+                  <SelectTrigger className={cn("text-xs", isPaid && !accountId && "border-destructive")}><SelectValue placeholder={isPaid ? "Conta (obrigatório)" : "Conta (opcional)"} /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.filter(a => a.is_active).map(a => (
+                      <SelectItem key={a.id} value={a.id}>
+                        <span className="flex items-center gap-1.5">
+                          {ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon}
+                          {a.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Forma Pgto</Label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger className={cn("text-xs", isPaid && !paymentMethod && "border-destructive")}><SelectValue placeholder={isPaid ? "Forma Pgto (obrigatório)" : "Forma Pgto"} /></SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Forma Pgto</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger className={cn("text-xs", isPaid && !paymentMethod && "border-destructive")}><SelectValue placeholder={isPaid ? "Forma Pgto (obrigatório)" : "Forma Pgto"} /></SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          )}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="is-fixed" />
               <label htmlFor="is-fixed" className="text-xs cursor-pointer">Conta fixa</label>
             </div>
             <div className="flex items-center gap-2">
+              <Checkbox checked={splitEnabled} onCheckedChange={(c) => {
+                const val = !!c;
+                setSplitEnabled(val);
+                if (val && splitLines.length === 0) addSplitLine();
+              }} id="split-edit" />
+              <label htmlFor="split-edit" className="text-xs cursor-pointer">Múltiplas carteiras</label>
+            </div>
+            <div className="flex items-center gap-2">
               <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid" />
               <label htmlFor="is-paid" className="text-xs cursor-pointer">Baixar conta</label>
             </div>
           </div>
+          {/* Split Lines */}
+          {splitEnabled && (
+            <div className="space-y-2 rounded-md border border-border/30 p-2.5 bg-muted/10">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium flex items-center gap-1.5">
+                  <WalletCards className="h-3.5 w-3.5" /> Fontes de pagamento
+                </span>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={addSplitLine}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {splitLines.map((line, idx) => (
+                <div key={line.id} className="space-y-1.5 rounded border border-border/20 p-2 bg-background">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-muted-foreground font-medium">Fonte {idx + 1}</span>
+                    <button onClick={() => removeSplitLine(line.id)} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Select value={line.accountId} onValueChange={(v) => updateSplitLine(line.id, "accountId", v)}>
+                      <SelectTrigger className="text-xs h-8"><SelectValue placeholder="Carteira" /></SelectTrigger>
+                      <SelectContent>
+                        {accounts.filter(a => a.is_active).map(a => (
+                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={line.paymentMethod} onValueChange={(v) => updateSplitLine(line.id, "paymentMethod", v)}>
+                      <SelectTrigger className="text-xs h-8"><SelectValue placeholder="Forma" /></SelectTrigger>
+                      <SelectContent>
+                        {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Input type="text" inputMode="decimal" placeholder="0,00" value={line.amount}
+                    onChange={(e) => updateSplitLine(line.id, "amount", e.target.value.replace(/[^0-9.,]/g, ""))}
+                    className="text-xs h-8" />
+                </div>
+              ))}
+              {totalAmountNum > 0 && (
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-muted-foreground">{splitPct.toFixed(0)}% alocado</span>
+                    <span className={cn("font-medium",
+                      splitRemaining > 0.01 ? "text-warning" : splitRemaining < -0.01 ? "text-destructive" : "text-[hsl(var(--success))]"
+                    )}>
+                      {splitRemaining > 0.01 ? `Faltam R$ ${splitRemaining.toFixed(2)}` :
+                       splitRemaining < -0.01 ? `Excede R$ ${Math.abs(splitRemaining).toFixed(2)}` :
+                       "✓ 100% alocado"}
+                    </span>
+                  </div>
+                  <Progress value={Math.min(100, splitPct)} className="h-1.5" />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       {/* Standardized footer */}
@@ -1092,6 +1240,17 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                   <>
                     <span className="text-xs text-muted-foreground">{selectedIds.size} selecionados</span>
                     <Button size="sm" variant="ghost"
+                      className="h-7 px-2.5 text-xs gap-1 text-[hsl(var(--success))] hover:text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] rounded-full"
+                      onClick={async () => {
+                        const ids = Array.from(selectedIds);
+                        await supabase.from("financial_entries").update({
+                          is_paid: true, payment_date: format(new Date(), "yyyy-MM-dd"),
+                        }).in("id", ids);
+                        setSelectedIds(new Set());
+                        fetchData();
+                      }}
+                    ><Check className="h-3 w-3" /> Baixar contas</Button>
+                    <Button size="sm" variant="ghost"
                       className="h-7 px-2.5 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
                       onClick={async () => {
                         const ids = Array.from(selectedIds);
@@ -1206,8 +1365,9 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                           "group cursor-pointer transition-colors hover:bg-muted/20",
                           idx > 0 && "border-t border-border/10",
                           isBreakEven && "bg-primary/5",
-                          isOverdue && !isBreakEven && (e.type === "expense" ? "bg-destructive/8" : "bg-success/8"),
-                          isSelected && "bg-primary/5"
+                          isOverdue && !isBreakEven && e.type === "expense" && "bg-destructive/15",
+                          isOverdue && !isBreakEven && e.type === "revenue" && "bg-[hsl(var(--success)/0.12)]",
+                          isSelected && "bg-primary/10"
                         )}
                         onClick={() => handleRowClick(e)}
                       >
@@ -1226,7 +1386,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                         </td>
                         <td className="py-2.5 px-2 text-muted-foreground/60 truncate max-w-[120px]">{e.counterpart || "—"}</td>
                         <td className="py-2.5 px-2 text-muted-foreground/60">{cat?.name || "—"}</td>
-                        <td className="py-2.5 px-2 text-muted-foreground/60 text-xs">{e.cost_center_id ? "●" : "—"}</td>
+                        <td className="py-2.5 px-2 text-muted-foreground/60 text-xs truncate max-w-[100px]">{costCenters.find((cc: any) => cc.id === e.cost_center_id)?.name || "—"}</td>
                         <td className="py-2.5 px-2">
                           <span className={cn("text-xs font-medium", e.type === "revenue" ? "text-success" : "text-destructive")}>
                             {e.type === "revenue" ? "Receita" : "Despesa"}
