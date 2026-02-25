@@ -20,7 +20,7 @@ import {
   Printer, FileDown, FileUp, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
   CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
-  Filter, BarChart3,
+  Filter, BarChart3, Copy, FolderKanban, ListChecks,
 } from "lucide-react";
 import {
   format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
@@ -35,13 +35,13 @@ import {
 import type { Tables as DBTables } from "@/integrations/supabase/types";
 
 type PeriodFilter = "daily" | "3days" | "weekly" | "monthly" | "yearly" | "custom";
-type SortField = "title" | "amount" | "entry_date" | "type" | "category" | "is_paid" | "balance";
+type SortField = "title" | "amount" | "entry_date" | "type" | "category" | "is_paid" | "balance" | "counterpart" | "cost_center";
 type SortDir = "asc" | "desc";
 type RecurrenceType = "none" | "daily" | "weekly" | "biweekly" | "monthly" | "quarterly" | "semiannual" | "yearly";
 type RecurrenceDateMode = "same_date" | "first_business_day";
 type ViewTab = "indicadores" | "previsao" | "doar";
 type AccountType = "bank_account" | "credit_card" | "investment" | "wallet" | "cash" | "crypto";
-type CashFlowFilter = "all" | "payable" | "receivable" | "overdue" | "pending";
+type CashFlowFilter = "all" | "payable" | "receivable" | "overdue" | "paid";
 
 interface FinancialAccount {
   id: string; user_id: string; name: string; type: string;
@@ -156,8 +156,12 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   const [customPeriodEnabled, setCustomPeriodEnabled] = useState(false);
   const [customStart, setCustomStart] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEnd, setCustomEnd] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
+  const [doarCustomPeriodEnabled, setDoarCustomPeriodEnabled] = useState(false);
   const [doarCustomStart, setDoarCustomStart] = useState(format(startOfYear(new Date()), "yyyy-MM-dd"));
   const [doarCustomEnd, setDoarCustomEnd] = useState(format(endOfYear(new Date()), "yyyy-MM-dd"));
+  const [indicCustomPeriodEnabled, setIndicCustomPeriodEnabled] = useState(false);
+  const [indicCustomStart, setIndicCustomStart] = useState(format(startOfYear(new Date()), "yyyy-MM-dd"));
+  const [indicCustomEnd, setIndicCustomEnd] = useState(format(endOfYear(new Date()), "yyyy-MM-dd"));
   const [recurrenceEditDialog, setRecurrenceEditDialog] = useState<{ entry: any; mode: "single" | "all" | null }>({ entry: null, mode: null });
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
@@ -172,7 +176,6 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   const [deleteEntryConfirm, setDeleteEntryConfirm] = useState<string | null>(null);
-  const [showPaidItems, setShowPaidItems] = useState(false);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -483,7 +486,6 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   // Helper to parse date-only strings without timezone issues
   const parseEntryDate = (d: string) => new Date(d + "T12:00:00");
 
-
   const saveAccount = async () => {
     if (!accName.trim() || !user) return;
     const bal = parseNum(accBalance);
@@ -511,7 +513,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
 
   const now = new Date();
 
-  // Fluxo de caixa: all entries by default, or filtered by custom period
+  // Fluxo de caixa: filter logic
   const filtered = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const query = searchQuery.toLowerCase().trim();
@@ -525,12 +527,12 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
           const end = parseEntryDate(customEnd);
           if (d < start || d > end) return false;
         }
-        // Filter by cash flow type (excluding "paid" — paid items go to hidden section)
+        // Filter by cash flow type
+        if (cashFlowFilter === "paid") return e.is_paid;
         if (cashFlowFilter === "payable") return e.type === "expense" && !e.is_paid;
         if (cashFlowFilter === "receivable") return e.type === "revenue" && !e.is_paid;
         if (cashFlowFilter === "overdue") { const ed = parseEntryDate(e.entry_date); return !e.is_paid && ed < today; }
-        if (cashFlowFilter === "pending") return !e.is_paid;
-        // "all" filter: show unpaid only (paid go to hidden section)
+        // "all" filter: show unpaid only
         return !e.is_paid;
       })
       .filter((e) => {
@@ -540,21 +542,30 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       })
       .sort((a, b) => {
         const today = new Date(); today.setHours(0, 0, 0, 0);
-        const aOverdue = !a.is_paid && parseEntryDate(a.entry_date) < today;
-        const bOverdue = !b.is_paid && parseEntryDate(b.entry_date) < today;
-        // Overdue items always at top
-        if (aOverdue && !bOverdue) return -1;
-        if (!aOverdue && bOverdue) return 1;
+        // For non-paid views, overdue items always at top
+        if (cashFlowFilter !== "paid") {
+          const aOverdue = !a.is_paid && parseEntryDate(a.entry_date) < today;
+          const bOverdue = !b.is_paid && parseEntryDate(b.entry_date) < today;
+          if (aOverdue && !bOverdue) return -1;
+          if (!aOverdue && bOverdue) return 1;
+        }
         
         // Then sort by selected field
         let aVal: any, bVal: any;
         if (sortField === "category") {
           aVal = categories.find(c => c.id === a.category_id)?.name || "";
           bVal = categories.find(c => c.id === b.category_id)?.name || "";
+        } else if (sortField === "counterpart") {
+          aVal = a.counterpart || "";
+          bVal = b.counterpart || "";
+        } else if (sortField === "cost_center") {
+          aVal = costCenters.find((cc: any) => cc.id === a.cost_center_id)?.name || "";
+          bVal = costCenters.find((cc: any) => cc.id === b.cost_center_id)?.name || "";
         } else if (sortField === "is_paid") {
           aVal = a.is_paid ? 1 : 0; bVal = b.is_paid ? 1 : 0;
         } else if (sortField === "balance") {
-          return 0;
+          // Sort by running balance order (entry_date)
+          aVal = a.entry_date; bVal = b.entry_date;
         } else {
           aVal = a[sortField]; bVal = b[sortField];
         }
@@ -562,32 +573,28 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, sortField, sortDir, categories, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd]);
+  }, [entries, sortField, sortDir, categories, costCenters, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd]);
 
-  // Paid items (hidden section)
-  const paidItems = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-    return entries
-      .filter((e) => {
-        if (!e.is_paid) return false;
-        if (customPeriodEnabled) {
-          const d = parseEntryDate(e.entry_date);
-          const start = parseEntryDate(customStart);
-          const end = parseEntryDate(customEnd);
-          if (d < start || d > end) return false;
-        }
-        if (!query) return true;
-        const cat = categories.find(c => c.id === e.category_id)?.name || "";
-        return e.title.toLowerCase().includes(query) || cat.toLowerCase().includes(query);
-      })
-      .sort((a, b) => a.entry_date.localeCompare(b.entry_date));
-  }, [entries, searchQuery, customPeriodEnabled, customStart, customEnd, categories]);
+  // KPI totals based on current filter
+  const kpiData = useMemo(() => {
+    const source = cashFlowFilter === "paid" ? filtered : filtered;
+    const totalRevenue = source.filter((e) => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
+    const totalExpense = source.filter((e) => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
+    const balance = totalRevenue - totalExpense;
+    return { totalRevenue, totalExpense, balance };
+  }, [filtered, cashFlowFilter]);
 
-  const totalRevenue = filtered.filter((e) => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
-  const totalExpense = filtered.filter((e) => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
-  const balance = totalRevenue - totalExpense;
+  const totalAvailable = accounts.reduce((s, a) => {
+    if (a.type === "credit_card") return s;
+    return s + a.current_balance;
+  }, 0);
 
   const runningBalances = useMemo(() => {
+    if (cashFlowFilter === "paid") {
+      // For paid items, no running balance needed
+      const balanceMap = new Map<string, number>();
+      return { balanceMap, breakEvenId: null };
+    }
     const sorted = [...filtered].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
     let running = 0;
     const balanceMap = new Map<string, number>();
@@ -601,12 +608,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       }
     }
     return { balanceMap, breakEvenId };
-  }, [filtered]);
-
-  const totalAvailable = accounts.reduce((s, a) => {
-    if (a.type === "credit_card") return s;
-    return s + a.current_balance;
-  }, 0);
+  }, [filtered, cashFlowFilter]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -631,18 +633,29 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     });
   }, [categories]);
 
-  // DRE / DOAR data
+  // DRE / DOAR data - now with optional period filtering
   const dreData = useMemo(() => {
     const yr = doarYear;
     const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
     const revenueCategories = categories.filter(c => c.is_revenue);
     const expenseCategories = categories.filter(c => c.is_expense);
 
-    const getMonthEntries = (month: Date) =>
-      entries.filter(e => {
+    const getMonthEntries = (month: Date) => {
+      let monthEntries = entries.filter(e => {
         const d = new Date(e.entry_date);
         return d.getMonth() === month.getMonth() && d.getFullYear() === yr;
       });
+      // Apply DOAR custom period filter if enabled
+      if (doarCustomPeriodEnabled) {
+        const pStart = parseEntryDate(doarCustomStart);
+        const pEnd = parseEntryDate(doarCustomEnd);
+        monthEntries = monthEntries.filter(e => {
+          const d = parseEntryDate(e.entry_date);
+          return d >= pStart && d <= pEnd;
+        });
+      }
+      return monthEntries;
+    };
 
     const getEntriesForCatMonth = (catId: string, month: Date, type: string) =>
       getMonthEntries(month).filter(e => e.type === type && e.category_id === catId);
@@ -651,6 +664,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     const carryOver = prevYearEntries.reduce((s, e) =>
       s + (e.type === "revenue" ? Number(e.amount) : -Number(e.amount)), 0);
 
+    // Include ALL revenue/expense categories (even if no data yet)
     const revRows = revenueCategories
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
       .map(cat => ({
@@ -706,14 +720,26 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       months: months.map(m => format(m, "MMM", { locale: ptBR }).toUpperCase()),
       revRows, expRows, monthTotalsRev, monthTotalsExp, monthBalance, accumulated, carryOver,
     };
-  }, [entries, categories, doarYear]);
+  }, [entries, categories, doarYear, doarCustomPeriodEnabled, doarCustomStart, doarCustomEnd]);
+
+  // Indicator chart data - with optional period filtering
+  const indicatorEntries = useMemo(() => {
+    if (!indicCustomPeriodEnabled) return entries;
+    const pStart = parseEntryDate(indicCustomStart);
+    const pEnd = parseEntryDate(indicCustomEnd);
+    return entries.filter(e => {
+      const d = parseEntryDate(e.entry_date);
+      return d >= pStart && d <= pEnd;
+    });
+  }, [entries, indicCustomPeriodEnabled, indicCustomStart, indicCustomEnd]);
 
   const reportChartData = useMemo(() => {
     const yr = doarYear;
     const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
     let accumulated = 0;
     return months.map(month => {
-      const mEntries = entries.filter(e => {
+      const src = indicCustomPeriodEnabled ? indicatorEntries : entries;
+      const mEntries = src.filter(e => {
         const d = new Date(e.entry_date);
         return d.getMonth() === month.getMonth() && d.getFullYear() === yr;
       });
@@ -722,11 +748,12 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       accumulated += rev - exp;
       return { month: format(month, "MMM", { locale: ptBR }).toUpperCase(), receita: rev, despesa: exp, saldo: rev - exp, acumulado: accumulated };
     });
-  }, [entries, doarYear]);
+  }, [entries, indicatorEntries, doarYear, indicCustomPeriodEnabled]);
 
   const categoryPieData = useMemo(() => {
     const yr = doarYear;
-    const yearEntries = entries.filter(e => new Date(e.entry_date).getFullYear() === yr);
+    const src = indicCustomPeriodEnabled ? indicatorEntries : entries;
+    const yearEntries = src.filter(e => new Date(e.entry_date).getFullYear() === yr);
     const map = new Map<string, { name: string; value: number; color: string }>();
     yearEntries.filter(e => e.type === "expense").forEach(e => {
       const cat = categories.find(c => c.id === e.category_id);
@@ -737,11 +764,12 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       map.set(name, prev);
     });
     return Array.from(map.values()).sort((a, b) => b.value - a.value);
-  }, [entries, categories, doarYear]);
+  }, [entries, indicatorEntries, categories, doarYear, indicCustomPeriodEnabled]);
 
   const revenuePieData = useMemo(() => {
     const yr = doarYear;
-    const yearEntries = entries.filter(e => new Date(e.entry_date).getFullYear() === yr);
+    const src = indicCustomPeriodEnabled ? indicatorEntries : entries;
+    const yearEntries = src.filter(e => new Date(e.entry_date).getFullYear() === yr);
     const map = new Map<string, { name: string; value: number; color: string }>();
     yearEntries.filter(e => e.type === "revenue").forEach(e => {
       const cat = categories.find(c => c.id === e.category_id);
@@ -752,14 +780,15 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       map.set(name, prev);
     });
     return Array.from(map.values()).sort((a, b) => b.value - a.value);
-  }, [entries, categories, doarYear]);
+  }, [entries, indicatorEntries, categories, doarYear, indicCustomPeriodEnabled]);
 
   // Monthly trend data for area chart
   const monthlyTrendData = useMemo(() => {
     const yr = doarYear;
     const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
     return months.map(month => {
-      const mEntries = entries.filter(e => {
+      const src = indicCustomPeriodEnabled ? indicatorEntries : entries;
+      const mEntries = src.filter(e => {
         const d = new Date(e.entry_date);
         return d.getMonth() === month.getMonth() && d.getFullYear() === yr;
       });
@@ -767,12 +796,59 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       const pending = mEntries.filter(e => !e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
       return { month: format(month, "MMM", { locale: ptBR }).toUpperCase(), pago: paid, pendente: pending };
     });
-  }, [entries, doarYear]);
+  }, [entries, indicatorEntries, doarYear, indicCustomPeriodEnabled]);
+
+  // Account balance data for horizontal bar chart
+  const accountBalanceData = useMemo(() => {
+    return accounts
+      .filter(a => a.is_active)
+      .map(a => ({
+        name: a.name,
+        balance: a.current_balance,
+        type: a.type,
+        color: a.color || CHART_COLORS[0],
+      }))
+      .sort((a, b) => b.balance - a.balance);
+  }, [accounts]);
+
+  // Cost center breakdown
+  const costCenterData = useMemo(() => {
+    const yr = doarYear;
+    const src = indicCustomPeriodEnabled ? indicatorEntries : entries;
+    const yearEntries = src.filter(e => new Date(e.entry_date).getFullYear() === yr && e.cost_center_id);
+    const map = new Map<string, { name: string; revenue: number; expense: number; color: string }>();
+    yearEntries.forEach(e => {
+      const cc = costCenters.find((c: any) => c.id === e.cost_center_id);
+      if (!cc) return;
+      const prev = map.get(cc.id) || { name: cc.name, revenue: 0, expense: 0, color: cc.color || "#6b7280" };
+      if (e.type === "revenue") prev.revenue += Number(e.amount);
+      else prev.expense += Number(e.amount);
+      map.set(cc.id, prev);
+    });
+    return Array.from(map.values()).sort((a, b) => (b.revenue + b.expense) - (a.revenue + a.expense));
+  }, [entries, indicatorEntries, costCenters, doarYear, indicCustomPeriodEnabled]);
+
+  // Project financial data
+  const projectFinData = useMemo(() => {
+    const yr = doarYear;
+    const src = indicCustomPeriodEnabled ? indicatorEntries : entries;
+    const yearEntries = src.filter(e => new Date(e.entry_date).getFullYear() === yr && e.project_id);
+    const map = new Map<string, { name: string; budget: number; revenue: number; expense: number }>();
+    yearEntries.forEach(e => {
+      const proj = projects.find(p => p.id === e.project_id);
+      if (!proj) return;
+      const prev = map.get(proj.id) || { name: proj.name, budget: Number(proj.budget || 0), revenue: 0, expense: 0 };
+      if (e.type === "revenue") prev.revenue += Number(e.amount);
+      else prev.expense += Number(e.amount);
+      map.set(proj.id, prev);
+    });
+    return Array.from(map.values()).sort((a, b) => (b.revenue + b.expense) - (a.revenue + a.expense));
+  }, [entries, indicatorEntries, projects, doarYear, indicCustomPeriodEnabled]);
 
   const handlePrint = () => window.print();
 
   const handleExportCSV = () => {
-    const allItems = [...filtered, ...paidItems];
+    const allItems = filtered;
     const header = "Data,Título,Tipo,Categoria,Projeto,Conta,Pago,Forma Pgto,Valor\n";
     const rows = allItems.map(e => {
       const cat = categories.find(c => c.id === e.category_id)?.name || "";
@@ -831,32 +907,49 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     });
   };
 
-  // 3-level expand/collapse cycle:
-  // Level 1: Everything collapsed (only Receitas/Despesas headers)
-  // Level 2: Receitas/Despesas expanded, categories visible (items hidden)
-  // Level 3: Everything expanded (categories + items)
-  const [doarExpandLevel, setDoarExpandLevel] = useState(2); // default: categories visible
+  const [doarExpandLevel, setDoarExpandLevel] = useState(2);
 
   const cycleDoarExpand = () => {
     const nextLevel = doarExpandLevel >= 3 ? 1 : doarExpandLevel + 1;
     setDoarExpandLevel(nextLevel);
     if (nextLevel === 1) {
-      // Collapse everything
       setRevenueCollapsed(true);
       setExpenseCollapsed(true);
       setExpandedCats(new Set());
     } else if (nextLevel === 2) {
-      // Show Receitas/Despesas + Categories, hide items
       setRevenueCollapsed(false);
       setExpenseCollapsed(false);
       setExpandedCats(new Set());
     } else {
-      // Expand everything including items
       setRevenueCollapsed(false);
       setExpenseCollapsed(false);
       const allIds = [...dreData.revRows, ...dreData.expRows].map(r => r.id);
       setExpandedCats(new Set(allIds));
     }
+  };
+
+  // Batch copy handler
+  const handleBatchCopy = async () => {
+    if (!user || selectedIds.size === 0) return;
+    const toCopy = entries.filter(e => selectedIds.has(e.id));
+    const copies = toCopy.map(e => ({
+      user_id: user.id,
+      title: e.title,
+      amount: Number(e.amount),
+      type: e.type,
+      category_id: e.category_id || null,
+      project_id: e.project_id || null,
+      cost_center_id: e.cost_center_id || null,
+      entry_date: e.entry_date,
+      account_id: e.account_id || null,
+      payment_method: e.payment_method || null,
+      is_paid: false,
+      counterpart: e.counterpart || null,
+      is_fixed: e.is_fixed || false,
+    }));
+    await supabase.from("financial_entries").insert(copies);
+    setSelectedIds(new Set());
+    fetchData();
   };
 
   // Entry dialog content (shared)
@@ -1146,14 +1239,14 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         ))}
       </div>
 
-      {/* KPI Cards - Patrimônio pattern */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="bg-card">
           <CardContent className="p-3">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
               <TrendingUp className="h-3 w-3" /> Receitas
             </p>
-            <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(totalRevenue)}</p>
+            <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(kpiData.totalRevenue)}</p>
           </CardContent>
         </Card>
         <Card className="bg-card">
@@ -1161,7 +1254,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
               <TrendingDown className="h-3 w-3" /> Despesas
             </p>
-            <p className="text-lg font-bold text-destructive">{brl(totalExpense)}</p>
+            <p className="text-lg font-bold text-destructive">{brl(kpiData.totalExpense)}</p>
           </CardContent>
         </Card>
         <Card className="bg-card">
@@ -1169,7 +1262,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
               <Wallet className="h-3 w-3" /> Saldo
             </p>
-            <p className={cn("text-lg font-bold", balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(balance)}</p>
+            <p className={cn("text-lg font-bold", kpiData.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(kpiData.balance)}</p>
           </CardContent>
         </Card>
         <Card className="bg-card">
@@ -1194,12 +1287,11 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                 {([
                   { key: "payable" as CashFlowFilter, label: "A Pagar" },
                   { key: "receivable" as CashFlowFilter, label: "A Receber" },
-                  { key: "pending" as CashFlowFilter, label: "Pendentes" },
+                  { key: "paid" as CashFlowFilter, label: "Baixados" },
                 ]).map(f => (
                   <Button key={f.key} size="sm"
-                    variant={cashFlowFilter === f.key ? "default" : (cashFlowFilter === "all" ? "default" : "ghost")}
+                    variant={cashFlowFilter === f.key ? "default" : "ghost"}
                     className={cn("h-7 text-xs px-2.5 gap-1 rounded-full",
-                      cashFlowFilter === "all" ? "bg-primary text-primary-foreground" :
                       cashFlowFilter !== f.key && "text-muted-foreground hover:text-foreground"
                     )}
                     onClick={() => setCashFlowFilter(prev => prev === f.key ? "all" : f.key)}
@@ -1251,6 +1343,10 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                       }}
                     ><Check className="h-3 w-3" /> Baixar contas</Button>
                     <Button size="sm" variant="ghost"
+                      className="h-7 px-2.5 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10 rounded-full"
+                      onClick={handleBatchCopy}
+                    ><Copy className="h-3 w-3" /> Copiar</Button>
+                    <Button size="sm" variant="ghost"
                       className="h-7 px-2.5 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
                       onClick={async () => {
                         const ids = Array.from(selectedIds);
@@ -1261,7 +1357,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                     ><Trash2 className="h-3 w-3" /> Excluir</Button>
                   </>
                 )}
-                {/* Import/Export/Print next to delete */}
+                {/* Import/Export/Print */}
                 <Tooltip delayDuration={200}>
                   <TooltipTrigger asChild>
                     <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
@@ -1339,19 +1435,23 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                     </th>
                     <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("entry_date")}>Data <SortIcon field="entry_date" /></th>
                     <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("title")}>Título <SortIcon field="title" /></th>
-                    <th className="text-left py-2 px-2">Contraparte</th>
+                    <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("counterpart")}>Contraparte <SortIcon field="counterpart" /></th>
                     <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("category")}>Categoria <SortIcon field="category" /></th>
-                    <th className="text-left py-2 px-2">C. Custo</th>
+                    <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("cost_center")}>C. Custo <SortIcon field="cost_center" /></th>
                     <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("type")}>Tipo <SortIcon field="type" /></th>
                     <th className="text-right py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("amount")}>Valor <SortIcon field="amount" /></th>
-                    <th className="text-right py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("balance")}>Saldo <SortIcon field="balance" /></th>
+                    {cashFlowFilter !== "paid" && (
+                      <th className="text-right py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("balance")}>Saldo <SortIcon field="balance" /></th>
+                    )}
                     <th className="text-center py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("is_paid")}>Status <SortIcon field="is_paid" /></th>
                     <th className="text-center py-2 px-2">Fixa</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={10} className="text-center text-muted-foreground/40 py-12">Sem lançamentos pendentes</td></tr>
+                    <tr><td colSpan={11} className="text-center text-muted-foreground/40 py-12">
+                      {cashFlowFilter === "paid" ? "Sem lançamentos baixados" : "Sem lançamentos pendentes"}
+                    </td></tr>
                   )}
                   {filtered.map((e, idx) => {
                     const cat = categories.find(c => c.id === e.category_id);
@@ -1359,14 +1459,16 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                     const isBreakEven = runningBalances.breakEvenId === e.id;
                     const isOverdue = !e.is_paid && parseEntryDate(e.entry_date) < new Date();
                     const isSelected = selectedIds.has(e.id);
+                    const isPaidItem = cashFlowFilter === "paid";
                     return (
                       <tr key={e.id}
                         className={cn(
                           "group cursor-pointer transition-colors hover:bg-muted/20",
                           idx > 0 && "border-t border-border/10",
-                          isBreakEven && "bg-primary/5",
-                          isOverdue && !isBreakEven && e.type === "expense" && "bg-destructive/15",
-                          isOverdue && !isBreakEven && e.type === "revenue" && "bg-[hsl(var(--success)/0.12)]",
+                          !isPaidItem && isBreakEven && "bg-primary/5",
+                          !isPaidItem && isOverdue && !isBreakEven && e.type === "expense" && "bg-destructive/15",
+                          !isPaidItem && isOverdue && !isBreakEven && e.type === "revenue" && "bg-[hsl(var(--success)/0.12)]",
+                          isPaidItem && "opacity-60",
                           isSelected && "bg-primary/10"
                         )}
                         onClick={() => handleRowClick(e)}
@@ -1381,7 +1483,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                             onClick={(ev) => ev.stopPropagation()} className="h-3.5 w-3.5" />
                         </td>
                         <td className="py-2.5 px-2 text-muted-foreground">{format(parseEntryDate(e.entry_date), "dd/MM/yy")}</td>
-                        <td className="py-2.5 px-2">
+                        <td className={cn("py-2.5 px-2", isPaidItem && "line-through text-muted-foreground")}>
                           <span>{e.title}</span>
                         </td>
                         <td className="py-2.5 px-2 text-muted-foreground/60 truncate max-w-[120px]">{e.counterpart || "—"}</td>
@@ -1395,11 +1497,17 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                         <td className={cn("py-2.5 px-2 text-right font-medium tabular-nums", e.type === "revenue" ? "text-success" : "text-destructive")}>
                           {brl(Number(e.amount))}
                         </td>
-                        <td className={cn("py-2.5 px-2 text-right font-semibold tabular-nums", runningBal >= 0 ? "text-success" : "text-destructive")}>
-                          {brl(runningBal)}
-                        </td>
+                        {cashFlowFilter !== "paid" && (
+                          <td className={cn("py-2.5 px-2 text-right font-semibold tabular-nums", runningBal >= 0 ? "text-success" : "text-destructive")}>
+                            {brl(runningBal)}
+                          </td>
+                        )}
                         <td className="py-2.5 px-2 text-center">
-                          {isOverdue ? (
+                          {isPaidItem ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-success/60">
+                              <Check className="h-2.5 w-2.5" /> Pago
+                            </span>
+                          ) : isOverdue ? (
                             <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); setIsPaid(true); }}
                               className="inline-flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors">
                               <AlertTriangle className="h-2.5 w-2.5" /> Atrasado
@@ -1422,58 +1530,6 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                 </tbody>
               </table>
             </div>
-
-            {/* Paid items - hidden at bottom */}
-            {paidItems.length > 0 && (
-              <div className="mt-4 border-t border-border/20 pt-2">
-                <button
-                  onClick={() => setShowPaidItems(!showPaidItems)}
-                  className="flex items-center gap-2 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors w-full py-1"
-                >
-                  {showPaidItems ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                  {paidItems.length} lançamento{paidItems.length !== 1 ? "s" : ""} pago{paidItems.length !== 1 ? "s" : ""}
-                </button>
-                {showPaidItems && (
-                  <div className="mt-1 rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <tbody>
-                        {paidItems.map((e, idx) => {
-                          const cat = categories.find(c => c.id === e.category_id);
-                          return (
-                            <tr key={e.id}
-                              className={cn(
-                                "group cursor-pointer transition-colors hover:bg-muted/20 opacity-50",
-                                idx > 0 && "border-t border-border/10",
-                              )}
-                              onClick={() => handleRowClick(e)}
-                            >
-                              <td className="py-2 px-2 w-8" />
-                              <td className="py-2 px-2 text-muted-foreground">{format(parseEntryDate(e.entry_date), "dd/MM/yy")}</td>
-                              <td className="py-2 px-2 line-through text-muted-foreground">{e.title}</td>
-                              <td className="py-2 px-2 text-muted-foreground/60">{cat?.name || "—"}</td>
-                              <td className="py-2 px-2">
-                                <span className={cn("text-xs font-medium", e.type === "revenue" ? "text-success" : "text-destructive")}>
-                                  {e.type === "revenue" ? "Receita" : "Despesa"}
-                                </span>
-                              </td>
-                              <td className={cn("py-2 px-2 text-right font-medium tabular-nums", e.type === "revenue" ? "text-success" : "text-destructive")}>
-                                {brl(Number(e.amount))}
-                              </td>
-                              <td className="py-2 px-2 text-right" />
-                              <td className="py-2 px-2 text-center">
-                                <span className="inline-flex items-center gap-1 text-xs text-success/60">
-                                  <Check className="h-2.5 w-2.5" /> Pago
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
           </>
         )}
 
@@ -1487,8 +1543,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
 
           const dQuery = doarSearchQuery.toLowerCase().trim();
           const filterDoarRow = (row: { name: string; months: number[] }) => {
-            const hasData = row.months.some(v => v > 0);
-            if (!hasData) return false;
+            // Show all categories, even without data (they'll show "—")
             return !dQuery || row.name.toLowerCase().includes(dQuery);
           };
           const filteredRevRows = dreData.revRows.filter(filterDoarRow);
@@ -1524,25 +1579,52 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
 
           return (
           <div className="space-y-4">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1 flex-wrap">
                 <Select value={String(doarYear)} onValueChange={(v) => setDoarYear(Number(v))}>
-                  <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-7 w-24 text-xs rounded-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {availableYears.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <Button size="sm"
+                  variant={doarCustomPeriodEnabled ? "default" : "ghost"}
+                  className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", !doarCustomPeriodEnabled && "text-muted-foreground hover:text-foreground")}
+                  onClick={() => setDoarCustomPeriodEnabled(!doarCustomPeriodEnabled)}
+                >
+                  <Filter className="h-3 w-3" /> Período
+                </Button>
               </div>
-              <div className="flex items-center gap-2">
-                <Input placeholder="Pesquisar categorias..."
-                  value={doarSearchQuery} onChange={(e) => setDoarSearchQuery(e.target.value)}
-                  className="h-8 w-48 text-xs bg-transparent border-0 border-b border-border/30 rounded-none focus-visible:ring-0 focus-visible:border-primary/40 placeholder:text-muted-foreground/40" />
-                <Button size="icon" variant="outline" className="h-8 w-8" onClick={cycleDoarExpand} title={`Nível ${doarExpandLevel}/3`}>
-                  <ChevronsUpDown className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="outline" className="h-8 w-8" onClick={handlePrintDOAR} title="Imprimir">
-                  <Printer className="h-4 w-4" />
-                </Button>
+              {doarCustomPeriodEnabled && (
+                <div className="flex items-center gap-1.5">
+                  <Input type="date" value={doarCustomStart} onChange={(e) => setDoarCustomStart(e.target.value)} className="h-7 text-xs w-32" />
+                  <span className="text-xs text-muted-foreground">a</span>
+                  <Input type="date" value={doarCustomEnd} onChange={(e) => setDoarCustomEnd(e.target.value)} className="h-7 text-xs w-32" />
+                </div>
+              )}
+              <div className="flex items-center gap-1.5 ml-auto">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input placeholder="Pesquisar categorias..."
+                    value={doarSearchQuery} onChange={(e) => setDoarSearchQuery(e.target.value)}
+                    className="h-7 pl-8 text-xs w-44" />
+                </div>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={cycleDoarExpand} title={`Nível ${doarExpandLevel}/3`}>
+                      <ChevronsUpDown className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Expandir/Recolher</TooltipContent>
+                </Tooltip>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handlePrintDOAR}>
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Imprimir</TooltipContent>
+                </Tooltip>
               </div>
             </div>
 
@@ -1726,14 +1808,30 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         {viewTab === "indicadores" && (
           <div className="space-y-4" ref={reportRef}>
             <div className="flex items-center gap-2 flex-wrap">
-              <Select value={String(doarYear)} onValueChange={(v) => setDoarYear(Number(v))}>
-                <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {[...new Set(entries.map(e => new Date(e.entry_date).getFullYear())), doarYear].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => b - a).map(y => (
-                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-1 flex-wrap">
+                <Select value={String(doarYear)} onValueChange={(v) => setDoarYear(Number(v))}>
+                  <SelectTrigger className="h-7 w-24 text-xs rounded-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[...new Set(entries.map(e => new Date(e.entry_date).getFullYear())), doarYear].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => b - a).map(y => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button size="sm"
+                  variant={indicCustomPeriodEnabled ? "default" : "ghost"}
+                  className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", !indicCustomPeriodEnabled && "text-muted-foreground hover:text-foreground")}
+                  onClick={() => setIndicCustomPeriodEnabled(!indicCustomPeriodEnabled)}
+                >
+                  <Filter className="h-3 w-3" /> Período
+                </Button>
+              </div>
+              {indicCustomPeriodEnabled && (
+                <div className="flex items-center gap-1.5">
+                  <Input type="date" value={indicCustomStart} onChange={(e) => setIndicCustomStart(e.target.value)} className="h-7 text-xs w-32" />
+                  <span className="text-xs text-muted-foreground">a</span>
+                  <Input type="date" value={indicCustomEnd} onChange={(e) => setIndicCustomEnd(e.target.value)} className="h-7 text-xs w-32" />
+                </div>
+              )}
               <div className="ml-auto flex items-center gap-1.5">
                 <Tooltip delayDuration={200}>
                   <TooltipTrigger asChild>
@@ -1764,12 +1862,12 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                   <div className="rounded-lg bg-success/10 p-3 text-center">
                     <p className="text-[10px] text-muted-foreground">Total Receitas</p>
                     <p className="text-lg font-bold text-success">{brl(dreData.monthTotalsRev.reduce((s, v) => s + v, 0))}</p>
-                    <p className="text-[10px] text-muted-foreground">{entries.filter(e => e.type === "revenue" && new Date(e.entry_date).getFullYear() === doarYear).length} lançamentos</p>
+                    <p className="text-[10px] text-muted-foreground">{(indicCustomPeriodEnabled ? indicatorEntries : entries).filter(e => e.type === "revenue" && new Date(e.entry_date).getFullYear() === doarYear).length} lançamentos</p>
                   </div>
                   <div className="rounded-lg bg-destructive/10 p-3 text-center">
                     <p className="text-[10px] text-muted-foreground">Total Despesas</p>
                     <p className="text-lg font-bold text-destructive">{brl(dreData.monthTotalsExp.reduce((s, v) => s + v, 0))}</p>
-                    <p className="text-[10px] text-muted-foreground">{entries.filter(e => e.type === "expense" && new Date(e.entry_date).getFullYear() === doarYear).length} lançamentos</p>
+                    <p className="text-[10px] text-muted-foreground">{(indicCustomPeriodEnabled ? indicatorEntries : entries).filter(e => e.type === "expense" && new Date(e.entry_date).getFullYear() === doarYear).length} lançamentos</p>
                   </div>
                   <div className="rounded-lg bg-primary/10 p-3 text-center">
                     <p className="text-[10px] text-muted-foreground">Resultado do Ano</p>
@@ -1778,6 +1876,30 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                     </p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Account Balance - Horizontal Bar Chart */}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5 text-primary" /> Recursos por Conta</CardTitle></CardHeader>
+              <CardContent>
+                {accountBalanceData.length > 0 ? (
+                  <div className="h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={accountBalanceData} layout="vertical" barSize={18}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => brl(v)} />
+                        <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={100} />
+                        <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                        <Bar dataKey="balance" name="Saldo" radius={[0, 4, 4, 0]}>
+                          {accountBalanceData.map((d, i) => (
+                            <Cell key={d.name} fill={d.balance >= 0 ? "#22c55e" : "#ef4444"} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : <p className="text-xs text-muted-foreground text-center py-8">Sem contas cadastradas</p>}
               </CardContent>
             </Card>
 
@@ -1802,7 +1924,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               </CardContent>
             </Card>
 
-            {/* Monthly balance trend (area chart with gradient) */}
+            {/* Monthly balance trend */}
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm">Saldo Mensal — {doarYear}</CardTitle></CardHeader>
               <CardContent>
@@ -1874,7 +1996,52 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               </CardContent>
             </Card>
 
-            {/* Pie charts - modern donut with separated segments */}
+            {/* Cost Center Breakdown */}
+            {costCenterData.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> Indicadores por Centro de Custo — {doarYear}</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="h-[220px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={costCenterData} barGap={4}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                        <Legend wrapperStyle={{ fontSize: 10 }} />
+                        <Bar dataKey="revenue" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="expense" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Project Financial Breakdown */}
+            {projectFinData.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><ListChecks className="h-3.5 w-3.5 text-primary" /> Indicadores por Projeto — {doarYear}</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="h-[220px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={projectFinData} barGap={4}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                        <Legend wrapperStyle={{ fontSize: 10 }} />
+                        <Bar dataKey="budget" name="Orçamento" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="revenue" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="expense" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Pie charts */}
             <div className="grid grid-cols-2 gap-4">
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Categorias — Despesas</CardTitle></CardHeader>
@@ -1947,8 +2114,6 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             </div>
           </div>
         )}
-
-        {/* Carteira tab removed - now in Patrimônio module */}
       </div>
 
       {/* Delete entry confirmation */}
