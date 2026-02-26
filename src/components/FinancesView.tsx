@@ -20,11 +20,11 @@ import {
   Printer, FileDown, FileUp, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
   CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
-  Filter, BarChart3, Copy, FolderKanban, ListChecks,
+  Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign,
 } from "lucide-react";
 import {
   format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
-  addMonths, addWeeks, addDays, startOfYear, endOfYear, eachMonthOfInterval,
+  addMonths, addWeeks, addDays, startOfYear, endOfYear, eachMonthOfInterval, differenceInDays,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -35,13 +35,14 @@ import {
 import type { Tables as DBTables } from "@/integrations/supabase/types";
 
 type PeriodFilter = "daily" | "3days" | "weekly" | "monthly" | "yearly" | "custom";
-type SortField = "title" | "amount" | "entry_date" | "type" | "category" | "is_paid" | "balance" | "counterpart" | "cost_center";
+type SortField = "title" | "amount" | "entry_date" | "type" | "category" | "is_paid" | "balance" | "counterpart" | "cost_center" | "payment_date";
 type SortDir = "asc" | "desc";
 type RecurrenceType = "none" | "daily" | "weekly" | "biweekly" | "monthly" | "quarterly" | "semiannual" | "yearly";
 type RecurrenceDateMode = "same_date" | "first_business_day";
-type ViewTab = "indicadores" | "previsao" | "doar";
+type ViewTab = "indicadores" | "previsao" | "doar" | "centrocusto";
 type AccountType = "bank_account" | "credit_card" | "investment" | "wallet" | "cash" | "crypto";
 type CashFlowFilter = "all" | "payable" | "receivable" | "overdue" | "paid";
+type CurrencyType = "BRL" | "USDT";
 
 interface FinancialAccount {
   id: string; user_id: string; name: string; type: string;
@@ -49,9 +50,11 @@ interface FinancialAccount {
   credit_limit: number | null; closing_day: number | null;
   due_day: number | null; color: string | null;
   is_active: boolean | null; created_at: string; updated_at: string;
+  currency?: string;
 }
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+const fmtCurrency = (v: number, cur: CurrencyType = "BRL") => cur === "USDT" ? `$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : brl(v);
 
 const ACCOUNT_TYPE_LABELS: Record<AccountType, { label: string; icon: React.ReactNode }> = {
   bank_account: { label: "Conta Bancária", icon: <Landmark className="h-4 w-4" /> },
@@ -153,19 +156,17 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   const { visibleTabs } = useModulePreferences("finances");
   
   useEffect(() => { onTabChange?.(viewTab); }, [viewTab, onTabChange]);
+
+  // Unified period filter (replaces year selector everywhere)
+  const [periodStart, setPeriodStart] = useState(format(startOfYear(new Date()), "yyyy-MM-dd"));
+  const [periodEnd, setPeriodEnd] = useState(format(endOfYear(new Date()), "yyyy-MM-dd"));
   const [customPeriodEnabled, setCustomPeriodEnabled] = useState(false);
   const [customStart, setCustomStart] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEnd, setCustomEnd] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
-  const [doarCustomPeriodEnabled, setDoarCustomPeriodEnabled] = useState(false);
-  const [doarCustomStart, setDoarCustomStart] = useState(format(startOfYear(new Date()), "yyyy-MM-dd"));
-  const [doarCustomEnd, setDoarCustomEnd] = useState(format(endOfYear(new Date()), "yyyy-MM-dd"));
-  const [indicCustomPeriodEnabled, setIndicCustomPeriodEnabled] = useState(false);
-  const [indicCustomStart, setIndicCustomStart] = useState(format(startOfYear(new Date()), "yyyy-MM-dd"));
-  const [indicCustomEnd, setIndicCustomEnd] = useState(format(endOfYear(new Date()), "yyyy-MM-dd"));
+
   const [recurrenceEditDialog, setRecurrenceEditDialog] = useState<{ entry: any; mode: "single" | "all" | null }>({ entry: null, mode: null });
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
-  const [doarYear, setDoarYear] = useState(new Date().getFullYear());
   const [revenueCollapsed, setRevenueCollapsed] = useState(false);
   const [expenseCollapsed, setExpenseCollapsed] = useState(false);
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
@@ -176,10 +177,15 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   const [deleteEntryConfirm, setDeleteEntryConfirm] = useState<string | null>(null);
+  const [doarShowPaid, setDoarShowPaid] = useState(false); // false=all, true=paid only
+  const [doarHideCarryOver, setDoarHideCarryOver] = useState(false);
+  const [ccReportSearch, setCcReportSearch] = useState("");
+  const [ccReportFilterIds, setCcReportFilterIds] = useState<Set<string>>(new Set()); // empty = all
 
   // Form state
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState<CurrencyType>("BRL");
   const [type, setType] = useState<"revenue" | "expense">("expense");
   const [categoryId, setCategoryId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -197,6 +203,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   const [costCenterId, setCostCenterId] = useState("");
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [splitLines, setSplitLines] = useState<{ id: string; accountId: string; paymentMethod: string; amount: string }[]>([]);
+  const [description, setDescription] = useState("");
 
   const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
   const splitTotal = splitLines.reduce((s, l) => s + parseNum(l.amount), 0);
@@ -247,7 +254,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     setRecurrence("none"); setRecurrenceCount("12"); setRecurrenceDateMode("same_date");
     setEditingEntry(null); setAccountId(""); setPaymentMethod(""); setIsPaid(false);
     setCounterpart(""); setIsFixed(false); setAllDay(true); setCostCenterId("");
-    setSplitEnabled(false); setSplitLines([]);
+    setSplitEnabled(false); setSplitLines([]); setCurrency("BRL"); setDescription("");
   };
 
   const resetAccForm = () => {
@@ -286,6 +293,8 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     setIsFixed(entry.is_fixed || false);
     setInstallments("1");
     setRecurrence("none");
+    setCurrency((entry.currency as CurrencyType) || "BRL");
+    setDescription(entry.description || "");
     // Load existing splits
     if (entry.has_split) {
       const { data: splits } = await supabase.from("payment_splits" as any).select("*").eq("entry_id", entry.id);
@@ -339,8 +348,11 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         payment_date: isPaid ? format(new Date(), "yyyy-MM-dd") : null,
         counterpart: counterpart || null, is_fixed: isFixed,
         has_split: splitEnabled && splitLines.length > 0,
+        currency: currency,
+        description: description || null,
       };
       if (recurrenceEditDialog.mode === "all" && editingEntry.installment_group) {
+        // Update ALL future items with ALL fields
         const allGroup = entries.filter(
           (e) => e.installment_group === editingEntry.installment_group &&
             e.installment_number >= editingEntry.installment_number
@@ -349,7 +361,9 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
           await supabase.from("financial_entries").update({
             ...updateData,
             title: allGroup.length > 1 ? `${title} (${e.installment_number}/${editingEntry.total_installments})` : title,
-            entry_date: e.entry_date,
+            entry_date: e.entry_date, // keep each item's own date
+            is_paid: e.is_paid, // keep each item's own paid status
+            payment_date: e.payment_date, // keep each item's own payment date
           }).eq("id", e.id);
         }
       } else {
@@ -387,6 +401,8 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             is_paid: i === 0 ? isPaid : false,
             counterpart: counterpart || null, is_fixed: isFixed,
             has_split: splitEnabled && splitLines.length > 0,
+            currency: currency,
+            description: description || null,
           }));
         const { data: inserted } = await supabase.from("financial_entries").insert(entriesToInsert).select("id");
         if (splitEnabled && splitLines.length > 0 && inserted?.[0]) {
@@ -413,6 +429,8 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             is_paid: i === 0 ? isPaid : false,
             counterpart: counterpart || null, is_fixed: isFixed,
             has_split: splitEnabled && splitLines.length > 0,
+            currency: currency,
+            description: description || null,
           }));
         const { data: inserted } = await supabase.from("financial_entries").insert(entriesToInsert).select("id");
         if (splitEnabled && splitLines.length > 0 && inserted?.[0]) {
@@ -512,8 +530,9 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   };
 
   const now = new Date();
+  const periodYear = new Date(periodStart).getFullYear();
 
-  // Fluxo de caixa: filter logic
+  // Fluxo de caixa: filter logic - expanded search
   const filtered = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const query = searchQuery.toLowerCase().trim();
@@ -538,7 +557,20 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       .filter((e) => {
         if (!query) return true;
         const cat = categories.find(c => c.id === e.category_id)?.name || "";
-        return e.title.toLowerCase().includes(query) || cat.toLowerCase().includes(query);
+        const cc = costCenters.find((c: any) => c.id === e.cost_center_id)?.name || "";
+        const proj = projects.find(p => p.id === e.project_id)?.name || "";
+        const acc = accounts.find(a => a.id === e.account_id)?.name || "";
+        const cp = e.counterpart || "";
+        const amt = String(e.amount);
+        const pm = e.payment_method || "";
+        return e.title.toLowerCase().includes(query) ||
+          cat.toLowerCase().includes(query) ||
+          cc.toLowerCase().includes(query) ||
+          proj.toLowerCase().includes(query) ||
+          acc.toLowerCase().includes(query) ||
+          cp.toLowerCase().includes(query) ||
+          amt.includes(query) ||
+          pm.toLowerCase().includes(query);
       })
       .sort((a, b) => {
         const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -564,8 +596,9 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         } else if (sortField === "is_paid") {
           aVal = a.is_paid ? 1 : 0; bVal = b.is_paid ? 1 : 0;
         } else if (sortField === "balance") {
-          // Sort by running balance order (entry_date)
           aVal = a.entry_date; bVal = b.entry_date;
+        } else if (sortField === "payment_date") {
+          aVal = a.payment_date || ""; bVal = b.payment_date || "";
         } else {
           aVal = a[sortField]; bVal = b[sortField];
         }
@@ -573,16 +606,15 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, sortField, sortDir, categories, costCenters, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd]);
+  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd]);
 
   // KPI totals based on current filter
   const kpiData = useMemo(() => {
-    const source = cashFlowFilter === "paid" ? filtered : filtered;
-    const totalRevenue = source.filter((e) => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
-    const totalExpense = source.filter((e) => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
+    const totalRevenue = filtered.filter((e) => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
+    const totalExpense = filtered.filter((e) => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
     const balance = totalRevenue - totalExpense;
     return { totalRevenue, totalExpense, balance };
-  }, [filtered, cashFlowFilter]);
+  }, [filtered]);
 
   const totalAvailable = accounts.reduce((s, a) => {
     if (a.type === "credit_card") return s;
@@ -591,7 +623,6 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
 
   const runningBalances = useMemo(() => {
     if (cashFlowFilter === "paid") {
-      // For paid items, no running balance needed
       const balanceMap = new Map<string, number>();
       return { balanceMap, breakEvenId: null };
     }
@@ -633,38 +664,45 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     });
   }, [categories]);
 
-  // DRE / DOAR data - now with optional period filtering
+  // Entries filtered by unified period
+  const periodFilteredEntries = useMemo(() => {
+    const pStart = parseEntryDate(periodStart);
+    const pEnd = parseEntryDate(periodEnd);
+    return entries.filter(e => {
+      const d = parseEntryDate(e.entry_date);
+      return d >= pStart && d <= pEnd;
+    });
+  }, [entries, periodStart, periodEnd]);
+
+  // DRE / DOAR data
   const dreData = useMemo(() => {
-    const yr = doarYear;
+    const pStart = new Date(periodStart);
+    const pEnd = new Date(periodEnd);
+    const yr = pStart.getFullYear();
     const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
     const revenueCategories = categories.filter(c => c.is_revenue);
     const expenseCategories = categories.filter(c => c.is_expense);
 
     const getMonthEntries = (month: Date) => {
-      let monthEntries = entries.filter(e => {
+      let src = doarShowPaid ? entries.filter(e => e.is_paid) : entries;
+      return src.filter(e => {
         const d = new Date(e.entry_date);
-        return d.getMonth() === month.getMonth() && d.getFullYear() === yr;
+        if (d.getMonth() !== month.getMonth() || d.getFullYear() !== yr) return false;
+        const ed = parseEntryDate(e.entry_date);
+        return ed >= parseEntryDate(periodStart) && ed <= parseEntryDate(periodEnd);
       });
-      // Apply DOAR custom period filter if enabled
-      if (doarCustomPeriodEnabled) {
-        const pStart = parseEntryDate(doarCustomStart);
-        const pEnd = parseEntryDate(doarCustomEnd);
-        monthEntries = monthEntries.filter(e => {
-          const d = parseEntryDate(e.entry_date);
-          return d >= pStart && d <= pEnd;
-        });
-      }
-      return monthEntries;
     };
 
     const getEntriesForCatMonth = (catId: string, month: Date, type: string) =>
       getMonthEntries(month).filter(e => e.type === type && e.category_id === catId);
 
-    const prevYearEntries = entries.filter(e => new Date(e.entry_date).getFullYear() < yr);
+    const prevYearEntries = entries.filter(e => {
+      if (doarShowPaid && !e.is_paid) return false;
+      return new Date(e.entry_date).getFullYear() < yr;
+    });
     const carryOver = prevYearEntries.reduce((s, e) =>
       s + (e.type === "revenue" ? Number(e.amount) : -Number(e.amount)), 0);
 
-    // Include ALL revenue/expense categories (even if no data yet)
     const revRows = revenueCategories
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
       .map(cat => ({
@@ -713,33 +751,22 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     const monthTotalsExp = months.map((_, i) => expRows.reduce((s, r) => s + r.months[i], 0));
     const monthBalance = months.map((_, i) => monthTotalsRev[i] - monthTotalsExp[i]);
 
-    let acc = carryOver;
+    let acc = doarHideCarryOver ? 0 : carryOver;
     const accumulated = monthBalance.map(b => { acc += b; return acc; });
 
     return {
       months: months.map(m => format(m, "MMM", { locale: ptBR }).toUpperCase()),
       revRows, expRows, monthTotalsRev, monthTotalsExp, monthBalance, accumulated, carryOver,
     };
-  }, [entries, categories, doarYear, doarCustomPeriodEnabled, doarCustomStart, doarCustomEnd]);
+  }, [entries, categories, periodStart, periodEnd, doarShowPaid, doarHideCarryOver]);
 
-  // Indicator chart data - with optional period filtering
-  const indicatorEntries = useMemo(() => {
-    if (!indicCustomPeriodEnabled) return entries;
-    const pStart = parseEntryDate(indicCustomStart);
-    const pEnd = parseEntryDate(indicCustomEnd);
-    return entries.filter(e => {
-      const d = parseEntryDate(e.entry_date);
-      return d >= pStart && d <= pEnd;
-    });
-  }, [entries, indicCustomPeriodEnabled, indicCustomStart, indicCustomEnd]);
-
+  // Indicator chart data
   const reportChartData = useMemo(() => {
-    const yr = doarYear;
+    const yr = periodYear;
     const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
     let accumulated = 0;
     return months.map(month => {
-      const src = indicCustomPeriodEnabled ? indicatorEntries : entries;
-      const mEntries = src.filter(e => {
+      const mEntries = periodFilteredEntries.filter(e => {
         const d = new Date(e.entry_date);
         return d.getMonth() === month.getMonth() && d.getFullYear() === yr;
       });
@@ -748,14 +775,11 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       accumulated += rev - exp;
       return { month: format(month, "MMM", { locale: ptBR }).toUpperCase(), receita: rev, despesa: exp, saldo: rev - exp, acumulado: accumulated };
     });
-  }, [entries, indicatorEntries, doarYear, indicCustomPeriodEnabled]);
+  }, [periodFilteredEntries, periodYear]);
 
   const categoryPieData = useMemo(() => {
-    const yr = doarYear;
-    const src = indicCustomPeriodEnabled ? indicatorEntries : entries;
-    const yearEntries = src.filter(e => new Date(e.entry_date).getFullYear() === yr);
     const map = new Map<string, { name: string; value: number; color: string }>();
-    yearEntries.filter(e => e.type === "expense").forEach(e => {
+    periodFilteredEntries.filter(e => e.type === "expense").forEach(e => {
       const cat = categories.find(c => c.id === e.category_id);
       const name = cat?.name || "Sem Categoria";
       const color = cat?.color || "#6b7280";
@@ -764,14 +788,11 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       map.set(name, prev);
     });
     return Array.from(map.values()).sort((a, b) => b.value - a.value);
-  }, [entries, indicatorEntries, categories, doarYear, indicCustomPeriodEnabled]);
+  }, [periodFilteredEntries, categories]);
 
   const revenuePieData = useMemo(() => {
-    const yr = doarYear;
-    const src = indicCustomPeriodEnabled ? indicatorEntries : entries;
-    const yearEntries = src.filter(e => new Date(e.entry_date).getFullYear() === yr);
     const map = new Map<string, { name: string; value: number; color: string }>();
-    yearEntries.filter(e => e.type === "revenue").forEach(e => {
+    periodFilteredEntries.filter(e => e.type === "revenue").forEach(e => {
       const cat = categories.find(c => c.id === e.category_id);
       const name = cat?.name || "Sem Categoria";
       const color = cat?.color || "#6b7280";
@@ -780,15 +801,13 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       map.set(name, prev);
     });
     return Array.from(map.values()).sort((a, b) => b.value - a.value);
-  }, [entries, indicatorEntries, categories, doarYear, indicCustomPeriodEnabled]);
+  }, [periodFilteredEntries, categories]);
 
-  // Monthly trend data for area chart
   const monthlyTrendData = useMemo(() => {
-    const yr = doarYear;
+    const yr = periodYear;
     const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
     return months.map(month => {
-      const src = indicCustomPeriodEnabled ? indicatorEntries : entries;
-      const mEntries = src.filter(e => {
+      const mEntries = periodFilteredEntries.filter(e => {
         const d = new Date(e.entry_date);
         return d.getMonth() === month.getMonth() && d.getFullYear() === yr;
       });
@@ -796,9 +815,8 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       const pending = mEntries.filter(e => !e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
       return { month: format(month, "MMM", { locale: ptBR }).toUpperCase(), pago: paid, pendente: pending };
     });
-  }, [entries, indicatorEntries, doarYear, indicCustomPeriodEnabled]);
+  }, [periodFilteredEntries, periodYear]);
 
-  // Account balance data for horizontal bar chart
   const accountBalanceData = useMemo(() => {
     return accounts
       .filter(a => a.is_active)
@@ -811,13 +829,9 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       .sort((a, b) => b.balance - a.balance);
   }, [accounts]);
 
-  // Cost center breakdown
   const costCenterData = useMemo(() => {
-    const yr = doarYear;
-    const src = indicCustomPeriodEnabled ? indicatorEntries : entries;
-    const yearEntries = src.filter(e => new Date(e.entry_date).getFullYear() === yr && e.cost_center_id);
     const map = new Map<string, { name: string; revenue: number; expense: number; color: string }>();
-    yearEntries.forEach(e => {
+    periodFilteredEntries.filter(e => e.cost_center_id).forEach(e => {
       const cc = costCenters.find((c: any) => c.id === e.cost_center_id);
       if (!cc) return;
       const prev = map.get(cc.id) || { name: cc.name, revenue: 0, expense: 0, color: cc.color || "#6b7280" };
@@ -826,15 +840,11 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       map.set(cc.id, prev);
     });
     return Array.from(map.values()).sort((a, b) => (b.revenue + b.expense) - (a.revenue + a.expense));
-  }, [entries, indicatorEntries, costCenters, doarYear, indicCustomPeriodEnabled]);
+  }, [periodFilteredEntries, costCenters]);
 
-  // Project financial data
   const projectFinData = useMemo(() => {
-    const yr = doarYear;
-    const src = indicCustomPeriodEnabled ? indicatorEntries : entries;
-    const yearEntries = src.filter(e => new Date(e.entry_date).getFullYear() === yr && e.project_id);
     const map = new Map<string, { name: string; budget: number; revenue: number; expense: number }>();
-    yearEntries.forEach(e => {
+    periodFilteredEntries.filter(e => e.project_id).forEach(e => {
       const proj = projects.find(p => p.id === e.project_id);
       if (!proj) return;
       const prev = map.get(proj.id) || { name: proj.name, budget: Number(proj.budget || 0), revenue: 0, expense: 0 };
@@ -843,7 +853,47 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       map.set(proj.id, prev);
     });
     return Array.from(map.values()).sort((a, b) => (b.revenue + b.expense) - (a.revenue + a.expense));
-  }, [entries, indicatorEntries, projects, doarYear, indicCustomPeriodEnabled]);
+  }, [periodFilteredEntries, projects]);
+
+  // Centro de custo report data
+  const ccReportData = useMemo(() => {
+    const yr = periodYear;
+    const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
+    const activeCCs = ccReportFilterIds.size > 0
+      ? costCenters.filter((cc: any) => ccReportFilterIds.has(cc.id))
+      : costCenters;
+
+    return activeCCs.map((cc: any) => {
+      const ccEntries = periodFilteredEntries.filter(e => e.cost_center_id === cc.id);
+      // Group by category
+      const catMap = new Map<string, { name: string; type: string; months: number[]; entries: any[][] }>();
+      ccEntries.forEach(e => {
+        const cat = categories.find(c => c.id === e.category_id);
+        const catName = cat?.name || "Sem Categoria";
+        const key = `${e.type}-${catName}`;
+        if (!catMap.has(key)) {
+          catMap.set(key, { name: catName, type: e.type, months: new Array(12).fill(0), entries: months.map(() => []) });
+        }
+        const mi = new Date(e.entry_date).getMonth();
+        catMap.get(key)!.months[mi] += Number(e.amount);
+        catMap.get(key)!.entries[mi].push(e);
+      });
+
+      const revRows = Array.from(catMap.values()).filter(r => r.type === "revenue").sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      const expRows = Array.from(catMap.values()).filter(r => r.type === "expense").sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      const monthTotalsRev = months.map((_, i) => revRows.reduce((s, r) => s + r.months[i], 0));
+      const monthTotalsExp = months.map((_, i) => expRows.reduce((s, r) => s + r.months[i], 0));
+      const monthBalance = months.map((_, i) => monthTotalsRev[i] - monthTotalsExp[i]);
+
+      return {
+        id: cc.id, name: cc.name, color: cc.color,
+        revRows, expRows, monthTotalsRev, monthTotalsExp, monthBalance,
+      };
+    }).filter(cc => {
+      if (!ccReportSearch) return true;
+      return cc.name.toLowerCase().includes(ccReportSearch.toLowerCase());
+    });
+  }, [periodFilteredEntries, costCenters, categories, periodYear, ccReportFilterIds, ccReportSearch]);
 
   const handlePrint = () => window.print();
 
@@ -869,7 +919,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(`
-      <html><head><title>DOAR ${doarYear}</title>
+      <html><head><title>DOAR</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; font-size: 9px; }
         @page { size: A4 landscape; margin: 10mm; }
@@ -928,7 +978,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     }
   };
 
-  // Batch copy handler
+  // Batch copy handler - includes all fields
   const handleBatchCopy = async () => {
     if (!user || selectedIds.size === 0) return;
     const toCopy = entries.filter(e => selectedIds.has(e.id));
@@ -946,11 +996,22 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
       is_paid: false,
       counterpart: e.counterpart || null,
       is_fixed: e.is_fixed || false,
+      description: e.description || null,
+      currency: e.currency || "BRL",
     }));
     await supabase.from("financial_entries").insert(copies);
     setSelectedIds(new Set());
     fetchData();
   };
+
+  // Period filter component (shared)
+  const renderPeriodFilter = () => (
+    <div className="flex items-center gap-1.5">
+      <Input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="h-7 text-xs w-32" />
+      <span className="text-xs text-muted-foreground">a</span>
+      <Input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="h-7 text-xs w-32" />
+    </div>
+  );
 
   // Entry dialog content (shared)
   const renderEntryDialog = () => (
@@ -964,6 +1025,10 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             <Input placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div>
+            <Label className="text-xs text-muted-foreground">Descrição</Label>
+            <Input placeholder="Descrição (opcional)" value={description} onChange={(e) => setDescription(e.target.value)} />
+          </div>
+          <div>
             <Label className="text-xs text-muted-foreground">Contraparte (Recebedor / Pagador)</Label>
             <CounterpartAutocomplete
               value={counterpart}
@@ -973,13 +1038,23 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
           </div>
           <div className="flex items-center gap-2">
             <div className="flex-1">
-              <Label className="text-xs text-muted-foreground">Valor (R$)</Label>
+              <Label className="text-xs text-muted-foreground">Valor</Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">{currency === "USDT" ? "$" : "R$"}</span>
                 <Input type="text" inputMode="decimal" placeholder="0,00" value={amount}
                   onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
                   className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               </div>
+            </div>
+            <div className="w-20">
+              <Label className="text-xs text-muted-foreground">Moeda</Label>
+              <Select value={currency} onValueChange={(v) => setCurrency(v as CurrencyType)}>
+                <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BRL">R$ BRL</SelectItem>
+                  <SelectItem value="USDT">$ USDT</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex-1">
               <Label className="text-xs text-muted-foreground">Tipo</Label>
@@ -1116,9 +1191,9 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                 </Select>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Forma Pgto</Label>
+                <Label className="text-xs text-muted-foreground">Forma de pagamento</Label>
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger className={cn("text-xs", isPaid && !paymentMethod && "border-destructive")}><SelectValue placeholder={isPaid ? "Forma Pgto (obrigatório)" : "Forma Pgto"} /></SelectTrigger>
+                  <SelectTrigger className={cn("text-xs", isPaid && !paymentMethod && "border-destructive")}><SelectValue placeholder={isPaid ? "Obrigatório" : "Opcional"} /></SelectTrigger>
                   <SelectContent>
                     {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                   </SelectContent>
@@ -1126,79 +1201,67 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               </div>
             </div>
           )}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="is-fixed" />
-              <label htmlFor="is-fixed" className="text-xs cursor-pointer">Conta fixa</label>
+
+          <div className="flex items-center gap-4 pt-1">
+            <div className="flex items-center gap-1.5">
+              <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="fixed-fin" />
+              <Label htmlFor="fixed-fin" className="text-xs whitespace-nowrap">Conta fixa</Label>
             </div>
-            <div className="flex items-center gap-2">
-              <Checkbox checked={splitEnabled} onCheckedChange={(c) => {
-                const val = !!c;
-                setSplitEnabled(val);
-                if (val && splitLines.length === 0) addSplitLine();
-              }} id="split-edit" />
-              <label htmlFor="split-edit" className="text-xs cursor-pointer">Múltiplas carteiras</label>
+            <div className="flex items-center gap-1.5">
+              <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="paid-fin" />
+              <Label htmlFor="paid-fin" className="text-xs whitespace-nowrap">Baixar conta</Label>
             </div>
-            <div className="flex items-center gap-2">
-              <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid" />
-              <label htmlFor="is-paid" className="text-xs cursor-pointer">Baixar conta</label>
+            <div className="flex items-center gap-1.5">
+              <Checkbox checked={splitEnabled} onCheckedChange={(c) => { setSplitEnabled(!!c); if (!c) setSplitLines([]); }} id="split-fin" />
+              <Label htmlFor="split-fin" className="text-xs whitespace-nowrap">Múltiplas carteiras</Label>
             </div>
           </div>
-          {/* Split Lines */}
+
+          {/* Split lines */}
           {splitEnabled && (
-            <div className="space-y-2 rounded-md border border-border/30 p-2.5 bg-muted/10">
+            <div className="space-y-2 pt-2 border-t border-border/20">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium flex items-center gap-1.5">
-                  <WalletCards className="h-3.5 w-3.5" /> Fontes de pagamento
-                </span>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={addSplitLine}>
-                  <Plus className="h-3.5 w-3.5" />
+                <span className="text-xs text-muted-foreground">Distribuição ({splitLines.length} fontes)</span>
+                <Button size="sm" variant="ghost" className="h-6 text-xs gap-1" onClick={addSplitLine}>
+                  <Plus className="h-3 w-3" /> Fonte
                 </Button>
               </div>
-              {splitLines.map((line, idx) => (
-                <div key={line.id} className="space-y-1.5 rounded border border-border/20 p-2 bg-background">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-muted-foreground font-medium">Fonte {idx + 1}</span>
-                    <button onClick={() => removeSplitLine(line.id)} className="text-muted-foreground hover:text-destructive">
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <Select value={line.accountId} onValueChange={(v) => updateSplitLine(line.id, "accountId", v)}>
-                      <SelectTrigger className="text-xs h-8"><SelectValue placeholder="Carteira" /></SelectTrigger>
-                      <SelectContent>
-                        {accounts.filter(a => a.is_active).map(a => (
-                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={line.paymentMethod} onValueChange={(v) => updateSplitLine(line.id, "paymentMethod", v)}>
-                      <SelectTrigger className="text-xs h-8"><SelectValue placeholder="Forma" /></SelectTrigger>
-                      <SelectContent>
-                        {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Input type="text" inputMode="decimal" placeholder="0,00" value={line.amount}
-                    onChange={(e) => updateSplitLine(line.id, "amount", e.target.value.replace(/[^0-9.,]/g, ""))}
-                    className="text-xs h-8" />
-                </div>
-              ))}
               {totalAmountNum > 0 && (
-                <div className="space-y-1 pt-1">
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-muted-foreground">{splitPct.toFixed(0)}% alocado</span>
-                    <span className={cn("font-medium",
-                      splitRemaining > 0.01 ? "text-warning" : splitRemaining < -0.01 ? "text-destructive" : "text-[hsl(var(--success))]"
-                    )}>
-                      {splitRemaining > 0.01 ? `Faltam R$ ${splitRemaining.toFixed(2)}` :
-                       splitRemaining < -0.01 ? `Excede R$ ${Math.abs(splitRemaining).toFixed(2)}` :
-                       "✓ 100% alocado"}
-                    </span>
+                <div className="space-y-1">
+                  <Progress value={splitPct} className="h-1.5" />
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>Distribuído: {brl(splitTotal)}</span>
+                    <span>Restante: {brl(splitRemaining)}</span>
                   </div>
-                  <Progress value={Math.min(100, splitPct)} className="h-1.5" />
                 </div>
               )}
+              {splitLines.map((line) => (
+                <div key={line.id} className="flex items-center gap-1.5">
+                  <Select value={line.accountId} onValueChange={(v) => updateSplitLine(line.id, "accountId", v)}>
+                    <SelectTrigger className="text-xs flex-1"><SelectValue placeholder="Conta" /></SelectTrigger>
+                    <SelectContent>
+                      {accounts.filter(a => a.is_active).map(a => (
+                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={line.paymentMethod} onValueChange={(v) => updateSplitLine(line.id, "paymentMethod", v)}>
+                    <SelectTrigger className="text-xs w-24"><SelectValue placeholder="Forma" /></SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="text" inputMode="decimal" placeholder="Valor"
+                    value={line.amount}
+                    onChange={(e) => updateSplitLine(line.id, "amount", e.target.value)}
+                    className="text-xs w-24"
+                  />
+                  <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-destructive/60 hover:text-destructive" onClick={() => removeSplitLine(line.id)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -1222,13 +1285,14 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
-      {/* Tab buttons - Patrimônio pattern */}
+      {/* Tab buttons */}
       <div className="flex items-center gap-2 overflow-x-auto">
         {([
           { key: "indicadores" as ViewTab, label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
           { key: "previsao" as ViewTab, label: "Fluxo de Caixa", icon: <CircleDollarSign className="h-3 w-3" /> },
           { key: "doar" as ViewTab, label: "DOAR", icon: <Landmark className="h-3 w-3" /> },
-        ]).filter(tab => visibleTabs.includes(tab.key)).map(tab => (
+          { key: "centrocusto" as ViewTab, label: "Centro de Custo", icon: <FolderKanban className="h-3 w-3" /> },
+        ]).filter(tab => tab.key === "centrocusto" || visibleTabs.includes(tab.key)).map(tab => (
           <Button key={tab.key} size="sm"
             variant={viewTab === tab.key ? "default" : "ghost"}
             className={cn("h-7 text-xs px-3 rounded-full gap-1.5", viewTab !== tab.key && "text-muted-foreground")}
@@ -1418,10 +1482,10 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               </div>
             </div>
 
-            {/* Table */}
-            <div className="rounded-lg overflow-hidden">
+            {/* Table with sticky header */}
+            <div className="rounded-lg overflow-auto max-h-[calc(100vh-320px)]">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-background">
                   <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
                     <th className="text-left py-2 px-2 w-8">
                       <Checkbox
@@ -1443,13 +1507,16 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                     {cashFlowFilter !== "paid" && (
                       <th className="text-right py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("balance")}>Saldo <SortIcon field="balance" /></th>
                     )}
+                    {cashFlowFilter === "paid" && (
+                      <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("payment_date")}>Pgto <SortIcon field="payment_date" /></th>
+                    )}
                     <th className="text-center py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("is_paid")}>Status <SortIcon field="is_paid" /></th>
                     <th className="text-center py-2 px-2">Fixa</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={11} className="text-center text-muted-foreground/40 py-12">
+                    <tr><td colSpan={12} className="text-center text-muted-foreground/40 py-12">
                       {cashFlowFilter === "paid" ? "Sem lançamentos baixados" : "Sem lançamentos pendentes"}
                     </td></tr>
                   )}
@@ -1457,7 +1524,10 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                     const cat = categories.find(c => c.id === e.category_id);
                     const runningBal = runningBalances.balanceMap.get(e.id) ?? 0;
                     const isBreakEven = runningBalances.breakEvenId === e.id;
-                    const isOverdue = !e.is_paid && parseEntryDate(e.entry_date) < new Date();
+                    const today = new Date(); today.setHours(0,0,0,0);
+                    const entDate = parseEntryDate(e.entry_date);
+                    const isOverdue = !e.is_paid && entDate < today;
+                    const overdueDays = isOverdue ? differenceInDays(today, entDate) : 0;
                     const isSelected = selectedIds.has(e.id);
                     const isPaidItem = cashFlowFilter === "paid";
                     return (
@@ -1482,7 +1552,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                             }}
                             onClick={(ev) => ev.stopPropagation()} className="h-3.5 w-3.5" />
                         </td>
-                        <td className="py-2.5 px-2 text-muted-foreground">{format(parseEntryDate(e.entry_date), "dd/MM/yy")}</td>
+                        <td className="py-2.5 px-2 text-muted-foreground">{format(entDate, "dd/MM/yy")}</td>
                         <td className={cn("py-2.5 px-2", isPaidItem && "line-through text-muted-foreground")}>
                           <span>{e.title}</span>
                         </td>
@@ -1495,11 +1565,16 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                           </span>
                         </td>
                         <td className={cn("py-2.5 px-2 text-right font-medium tabular-nums", e.type === "revenue" ? "text-success" : "text-destructive")}>
-                          {brl(Number(e.amount))}
+                          {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
                         </td>
                         {cashFlowFilter !== "paid" && (
                           <td className={cn("py-2.5 px-2 text-right font-semibold tabular-nums", runningBal >= 0 ? "text-success" : "text-destructive")}>
                             {brl(runningBal)}
+                          </td>
+                        )}
+                        {cashFlowFilter === "paid" && (
+                          <td className="py-2.5 px-2 text-muted-foreground text-xs">
+                            {e.payment_date ? format(parseEntryDate(e.payment_date), "dd/MM/yy") : "—"}
                           </td>
                         )}
                         <td className="py-2.5 px-2 text-center">
@@ -1510,7 +1585,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                           ) : isOverdue ? (
                             <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); setIsPaid(true); }}
                               className="inline-flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors">
-                              <AlertTriangle className="h-2.5 w-2.5" /> Atrasado
+                              <AlertTriangle className="h-2.5 w-2.5" /> {overdueDays}d
                             </button>
                           ) : (
                             <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); setIsPaid(true); }}
@@ -1537,13 +1612,9 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         {viewTab === "doar" && (() => {
           const totalRevYear = dreData.monthTotalsRev.reduce((s, v) => s + v, 0);
           const totalExpYear = dreData.monthTotalsExp.reduce((s, v) => s + v, 0);
-          const availableYears = [...new Set(entries.map(e => new Date(e.entry_date).getFullYear()))].sort((a, b) => b - a);
-          if (!availableYears.includes(doarYear)) availableYears.push(doarYear);
-          availableYears.sort((a, b) => b - a);
 
           const dQuery = doarSearchQuery.toLowerCase().trim();
           const filterDoarRow = (row: { name: string; months: number[] }) => {
-            // Show all categories, even without data (they'll show "—")
             return !dQuery || row.name.toLowerCase().includes(dQuery);
           };
           const filteredRevRows = dreData.revRows.filter(filterDoarRow);
@@ -1562,46 +1633,47 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               const mi = new Date(e.entry_date).getMonth();
               grouped.get(key)!.monthAmounts[mi] += Number(e.amount);
             });
-            return Array.from(grouped.values()).map(g => (
-              <tr key={g.title} className="entry-row bg-muted/10 text-xs">
-                <td className="p-1.5 border-b border-border/50 pl-10 text-muted-foreground" colSpan={2}>{g.title}</td>
-                {g.monthAmounts.map((v, mi) => (
-                  <td key={mi} className="text-right p-1.5 border-b border-border/50 text-muted-foreground">
-                    {v > 0 ? brl(v) : ""}
-                  </td>
-                ))}
-                <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground font-medium">
-                  {brl(g.monthAmounts.reduce((s, v) => s + v, 0))}
-                </td>
-              </tr>
-            ));
+            const rowTotal = row.months.reduce((s, v) => s + v, 0);
+            // Sort alphabetically
+            return Array.from(grouped.values())
+              .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"))
+              .map(g => {
+                const entryTotal = g.monthAmounts.reduce((s, v) => s + v, 0);
+                const pctOfCat = rowTotal > 0 ? ((entryTotal / rowTotal) * 100).toFixed(1) : "0.0";
+                return (
+                  <tr key={g.title} className="entry-row bg-muted/10 text-xs">
+                    <td className="p-1.5 border-b border-border/50 pl-10 text-muted-foreground">{g.title}</td>
+                    <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground/60">{pctOfCat}%</td>
+                    {g.monthAmounts.map((v, mi) => (
+                      <td key={mi} className="text-right p-1.5 border-b border-border/50 text-muted-foreground">
+                        {v > 0 ? brl(v) : ""}
+                      </td>
+                    ))}
+                    <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground font-medium">
+                      {brl(entryTotal)}
+                    </td>
+                  </tr>
+                );
+              });
           };
 
           return (
           <div className="space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 flex-wrap">
-                <Select value={String(doarYear)} onValueChange={(v) => setDoarYear(Number(v))}>
-                  <SelectTrigger className="h-7 w-24 text-xs rounded-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {availableYears.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                {renderPeriodFilter()}
                 <Button size="sm"
-                  variant={doarCustomPeriodEnabled ? "default" : "ghost"}
-                  className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", !doarCustomPeriodEnabled && "text-muted-foreground hover:text-foreground")}
-                  onClick={() => setDoarCustomPeriodEnabled(!doarCustomPeriodEnabled)}
+                  variant={doarShowPaid ? "default" : "ghost"}
+                  className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", !doarShowPaid && "text-muted-foreground hover:text-foreground")}
+                  onClick={() => setDoarShowPaid(!doarShowPaid)}
                 >
-                  <Filter className="h-3 w-3" /> Período
+                  {doarShowPaid ? "Real (Baixados)" : "Previsto (Todos)"}
                 </Button>
-              </div>
-              {doarCustomPeriodEnabled && (
                 <div className="flex items-center gap-1.5">
-                  <Input type="date" value={doarCustomStart} onChange={(e) => setDoarCustomStart(e.target.value)} className="h-7 text-xs w-32" />
-                  <span className="text-xs text-muted-foreground">a</span>
-                  <Input type="date" value={doarCustomEnd} onChange={(e) => setDoarCustomEnd(e.target.value)} className="h-7 text-xs w-32" />
+                  <Checkbox checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} id="carry-over" className="h-3.5 w-3.5" />
+                  <Label htmlFor="carry-over" className="text-xs text-muted-foreground whitespace-nowrap">Saldo anterior</Label>
                 </div>
-              )}
+              </div>
               <div className="flex items-center gap-1.5 ml-auto">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
@@ -1630,10 +1702,10 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
 
             <div id="doar-print-area" className="rounded-lg border border-border overflow-auto">
               <table className="w-full text-xs border-collapse">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-background">
                   <tr className="bg-primary/10">
                     <th colSpan={15} className="text-center p-3 border-b border-border font-bold text-sm text-primary tracking-wide">
-                      DOAR – DEMONSTRATIVO DE ORIGEM E APLICAÇÃO DE RECURSOS
+                      DOAR – {doarShowPaid ? "REALIZADO" : "PREVISTO"} — {periodYear}
                     </th>
                   </tr>
                   <tr className="bg-muted">
@@ -1647,7 +1719,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                 </thead>
                 <tbody>
                   {/* Carry-over */}
-                  {dreData.carryOver !== 0 && (
+                  {!doarHideCarryOver && dreData.carryOver !== 0 && (
                     <tr className="carry-row bg-primary/5">
                       <td className="p-2 border-b border-border font-bold text-primary">📦 Saldo Anterior</td>
                       <td className="text-right p-2 border-b border-border text-muted-foreground">—</td>
@@ -1804,34 +1876,195 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
           );
         })()}
 
+        {/* ============ CENTRO DE CUSTO REPORT ============ */}
+        {viewTab === "centrocusto" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1 flex-wrap">
+                {renderPeriodFilter()}
+                <Select value={ccReportFilterIds.size === 0 ? "all" : "custom"} onValueChange={(v) => {
+                  if (v === "all") setCcReportFilterIds(new Set());
+                }}>
+                  <SelectTrigger className="h-7 w-40 text-xs rounded-full"><SelectValue placeholder="Centros de Custo" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Centros</SelectItem>
+                    {costCenters.map((cc: any) => (
+                      <SelectItem key={cc.id} value={cc.id}>{cc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input placeholder="Pesquisar centros..."
+                    value={ccReportSearch} onChange={(e) => setCcReportSearch(e.target.value)}
+                    className="h-7 pl-8 text-xs w-44" />
+                </div>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handlePrint}>
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Imprimir</TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+
+            {/* Active CC filter chips */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {costCenters.map((cc: any) => {
+                const isActive = ccReportFilterIds.size === 0 || ccReportFilterIds.has(cc.id);
+                return (
+                  <Button key={cc.id} size="sm" variant={isActive ? "default" : "ghost"}
+                    className={cn("h-6 text-[10px] px-2 rounded-full gap-1", !isActive && "text-muted-foreground")}
+                    onClick={() => {
+                      const next = new Set(ccReportFilterIds);
+                      if (ccReportFilterIds.size === 0) {
+                        // Switch from "all" to only this one
+                        costCenters.forEach((c: any) => { if (c.id !== cc.id) next.add(c.id); });
+                        setCcReportFilterIds(new Set([cc.id]));
+                      } else if (next.has(cc.id)) {
+                        next.delete(cc.id);
+                        if (next.size === 0) setCcReportFilterIds(new Set()); // back to all
+                        else setCcReportFilterIds(next);
+                      } else {
+                        next.add(cc.id);
+                        if (next.size === costCenters.length) setCcReportFilterIds(new Set()); // all selected = all
+                        else setCcReportFilterIds(next);
+                      }
+                    }}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color || "#6b7280" }} />
+                    {cc.name}
+                  </Button>
+                );
+              })}
+            </div>
+
+            {ccReportData.length === 0 && (
+              <div className="text-center text-muted-foreground/40 py-12">Sem dados de centros de custo no período</div>
+            )}
+
+            {ccReportData.map(cc => {
+              const totalRev = cc.monthTotalsRev.reduce((s, v) => s + v, 0);
+              const totalExp = cc.monthTotalsExp.reduce((s, v) => s + v, 0);
+              const months = dreData.months;
+              return (
+                <div key={cc.id} className="rounded-lg border border-border overflow-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead className="sticky top-0 z-10 bg-background">
+                      <tr className="bg-primary/10">
+                        <th colSpan={15} className="text-left p-3 border-b border-border font-bold text-sm text-primary tracking-wide">
+                          <span className="flex items-center gap-2">
+                            <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cc.color || "#6b7280" }} />
+                            {cc.name}
+                          </span>
+                        </th>
+                      </tr>
+                      <tr className="bg-muted">
+                        <th className="text-left p-2 border-b border-border font-bold min-w-[140px]">Descrição</th>
+                        <th className="text-right p-2 border-b border-border font-bold min-w-[50px]">%</th>
+                        {months.map(m => (
+                          <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px]">{m}</th>
+                        ))}
+                        <th className="text-right p-2 border-b border-border font-bold min-w-[90px]">TOTAL</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Revenue */}
+                      {cc.revRows.length > 0 && (
+                        <>
+                          <tr className="bg-success/10">
+                            <td colSpan={15} className="p-2 border-b border-border font-bold text-success text-xs">RECEITAS</td>
+                          </tr>
+                          {cc.revRows.map(row => {
+                            const rowTotal = row.months.reduce((s, v) => s + v, 0);
+                            const pct = totalRev > 0 ? ((rowTotal / totalRev) * 100).toFixed(1) : "0.0";
+                            return (
+                              <tr key={row.name} className="hover:bg-muted/30">
+                                <td className="p-2 border-b border-border pl-6">{row.name}</td>
+                                <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
+                                {row.months.map((v, i) => (
+                                  <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-success" : "text-muted-foreground")}>
+                                    {v > 0 ? brl(v) : "—"}
+                                  </td>
+                                ))}
+                                <td className="text-right p-2 border-b border-border font-medium text-success">{brl(rowTotal)}</td>
+                              </tr>
+                            );
+                          })}
+                          <tr className="bg-success/5 font-bold">
+                            <td className="p-2 border-b border-border text-success">Total Receitas</td>
+                            <td className="text-right p-2 border-b border-border text-success">100%</td>
+                            {cc.monthTotalsRev.map((v, i) => (
+                              <td key={i} className="text-right p-2 border-b border-border text-success">{brl(v)}</td>
+                            ))}
+                            <td className="text-right p-2 border-b border-border text-success">{brl(totalRev)}</td>
+                          </tr>
+                        </>
+                      )}
+                      {/* Expense */}
+                      {cc.expRows.length > 0 && (
+                        <>
+                          <tr className="bg-destructive/10">
+                            <td colSpan={15} className="p-2 border-b border-border font-bold text-destructive text-xs">DESPESAS</td>
+                          </tr>
+                          {cc.expRows.map(row => {
+                            const rowTotal = row.months.reduce((s, v) => s + v, 0);
+                            const pct = totalExp > 0 ? ((rowTotal / totalExp) * 100).toFixed(1) : "0.0";
+                            return (
+                              <tr key={row.name} className="hover:bg-muted/30">
+                                <td className="p-2 border-b border-border pl-6">{row.name}</td>
+                                <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
+                                {row.months.map((v, i) => (
+                                  <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-destructive" : "text-muted-foreground")}>
+                                    {v > 0 ? brl(v) : "—"}
+                                  </td>
+                                ))}
+                                <td className="text-right p-2 border-b border-border font-medium text-destructive">{brl(rowTotal)}</td>
+                              </tr>
+                            );
+                          })}
+                          <tr className="bg-destructive/5 font-bold">
+                            <td className="p-2 border-b border-border text-destructive">Total Despesas</td>
+                            <td className="text-right p-2 border-b border-border text-destructive">100%</td>
+                            {cc.monthTotalsExp.map((v, i) => (
+                              <td key={i} className="text-right p-2 border-b border-border text-destructive">{brl(v)}</td>
+                            ))}
+                            <td className="text-right p-2 border-b border-border text-destructive">{brl(totalExp)}</td>
+                          </tr>
+                        </>
+                      )}
+                      {/* Balance */}
+                      <tr className="bg-primary/5 font-bold">
+                        <td className="p-2 border-b border-border text-primary">RESULTADO</td>
+                        <td className="p-2 border-b border-border">—</td>
+                        {cc.monthBalance.map((v, i) => (
+                          <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
+                            {brl(v)}
+                          </td>
+                        ))}
+                        <td className={cn("text-right p-2 border-b border-border font-bold",
+                          (totalRev - totalExp) >= 0 ? "text-success" : "text-destructive"
+                        )}>{brl(totalRev - totalExp)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* ============ INDICADORES ============ */}
         {viewTab === "indicadores" && (
           <div className="space-y-4" ref={reportRef}>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 flex-wrap">
-                <Select value={String(doarYear)} onValueChange={(v) => setDoarYear(Number(v))}>
-                  <SelectTrigger className="h-7 w-24 text-xs rounded-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {[...new Set(entries.map(e => new Date(e.entry_date).getFullYear())), doarYear].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => b - a).map(y => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button size="sm"
-                  variant={indicCustomPeriodEnabled ? "default" : "ghost"}
-                  className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", !indicCustomPeriodEnabled && "text-muted-foreground hover:text-foreground")}
-                  onClick={() => setIndicCustomPeriodEnabled(!indicCustomPeriodEnabled)}
-                >
-                  <Filter className="h-3 w-3" /> Período
-                </Button>
+                {renderPeriodFilter()}
               </div>
-              {indicCustomPeriodEnabled && (
-                <div className="flex items-center gap-1.5">
-                  <Input type="date" value={indicCustomStart} onChange={(e) => setIndicCustomStart(e.target.value)} className="h-7 text-xs w-32" />
-                  <span className="text-xs text-muted-foreground">a</span>
-                  <Input type="date" value={indicCustomEnd} onChange={(e) => setIndicCustomEnd(e.target.value)} className="h-7 text-xs w-32" />
-                </div>
-              )}
               <div className="ml-auto flex items-center gap-1.5">
                 <Tooltip delayDuration={200}>
                   <TooltipTrigger asChild>
@@ -1855,25 +2088,28 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             {/* Summary cards */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Resumo Anual — {doarYear}</CardTitle>
+                <CardTitle className="text-sm">Resumo — {periodYear}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-4 mb-4">
                   <div className="rounded-lg bg-success/10 p-3 text-center">
                     <p className="text-[10px] text-muted-foreground">Total Receitas</p>
-                    <p className="text-lg font-bold text-success">{brl(dreData.monthTotalsRev.reduce((s, v) => s + v, 0))}</p>
-                    <p className="text-[10px] text-muted-foreground">{(indicCustomPeriodEnabled ? indicatorEntries : entries).filter(e => e.type === "revenue" && new Date(e.entry_date).getFullYear() === doarYear).length} lançamentos</p>
+                    <p className="text-lg font-bold text-success">{brl(periodFilteredEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0))}</p>
+                    <p className="text-[10px] text-muted-foreground">{periodFilteredEntries.filter(e => e.type === "revenue").length} lançamentos</p>
                   </div>
                   <div className="rounded-lg bg-destructive/10 p-3 text-center">
                     <p className="text-[10px] text-muted-foreground">Total Despesas</p>
-                    <p className="text-lg font-bold text-destructive">{brl(dreData.monthTotalsExp.reduce((s, v) => s + v, 0))}</p>
-                    <p className="text-[10px] text-muted-foreground">{(indicCustomPeriodEnabled ? indicatorEntries : entries).filter(e => e.type === "expense" && new Date(e.entry_date).getFullYear() === doarYear).length} lançamentos</p>
+                    <p className="text-lg font-bold text-destructive">{brl(periodFilteredEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0))}</p>
+                    <p className="text-[10px] text-muted-foreground">{periodFilteredEntries.filter(e => e.type === "expense").length} lançamentos</p>
                   </div>
                   <div className="rounded-lg bg-primary/10 p-3 text-center">
-                    <p className="text-[10px] text-muted-foreground">Resultado do Ano</p>
-                    <p className={cn("text-lg font-bold", (dreData.accumulated[11] || 0) >= 0 ? "text-success" : "text-destructive")}>
-                      {brl(dreData.accumulated[11] || 0)}
-                    </p>
+                    <p className="text-[10px] text-muted-foreground">Resultado</p>
+                    {(() => {
+                      const rev = periodFilteredEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
+                      const exp = periodFilteredEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
+                      const result = rev - exp;
+                      return <p className={cn("text-lg font-bold", result >= 0 ? "text-success" : "text-destructive")}>{brl(result)}</p>;
+                    })()}
                   </div>
                 </div>
               </CardContent>
@@ -1905,7 +2141,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
 
             {/* Revenue vs Expense chart */}
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Receita × Despesa Mensal — {doarYear}</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Receita × Despesa Mensal — {periodYear}</CardTitle></CardHeader>
               <CardContent>
                 <div className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1926,7 +2162,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
 
             {/* Monthly balance trend */}
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Saldo Mensal — {doarYear}</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Saldo Mensal — {periodYear}</CardTitle></CardHeader>
               <CardContent>
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1978,7 +2214,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
 
             {/* Paid vs Pending trend */}
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Pago × Pendente — {doarYear}</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Pago × Pendente — {periodYear}</CardTitle></CardHeader>
               <CardContent>
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1999,7 +2235,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             {/* Cost Center Breakdown */}
             {costCenterData.length > 0 && (
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> Indicadores por Centro de Custo — {doarYear}</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> Indicadores por Centro de Custo</CardTitle></CardHeader>
                 <CardContent>
                   <div className="h-[220px]">
                     <ResponsiveContainer width="100%" height="100%">
@@ -2021,7 +2257,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             {/* Project Financial Breakdown */}
             {projectFinData.length > 0 && (
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><ListChecks className="h-3.5 w-3.5 text-primary" /> Indicadores por Projeto — {doarYear}</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><ListChecks className="h-3.5 w-3.5 text-primary" /> Indicadores por Projeto</CardTitle></CardHeader>
                 <CardContent>
                   <div className="h-[220px]">
                     <ResponsiveContainer width="100%" height="100%">
