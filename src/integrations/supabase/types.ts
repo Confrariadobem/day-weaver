@@ -198,6 +198,8 @@ export type Database = {
           cost_center_id: string | null
           counterpart: string | null
           created_at: string
+          currency: string | null
+          description: string | null
           entry_date: string
           has_split: boolean | null
           id: string
@@ -223,6 +225,8 @@ export type Database = {
           cost_center_id?: string | null
           counterpart?: string | null
           created_at?: string
+          currency?: string | null
+          description?: string | null
           entry_date?: string
           has_split?: boolean | null
           id?: string
@@ -248,6 +252,8 @@ export type Database = {
           cost_center_id?: string | null
           counterpart?: string | null
           created_at?: string
+          currency?: string | null
+          description?: string | null
           entry_date?: string
           has_split?: boolean | null
           id?: string
