@@ -725,7 +725,12 @@ function EventChip({ item, onToggle, onClick, compact }: { item: CalendarItem; o
       <span className="truncate min-w-0 flex-1">{item.title.replace(/^↻\s*/, "")}</span>
       {item.is_favorite && <Star className="h-2 w-2 shrink-0 fill-warning text-warning" />}
       {hasRecurrence && <Repeat className="h-2 w-2 shrink-0 opacity-70" />}
-      {!item.all_day && !hasRecurrence && <span className="shrink-0 opacity-70 text-[10px]">{format(new Date(item.start_time), "HH:mm")}</span>}
+      {!item.all_day && !hasRecurrence && (
+        <span className="shrink-0 opacity-70 text-[10px]">
+          {format(new Date(item.start_time), "HH:mm")}
+          {item.end_time && `–${format(new Date(item.end_time), "HH:mm")}`}
+        </span>
+      )}
     </div>
   );
 }
@@ -782,8 +787,13 @@ function HourlyDayView({ days, items, onDrop, onToggle, onClick, onNewEvent }: H
             {days.map((day) => {
               const hourItems = items.filter((it) => {
                 const d = new Date(it.start_time);
-                return isSameDay(d, day) && !it.all_day && d.getHours() === h;
-              });
+                if (!isSameDay(d, day) || it.all_day) return false;
+                const startHour = d.getHours();
+                if (!it.end_time) return startHour === h;
+                const endD = new Date(it.end_time);
+                const endHour = isSameDay(endD, day) ? (endD.getMinutes() > 0 ? endD.getHours() + 1 : endD.getHours()) : 24;
+                return h >= startHour && h < Math.max(startHour + 1, endHour);
+              }).map(it => ({ ...it, _isStart: new Date(it.start_time).getHours() === h }));
               const slotDate = new Date(day);
               slotDate.setHours(h, 0, 0, 0);
               const showTimeLine = isToday(day) && isCurrentHour;
@@ -803,7 +813,13 @@ function HourlyDayView({ days, items, onDrop, onToggle, onClick, onNewEvent }: H
                       </div>
                     </div>
                   )}
-                  {hourItems.map((it) => <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />)}
+                  {hourItems.map((it) => (it as any)._isStart ? (
+                    <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />
+                  ) : (
+                    <div key={`cont-${it.id}`} className="h-1.5 rounded-full mx-1 my-0.5 cursor-pointer opacity-60"
+                      style={{ backgroundColor: it.color || "#3b82f6" }}
+                      onClick={(e) => { e.stopPropagation(); onClick(it); }} />
+                  ))}
                 </div>
               );
             })}
@@ -864,8 +880,13 @@ function HourlyWeekView({ date, items, onDrop, onToggle, onClick, onNewEvent }: 
             {days.map((day) => {
               const hourItems = items.filter((it) => {
                 const d = new Date(it.start_time);
-                return isSameDay(d, day) && !it.all_day && d.getHours() === h;
-              });
+                if (!isSameDay(d, day) || it.all_day) return false;
+                const startHour = d.getHours();
+                if (!it.end_time) return startHour === h;
+                const endD = new Date(it.end_time);
+                const endHour = isSameDay(endD, day) ? (endD.getMinutes() > 0 ? endD.getHours() + 1 : endD.getHours()) : 24;
+                return h >= startHour && h < Math.max(startHour + 1, endHour);
+              }).map(it => ({ ...it, _isStart: new Date(it.start_time).getHours() === h }));
               const slotDate = new Date(day);
               slotDate.setHours(h, 0, 0, 0);
               return (
@@ -876,7 +897,13 @@ function HourlyWeekView({ date, items, onDrop, onToggle, onClick, onNewEvent }: 
                   onDrop={(e) => onDrop(e, slotDate)}
                   onClick={() => onNewEvent(slotDate)}
                 >
-                  {hourItems.map((it) => <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />)}
+                  {hourItems.map((it) => (it as any)._isStart ? (
+                    <EventChip key={it.id} item={it} onToggle={onToggle} onClick={onClick} compact />
+                  ) : (
+                    <div key={`cont-${it.id}`} className="h-1.5 rounded-full mx-1 my-0.5 cursor-pointer opacity-60"
+                      style={{ backgroundColor: it.color || "#3b82f6" }}
+                      onClick={(e) => { e.stopPropagation(); onClick(it); }} />
+                  ))}
                 </div>
               );
             })}

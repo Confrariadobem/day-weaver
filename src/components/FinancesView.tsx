@@ -149,7 +149,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [costCenters, setCostCenters] = useState<any[]>([]);
   const [sortField, setSortField] = useState<SortField>("entry_date");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<any | null>(null);
   const [viewTab, setViewTab] = useState<ViewTab>("previsao");
@@ -563,6 +563,12 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         const cp = e.counterpart || "";
         const amt = String(e.amount);
         const pm = e.payment_method || "";
+        const desc = e.description || "";
+        // Status search
+        const statusLabel = e.is_paid ? "pago baixado" : "pendente";
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const isOverdue = !e.is_paid && parseEntryDate(e.entry_date) < today;
+        const overdueLabel = isOverdue ? "atrasado vencido" : "";
         return e.title.toLowerCase().includes(query) ||
           cat.toLowerCase().includes(query) ||
           cc.toLowerCase().includes(query) ||
@@ -570,19 +576,12 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
           acc.toLowerCase().includes(query) ||
           cp.toLowerCase().includes(query) ||
           amt.includes(query) ||
-          pm.toLowerCase().includes(query);
+          pm.toLowerCase().includes(query) ||
+          desc.toLowerCase().includes(query) ||
+          statusLabel.includes(query) ||
+          overdueLabel.includes(query);
       })
       .sort((a, b) => {
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        // For non-paid views, overdue items always at top
-        if (cashFlowFilter !== "paid") {
-          const aOverdue = !a.is_paid && parseEntryDate(a.entry_date) < today;
-          const bOverdue = !b.is_paid && parseEntryDate(b.entry_date) < today;
-          if (aOverdue && !bOverdue) return -1;
-          if (!aOverdue && bOverdue) return 1;
-        }
-        
-        // Then sort by selected field
         let aVal: any, bVal: any;
         if (sortField === "category") {
           aVal = categories.find(c => c.id === a.category_id)?.name || "";
@@ -680,8 +679,11 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     const pEnd = new Date(periodEnd);
     const yr = pStart.getFullYear();
     const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
-    const revenueCategories = categories.filter(c => c.is_revenue);
-    const expenseCategories = categories.filter(c => c.is_expense);
+    // Include categories that have entries even if is_revenue/is_expense flags aren't set
+    const catIdsWithRevEntries = new Set(entries.filter(e => e.type === "revenue" && e.category_id).map(e => e.category_id));
+    const catIdsWithExpEntries = new Set(entries.filter(e => e.type === "expense" && e.category_id).map(e => e.category_id));
+    const revenueCategories = categories.filter(c => c.is_revenue || catIdsWithRevEntries.has(c.id));
+    const expenseCategories = categories.filter(c => c.is_expense || catIdsWithExpEntries.has(c.id));
 
     const getMonthEntries = (month: Date) => {
       let src = doarShowPaid ? entries.filter(e => e.is_paid) : entries;
@@ -1007,6 +1009,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   // Period filter component (shared)
   const renderPeriodFilter = () => (
     <div className="flex items-center gap-1.5">
+      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Período</span>
       <Input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="h-7 text-xs w-32" />
       <span className="text-xs text-muted-foreground">a</span>
       <Input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="h-7 text-xs w-32" />
@@ -1087,6 +1090,20 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               <Label htmlFor="allday-fin" className="text-sm whitespace-nowrap">Dia inteiro</Label>
             </div>
           </div>
+          {editingEntry && (editingEntry.recurrence_type || (editingEntry.installment_group && editingEntry.total_installments > 1)) && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded p-2">
+              <Repeat className="h-3.5 w-3.5" />
+              {editingEntry.installment_group && editingEntry.total_installments > 1 && (
+                <span>Parcela {editingEntry.installment_number}/{editingEntry.total_installments}</span>
+              )}
+              {editingEntry.recurrence_type && (
+                <span>• Recorrência: {
+                  ({ daily: "Diária", weekly: "Semanal", biweekly: "Quinzenal", monthly: "Mensal",
+                    quarterly: "Trimestral", semiannual: "Semestral", yearly: "Anual" } as any)[editingEntry.recurrence_type] || editingEntry.recurrence_type
+                }</span>
+              )}
+            </div>
+          )}
           {!editingEntry && (
             <>
               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -1583,12 +1600,12 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                               <Check className="h-2.5 w-2.5" /> Pago
                             </span>
                           ) : isOverdue ? (
-                            <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); setIsPaid(true); }}
+                            <button onClick={(ev) => { ev.stopPropagation(); togglePaid(e); }}
                               className="inline-flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors">
                               <AlertTriangle className="h-2.5 w-2.5" /> {overdueDays}d
                             </button>
                           ) : (
-                            <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); setIsPaid(true); }}
+                            <button onClick={(ev) => { ev.stopPropagation(); togglePaid(e); }}
                               className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-success transition-colors">
                               <CircleDollarSign className="h-2.5 w-2.5" /> Baixa
                             </button>
@@ -1661,7 +1678,6 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
           <div className="space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 flex-wrap">
-                {renderPeriodFilter()}
                 <Button size="sm"
                   variant={doarShowPaid ? "default" : "ghost"}
                   className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", !doarShowPaid && "text-muted-foreground hover:text-foreground")}
@@ -1673,6 +1689,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                   <Checkbox checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} id="carry-over" className="h-3.5 w-3.5" />
                   <Label htmlFor="carry-over" className="text-xs text-muted-foreground whitespace-nowrap">Saldo anterior</Label>
                 </div>
+                {renderPeriodFilter()}
               </div>
               <div className="flex items-center gap-1.5 ml-auto">
                 <div className="relative">
@@ -1843,32 +1860,44 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                   )}
 
                   {/* Balance per month */}
-                  <tr className="result-row bg-primary/5 font-bold">
-                    <td className="p-2 border-b border-border text-primary">RESULTADO DO MÊS</td>
-                    <td className="p-2 border-b border-border">—</td>
-                    {dreData.monthBalance.map((v, i) => (
-                      <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
-                        {brl(v)}
-                      </td>
-                    ))}
-                    <td className={cn("text-right p-2 border-b border-border font-bold",
-                      dreData.monthBalance.reduce((s, v) => s + v, 0) >= 0 ? "text-success" : "text-destructive"
-                    )}>{brl(dreData.monthBalance.reduce((s, v) => s + v, 0))}</td>
-                  </tr>
+                  {(() => {
+                    const totalResult = dreData.monthBalance.reduce((s, v) => s + v, 0);
+                    const resultPctRev = totalRevYear > 0 ? ((totalResult / totalRevYear) * 100).toFixed(1) : "0.0";
+                    return (
+                      <tr className="result-row bg-primary/5 font-bold">
+                        <td className="p-2 border-b border-border text-primary">RESULTADO DO MÊS</td>
+                        <td className="text-right p-2 border-b border-border text-primary">{resultPctRev}%</td>
+                        {dreData.monthBalance.map((v, i) => (
+                          <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
+                            {brl(v)}
+                          </td>
+                        ))}
+                        <td className={cn("text-right p-2 border-b border-border font-bold",
+                          totalResult >= 0 ? "text-success" : "text-destructive"
+                        )}>{brl(totalResult)}</td>
+                      </tr>
+                    );
+                  })()}
 
                   {/* Accumulated */}
-                  <tr className="accum-row bg-muted font-bold">
-                    <td className="p-2 border-b border-border">SALDO ACUMULADO</td>
-                    <td className="p-2 border-b border-border">—</td>
-                    {dreData.accumulated.map((v, i) => (
-                      <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
-                        {brl(v)}
-                      </td>
-                    ))}
-                    <td className={cn("text-right p-2 border-b border-border font-bold",
-                      (dreData.accumulated[11] || 0) >= 0 ? "text-success" : "text-destructive"
-                    )}>{brl(dreData.accumulated[11] || 0)}</td>
-                  </tr>
+                  {(() => {
+                    const lastAcc = dreData.accumulated[11] || 0;
+                    const accPctRev = totalRevYear > 0 ? ((lastAcc / totalRevYear) * 100).toFixed(1) : "0.0";
+                    return (
+                      <tr className="accum-row bg-muted font-bold">
+                        <td className="p-2 border-b border-border">SALDO ACUMULADO</td>
+                        <td className="text-right p-2 border-b border-border text-muted-foreground">{accPctRev}%</td>
+                        {dreData.accumulated.map((v, i) => (
+                          <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
+                            {brl(v)}
+                          </td>
+                        ))}
+                        <td className={cn("text-right p-2 border-b border-border font-bold",
+                          lastAcc >= 0 ? "text-success" : "text-destructive"
+                        )}>{brl(lastAcc)}</td>
+                      </tr>
+                    );
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -1881,18 +1910,24 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
           <div className="space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 flex-wrap">
-                {renderPeriodFilter()}
-                <Select value={ccReportFilterIds.size === 0 ? "all" : "custom"} onValueChange={(v) => {
+                <Select value={ccReportFilterIds.size === 0 ? "all" : Array.from(ccReportFilterIds)[0] || "all"} onValueChange={(v) => {
                   if (v === "all") setCcReportFilterIds(new Set());
+                  else setCcReportFilterIds(new Set([v]));
                 }}>
-                  <SelectTrigger className="h-7 w-40 text-xs rounded-full"><SelectValue placeholder="Centros de Custo" /></SelectTrigger>
+                  <SelectTrigger className="h-7 w-44 text-xs rounded-full"><SelectValue placeholder="Centros de Custo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os Centros</SelectItem>
                     {costCenters.map((cc: any) => (
-                      <SelectItem key={cc.id} value={cc.id}>{cc.name}</SelectItem>
+                      <SelectItem key={cc.id} value={cc.id}>
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color || "#6b7280" }} />
+                          {cc.name}
+                        </span>
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {renderPeriodFilter()}
               </div>
               <div className="flex items-center gap-1.5 ml-auto">
                 <div className="relative">
@@ -1910,37 +1945,6 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                   <TooltipContent>Imprimir</TooltipContent>
                 </Tooltip>
               </div>
-            </div>
-
-            {/* Active CC filter chips */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {costCenters.map((cc: any) => {
-                const isActive = ccReportFilterIds.size === 0 || ccReportFilterIds.has(cc.id);
-                return (
-                  <Button key={cc.id} size="sm" variant={isActive ? "default" : "ghost"}
-                    className={cn("h-6 text-[10px] px-2 rounded-full gap-1", !isActive && "text-muted-foreground")}
-                    onClick={() => {
-                      const next = new Set(ccReportFilterIds);
-                      if (ccReportFilterIds.size === 0) {
-                        // Switch from "all" to only this one
-                        costCenters.forEach((c: any) => { if (c.id !== cc.id) next.add(c.id); });
-                        setCcReportFilterIds(new Set([cc.id]));
-                      } else if (next.has(cc.id)) {
-                        next.delete(cc.id);
-                        if (next.size === 0) setCcReportFilterIds(new Set()); // back to all
-                        else setCcReportFilterIds(next);
-                      } else {
-                        next.add(cc.id);
-                        if (next.size === costCenters.length) setCcReportFilterIds(new Set()); // all selected = all
-                        else setCcReportFilterIds(next);
-                      }
-                    }}
-                  >
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color || "#6b7280" }} />
-                    {cc.name}
-                  </Button>
-                );
-              })}
             </div>
 
             {ccReportData.length === 0 && (
@@ -2038,18 +2042,24 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                         </>
                       )}
                       {/* Balance */}
-                      <tr className="bg-primary/5 font-bold">
-                        <td className="p-2 border-b border-border text-primary">RESULTADO</td>
-                        <td className="p-2 border-b border-border">—</td>
-                        {cc.monthBalance.map((v, i) => (
-                          <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
-                            {brl(v)}
-                          </td>
-                        ))}
-                        <td className={cn("text-right p-2 border-b border-border font-bold",
-                          (totalRev - totalExp) >= 0 ? "text-success" : "text-destructive"
-                        )}>{brl(totalRev - totalExp)}</td>
-                      </tr>
+                      {(() => {
+                        const ccResult = totalRev - totalExp;
+                        const ccResultPct = (totalRev + totalExp) > 0 ? ((ccResult / Math.max(totalRev, totalExp, 1)) * 100).toFixed(1) : "0.0";
+                        return (
+                          <tr className="bg-primary/5 font-bold">
+                            <td className="p-2 border-b border-border text-primary">RESULTADO</td>
+                            <td className="text-right p-2 border-b border-border text-primary">{ccResultPct}%</td>
+                            {cc.monthBalance.map((v, i) => (
+                              <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
+                                {brl(v)}
+                              </td>
+                            ))}
+                            <td className={cn("text-right p-2 border-b border-border font-bold",
+                              ccResult >= 0 ? "text-success" : "text-destructive"
+                            )}>{brl(ccResult)}</td>
+                          </tr>
+                        );
+                      })()}
                     </tbody>
                   </table>
                 </div>
