@@ -166,30 +166,29 @@ export default function DashboardView() {
             { key: "today" as PeriodKey, label: "Hoje", icon: CalendarIcon },
             { key: "3days" as PeriodKey, label: "3 dias", icon: Clock },
             { key: "month" as PeriodKey, label: "Mês", icon: CalendarIcon },
-            { key: "year" as PeriodKey, label: "Ano", icon: CalendarIcon },
-            { key: "custom" as PeriodKey, label: "Personalizado", icon: CalendarX },
+            { key: "custom" as PeriodKey, label: "Outros", icon: CalendarX },
           ]).map(({ key, label, icon: Icon }) => (
             <Popover key={key}>
               <PopoverTrigger asChild>
                 <button
                   onClick={() => { if (key !== "custom") handlePeriodChange(key); else setPeriodKey("custom"); }}
                   className={cn(
-                    "flex flex-col items-center rounded-lg px-4 py-3 transition-colors shrink-0",
+                    "flex flex-col items-center justify-center rounded-lg w-24 py-3 transition-colors shrink-0",
                     periodKey === key
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted hover:bg-accent"
                   )}
                 >
-                  <Icon className="h-5 w-5 mb-1" />
+                  <Icon className="size-6 mb-1" />
                   <span className="text-sm font-medium">{label}</span>
                 </button>
               </PopoverTrigger>
               {key === "custom" && periodKey === "custom" && (
-                <PopoverContent className="w-auto p-3 space-y-3" align="start">
+                <PopoverContent className="w-72 p-3 space-y-3" align="start">
                   <p className="text-xs font-medium text-muted-foreground">De:</p>
-                  <Calendar mode="single" selected={customFrom} onSelect={handleCustomFrom} className="pointer-events-auto" />
+                  <Calendar mode="single" locale={ptBR} selected={customFrom} onSelect={handleCustomFrom} className="pointer-events-auto" />
                   <p className="text-xs font-medium text-muted-foreground">Até:</p>
-                  <Calendar mode="single" selected={customTo} onSelect={handleCustomTo} className="pointer-events-auto" />
+                  <Calendar mode="single" locale={ptBR} selected={customTo} onSelect={handleCustomTo} className="pointer-events-auto" />
                 </PopoverContent>
               )}
             </Popover>
@@ -200,41 +199,41 @@ export default function DashboardView() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <Card className="bg-card h-24">
             <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <Wallet className="h-3 w-3" /> Patrimônio
-              </p>
-              <p className="text-lg md:text-xl font-bold text-foreground">{brl(totalPatrimony)}</p>
-              <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight line-clamp-2">{KPI_DESCRIPTIONS.patrimonio}</p>
+               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <Wallet className="h-3.5 w-3.5" /> Patrimônio
+               </p>
+               <p className="text-xl md:text-2xl font-bold text-foreground">{brl(totalPatrimony)}</p>
+               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium line-clamp-2">{KPI_DESCRIPTIONS.patrimonio}</p>
             </CardContent>
           </Card>
           <Card className="bg-card h-24">
             <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" /> Receitas {periodLabel}
-              </p>
-              <p className="text-lg md:text-xl font-bold text-[hsl(var(--success))]">{brl(totalRevenue)}</p>
-              <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight line-clamp-2">{KPI_DESCRIPTIONS.receitas}</p>
+               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <TrendingUp className="h-3.5 w-3.5" /> Receitas {periodLabel}
+               </p>
+               <p className="text-xl md:text-2xl font-bold text-[hsl(var(--success))]">{brl(totalRevenue)}</p>
+               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium line-clamp-2">{KPI_DESCRIPTIONS.receitas}</p>
             </CardContent>
           </Card>
           <Card className="bg-card h-24">
             <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <TrendingDown className="h-3 w-3" /> Despesas {periodLabel}
-              </p>
-              <p className="text-lg md:text-xl font-bold text-destructive">{brl(totalExpense)}</p>
-              <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight line-clamp-2">{KPI_DESCRIPTIONS.despesas}</p>
+               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <TrendingDown className="h-3.5 w-3.5" /> Despesas {periodLabel}
+               </p>
+               <p className="text-xl md:text-2xl font-bold text-destructive">{brl(totalExpense)}</p>
+               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium line-clamp-2">{KPI_DESCRIPTIONS.despesas}</p>
             </CardContent>
           </Card>
           <Card className="bg-card h-24">
             <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Saldo do Período</p>
-              <p className={cn(
-                "font-bold text-[28px] md:text-[32px] leading-tight",
-                totalBalance >= 0 ? "text-[hsl(142,71%,45%)]" : "text-[hsl(0,84%,60%)]"
-              )}>
-                {brl(totalBalance)}
-              </p>
-              <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight line-clamp-2">{KPI_DESCRIPTIONS.saldo}</p>
+               <p className="text-xs text-muted-foreground uppercase tracking-wider">Saldo do Período</p>
+               <p className={cn(
+                 "font-bold text-2xl md:text-3xl leading-tight",
+                 totalBalance >= 0 ? "text-[hsl(142,71%,45%)]" : "text-[hsl(0,84%,60%)]"
+               )}>
+                 {brl(totalBalance)}
+               </p>
+               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium line-clamp-2">{KPI_DESCRIPTIONS.saldo}</p>
             </CardContent>
           </Card>
         </div>
@@ -243,40 +242,40 @@ export default function DashboardView() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <Card className="bg-card h-24">
             <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <FolderKanban className="h-3 w-3" /> Projetos Ativos
-              </p>
-              <p className="text-lg md:text-xl font-bold text-foreground">{activeProjects}</p>
-              <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{KPI_DESCRIPTIONS.projetos}</p>
+               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                 <FolderKanban className="h-3.5 w-3.5" /> Projetos Ativos
+               </p>
+               <p className="text-xl md:text-2xl font-bold text-foreground">{activeProjects}</p>
+               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium">{KPI_DESCRIPTIONS.projetos}</p>
             </CardContent>
           </Card>
           <Card className="bg-card h-24">
             <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" /> Tarefas
-              </p>
-              <p className="text-lg md:text-xl font-bold text-foreground">{completedTasks}/{totalTasks}</p>
-              <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{KPI_DESCRIPTIONS.tarefas}</p>
+               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                 <CheckCircle2 className="h-3.5 w-3.5" /> Tarefas
+               </p>
+               <p className="text-xl md:text-2xl font-bold text-foreground">{completedTasks}/{totalTasks}</p>
+               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium">{KPI_DESCRIPTIONS.tarefas}</p>
             </CardContent>
           </Card>
           <Card className="bg-card h-24">
             <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <PiggyBank className="h-3 w-3" /> Investimentos
-              </p>
-              <p className="text-lg md:text-xl font-bold text-foreground">{brl(totalInvestments)}</p>
-              <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{KPI_DESCRIPTIONS.investimentos}</p>
+               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                 <PiggyBank className="h-3.5 w-3.5" /> Investimentos
+               </p>
+               <p className="text-xl md:text-2xl font-bold text-foreground">{brl(totalInvestments)}</p>
+               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium">{KPI_DESCRIPTIONS.investimentos}</p>
             </CardContent>
           </Card>
           <Card className="bg-card h-24">
             <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <Wallet className="h-3 w-3" /> Caixa
-              </p>
-              <p className={cn("text-lg md:text-xl font-bold", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
-                {brl(totalCash)}
-              </p>
-              <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{KPI_DESCRIPTIONS.caixa}</p>
+               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                 <Wallet className="h-3.5 w-3.5" /> Caixa
+               </p>
+               <p className={cn("text-xl md:text-2xl font-bold", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                 {brl(totalCash)}
+               </p>
+               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium">{KPI_DESCRIPTIONS.caixa}</p>
             </CardContent>
           </Card>
         </div>
@@ -294,7 +293,7 @@ export default function DashboardView() {
                   <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
                   <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
                   <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Legend wrapperStyle={{ fontSize: 13 }} />
                   <Bar dataKey="receita" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="despesa" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
                   <Line type="monotone" dataKey="acumulado" name="Acumulado" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6" }} />
