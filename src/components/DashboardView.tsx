@@ -16,6 +16,7 @@ import { ptBR } from "date-fns/locale";
 import {
   TrendingUp, TrendingDown, Wallet, CheckCircle2, FolderKanban,
   BarChart3, PiggyBank, ArrowUpRight, ArrowDownRight, CalendarIcon,
+  Clock, CalendarX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
@@ -159,49 +160,40 @@ export default function DashboardView() {
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
-        {/* Period filter */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground font-medium">Período</span>
-          <Select value={periodKey} onValueChange={handlePeriodChange}>
-            <SelectTrigger className="w-[160px] h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today">Hoje</SelectItem>
-              <SelectItem value="3days">Próximos 3 dias</SelectItem>
-              <SelectItem value="week">Semana</SelectItem>
-              <SelectItem value="month">Mês</SelectItem>
-              <SelectItem value="year">Ano atual</SelectItem>
-              <SelectItem value="custom">Personalizado</SelectItem>
-            </SelectContent>
-          </Select>
-          {periodKey === "custom" && (
-            <div className="flex items-center gap-1">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
-                    <CalendarIcon className="h-3 w-3" />
-                    {customFrom ? format(customFrom, "dd/MM/yy") : "Início"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={customFrom} onSelect={handleCustomFrom} className="p-3 pointer-events-auto" />
+         {/* Period filter - Xiaomi Mi Calendar style */}
+        <div className="flex flex-row gap-3 overflow-x-auto pb-1">
+          {([
+            { key: "today" as PeriodKey, label: "Hoje", icon: CalendarIcon },
+            { key: "3days" as PeriodKey, label: "3 dias", icon: Clock },
+            { key: "month" as PeriodKey, label: "Mês", icon: CalendarIcon },
+            { key: "year" as PeriodKey, label: "Ano", icon: CalendarIcon },
+            { key: "custom" as PeriodKey, label: "Personalizado", icon: CalendarX },
+          ]).map(({ key, label, icon: Icon }) => (
+            <Popover key={key}>
+              <PopoverTrigger asChild>
+                <button
+                  onClick={() => { if (key !== "custom") handlePeriodChange(key); else setPeriodKey("custom"); }}
+                  className={cn(
+                    "flex flex-col items-center rounded-lg px-4 py-3 transition-colors shrink-0",
+                    periodKey === key
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted hover:bg-accent"
+                  )}
+                >
+                  <Icon className="h-5 w-5 mb-1" />
+                  <span className="text-sm font-medium">{label}</span>
+                </button>
+              </PopoverTrigger>
+              {key === "custom" && periodKey === "custom" && (
+                <PopoverContent className="w-auto p-3 space-y-3" align="start">
+                  <p className="text-xs font-medium text-muted-foreground">De:</p>
+                  <Calendar mode="single" selected={customFrom} onSelect={handleCustomFrom} className="pointer-events-auto" />
+                  <p className="text-xs font-medium text-muted-foreground">Até:</p>
+                  <Calendar mode="single" selected={customTo} onSelect={handleCustomTo} className="pointer-events-auto" />
                 </PopoverContent>
-              </Popover>
-              <span className="text-xs text-muted-foreground">→</span>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
-                    <CalendarIcon className="h-3 w-3" />
-                    {customTo ? format(customTo, "dd/MM/yy") : "Fim"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={customTo} onSelect={handleCustomTo} className="p-3 pointer-events-auto" />
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
+              )}
+            </Popover>
+          ))}
         </div>
 
         {/* KPI Cards */}
