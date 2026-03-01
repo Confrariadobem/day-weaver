@@ -220,7 +220,17 @@ export default function DashboardView() {
               </PopoverTrigger>
               {key === "custom" && periodKey === "custom" && (
                 <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-2" align="start">
-                  <Calendar mode="single" locale={ptBR} showOutsideDays={false} selected={customFrom} onSelect={handleCustomFrom} className="pointer-events-auto" />
+                  <Calendar
+                    mode="range"
+                    locale={ptBR}
+                    showOutsideDays={false}
+                    selected={{ from: customFrom, to: customTo }}
+                    onSelect={(range) => {
+                      handleCustomFrom(range?.from);
+                      handleCustomTo(range?.to);
+                    }}
+                    className="pointer-events-auto"
+                  />
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium text-muted-foreground shrink-0">De:</label>
                     <Input value={inputFrom} onChange={e => handleInputFrom(e.target.value)} placeholder="dd/MM/yyyy" className="h-8 text-sm" />
@@ -229,6 +239,17 @@ export default function DashboardView() {
                     <label className="text-sm font-medium text-muted-foreground shrink-0">Até:</label>
                     <Input value={inputTo} onChange={e => handleInputTo(e.target.value)} placeholder="dd/MM/yyyy" className="h-8 text-sm" />
                   </div>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="mt-2 w-full"
+                    onClick={() => {
+                      if (customFrom) setCustomRange(prev => ({ ...prev, start: customFrom }));
+                      if (customTo) setCustomRange(prev => ({ ...prev, end: customTo }));
+                    }}
+                  >
+                    Aplicar
+                  </Button>
                 </PopoverContent>
               )}
             </Popover>
@@ -240,7 +261,7 @@ export default function DashboardView() {
           <Card className="bg-card min-h-32">
             <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <Wallet className="h-3.5 w-3.5" /> Patrimônio
+                <Wallet className="size-7 mr-2 text-muted-foreground" /> Patrimônio
                </p>
                <p className="text-xl md:text-2xl font-semibold text-foreground">{brl(totalPatrimony)}</p>
                <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.patrimonio}</p>
@@ -249,7 +270,7 @@ export default function DashboardView() {
           <Card className="bg-card min-h-32">
             <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <TrendingUp className="h-3.5 w-3.5" /> Receitas {periodLabel}
+                <TrendingUp className="size-7 mr-2 text-muted-foreground" /> Receitas {periodLabel}
                </p>
                <p className="text-xl md:text-2xl font-semibold text-[hsl(var(--success))]">{brl(totalRevenue)}</p>
                <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.receitas}</p>
@@ -258,7 +279,7 @@ export default function DashboardView() {
           <Card className="bg-card min-h-32">
             <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <TrendingDown className="h-3.5 w-3.5" /> Despesas {periodLabel}
+                <TrendingDown className="size-7 mr-2 text-muted-foreground" /> Despesas {periodLabel}
                </p>
                <p className="text-xl md:text-2xl font-semibold text-destructive">{brl(totalExpense)}</p>
                <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.despesas}</p>
@@ -283,7 +304,7 @@ export default function DashboardView() {
           <Card className="bg-card min-h-32">
             <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                 <FolderKanban className="h-3.5 w-3.5" /> Projetos Ativos
+                 <FolderKanban className="size-7 mr-2 text-muted-foreground" /> Projetos Ativos
                </p>
                <p className="text-xl md:text-2xl font-semibold text-foreground">{activeProjects}</p>
                <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.projetos}</p>
@@ -292,7 +313,7 @@ export default function DashboardView() {
           <Card className="bg-card min-h-32">
             <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                 <CheckCircle2 className="h-3.5 w-3.5" /> Tarefas
+                 <CheckCircle2 className="size-7 mr-2 text-muted-foreground" /> Tarefas
                </p>
                <p className="text-xl md:text-2xl font-semibold text-foreground">{completedTasks}/{totalTasks}</p>
                <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.tarefas}</p>
@@ -301,7 +322,7 @@ export default function DashboardView() {
           <Card className="bg-card min-h-32">
             <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                 <PiggyBank className="h-3.5 w-3.5" /> Investimentos
+                 <PiggyBank className="size-7 mr-2 text-muted-foreground" /> Investimentos
                </p>
                <p className="text-xl md:text-2xl font-semibold text-foreground">{brl(totalInvestments)}</p>
                <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.investimentos}</p>
@@ -310,7 +331,7 @@ export default function DashboardView() {
           <Card className="bg-card min-h-32">
             <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                 <Wallet className="h-3.5 w-3.5" /> Caixa
+                 <Wallet className="size-7 mr-2 text-muted-foreground" /> Caixa
                </p>
                <p className={cn("text-xl md:text-2xl font-semibold", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
                  {brl(totalCash)}
@@ -325,7 +346,7 @@ export default function DashboardView() {
           <Card className="bg-card md:col-span-2">
             <CardContent className="p-3">
               <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
-                <BarChart3 className="h-4 w-4 text-primary" /> Receita × Despesa
+                <BarChart3 className="size-7 mr-2 text-muted-foreground" /> Receita × Despesa
               </p>
               <ResponsiveContainer width="100%" height={180}>
                 <ComposedChart data={monthlyData} barGap={0}>
@@ -345,7 +366,7 @@ export default function DashboardView() {
           <Card className="bg-card">
             <CardContent className="p-3">
               <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
-                <TrendingUp className="h-4 w-4 text-primary" /> Saldo Mensal
+                <TrendingUp className="size-7 mr-2 text-muted-foreground" /> Saldo Mensal
               </p>
               <ResponsiveContainer width="100%" height={180}>
                 <AreaChart data={monthlyData}>
@@ -368,7 +389,7 @@ export default function DashboardView() {
           <Card className="bg-card">
             <CardContent className="p-3">
               <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
-                <PiggyBank className="h-4 w-4 text-primary" /> Despesas por Categoria
+                <PiggyBank className="size-7 mr-2 text-muted-foreground" /> Despesas por Categoria
               </p>
               {categoryBreakdown.length > 0 ? (
                 <div className="flex items-center gap-4">
