@@ -13,10 +13,11 @@ import {
 } from "recharts";
 import { format, startOfYear, endOfYear, eachMonthOfInterval, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Input } from "@/components/ui/input";
 import {
   TrendingUp, TrendingDown, Wallet, CheckCircle2, FolderKanban,
-  BarChart3, PiggyBank, ArrowUpRight, ArrowDownRight, CalendarIcon,
-  Clock, CalendarX,
+  BarChart3, PiggyBank, ArrowUpRight, ArrowDownRight,
+  CalendarCheck, CalendarDays, CalendarX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
@@ -62,6 +63,8 @@ export default function DashboardView() {
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>(getPeriodRange("year"));
   const [customFrom, setCustomFrom] = useState<Date | undefined>(undefined);
   const [customTo, setCustomTo] = useState<Date | undefined>(undefined);
+  const [inputFrom, setInputFrom] = useState("");
+  const [inputTo, setInputTo] = useState("");
 
   const period = useMemo(() => {
     if (periodKey === "custom") return customRange;
@@ -79,11 +82,43 @@ export default function DashboardView() {
 
   const handleCustomFrom = (d: Date | undefined) => {
     setCustomFrom(d);
-    if (d) setCustomRange(prev => ({ ...prev, start: d }));
+    if (d) {
+      setCustomRange(prev => ({ ...prev, start: d }));
+      setInputFrom(format(d, "dd/MM/yyyy"));
+    }
   };
   const handleCustomTo = (d: Date | undefined) => {
     setCustomTo(d);
-    if (d) setCustomRange(prev => ({ ...prev, end: d }));
+    if (d) {
+      setCustomRange(prev => ({ ...prev, end: d }));
+      setInputTo(format(d, "dd/MM/yyyy"));
+    }
+  };
+
+  const parseDate = (str: string): Date | null => {
+    const m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return null;
+    const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const handleInputFrom = (v: string) => {
+    // auto-insert slashes
+    let raw = v.replace(/\D/g, "").slice(0, 8);
+    if (raw.length > 4) raw = raw.slice(0, 2) + "/" + raw.slice(2, 4) + "/" + raw.slice(4);
+    else if (raw.length > 2) raw = raw.slice(0, 2) + "/" + raw.slice(2);
+    setInputFrom(raw);
+    const d = parseDate(raw);
+    if (d) { setCustomFrom(d); setCustomRange(prev => ({ ...prev, start: d })); }
+  };
+
+  const handleInputTo = (v: string) => {
+    let raw = v.replace(/\D/g, "").slice(0, 8);
+    if (raw.length > 4) raw = raw.slice(0, 2) + "/" + raw.slice(2, 4) + "/" + raw.slice(4);
+    else if (raw.length > 2) raw = raw.slice(0, 2) + "/" + raw.slice(2);
+    setInputTo(raw);
+    const d = parseDate(raw);
+    if (d) { setCustomTo(d); setCustomRange(prev => ({ ...prev, end: d })); }
   };
 
   useEffect(() => {
@@ -163,9 +198,9 @@ export default function DashboardView() {
          {/* Period filter - Xiaomi Mi Calendar style */}
         <div className="flex flex-row gap-3 overflow-x-auto pb-1">
           {([
-            { key: "today" as PeriodKey, label: "Hoje", icon: CalendarIcon },
-            { key: "3days" as PeriodKey, label: "3 dias", icon: Clock },
-            { key: "month" as PeriodKey, label: "Mês", icon: CalendarIcon },
+            { key: "today" as PeriodKey, label: "Hoje", icon: CalendarCheck },
+            { key: "3days" as PeriodKey, label: "3 dias", icon: CalendarDays },
+            { key: "month" as PeriodKey, label: "Mês", icon: CalendarCheck },
             { key: "custom" as PeriodKey, label: "Outros", icon: CalendarX },
           ]).map(({ key, label, icon: Icon }) => (
             <Popover key={key}>
@@ -173,7 +208,7 @@ export default function DashboardView() {
                 <button
                   onClick={() => { if (key !== "custom") handlePeriodChange(key); else setPeriodKey("custom"); }}
                   className={cn(
-                    "flex flex-col items-center justify-center rounded-lg w-24 py-3 transition-colors shrink-0",
+                    "flex flex-col items-center justify-center rounded-lg w-24 px-3 py-3 transition-colors shrink-0",
                     periodKey === key
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted hover:bg-accent"
@@ -184,11 +219,16 @@ export default function DashboardView() {
                 </button>
               </PopoverTrigger>
               {key === "custom" && periodKey === "custom" && (
-                <PopoverContent className="w-72 p-3 space-y-3" align="start">
-                  <p className="text-xs font-medium text-muted-foreground">De:</p>
-                  <Calendar mode="single" locale={ptBR} selected={customFrom} onSelect={handleCustomFrom} className="pointer-events-auto" />
-                  <p className="text-xs font-medium text-muted-foreground">Até:</p>
-                  <Calendar mode="single" locale={ptBR} selected={customTo} onSelect={handleCustomTo} className="pointer-events-auto" />
+                <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-2" align="start">
+                  <Calendar mode="single" locale={ptBR} showOutsideDays={false} selected={customFrom} onSelect={handleCustomFrom} className="pointer-events-auto" />
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-muted-foreground shrink-0">De:</label>
+                    <Input value={inputFrom} onChange={e => handleInputFrom(e.target.value)} placeholder="dd/MM/yyyy" className="h-8 text-sm" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-muted-foreground shrink-0">Até:</label>
+                    <Input value={inputTo} onChange={e => handleInputTo(e.target.value)} placeholder="dd/MM/yyyy" className="h-8 text-sm" />
+                  </div>
                 </PopoverContent>
               )}
             </Popover>
@@ -197,85 +237,85 @@ export default function DashboardView() {
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="bg-card h-24">
-            <CardContent className="p-3">
+          <Card className="bg-card min-h-32">
+            <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                 <Wallet className="h-3.5 w-3.5" /> Patrimônio
                </p>
-               <p className="text-xl md:text-2xl font-bold text-foreground">{brl(totalPatrimony)}</p>
-               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium line-clamp-2">{KPI_DESCRIPTIONS.patrimonio}</p>
+               <p className="text-xl md:text-2xl font-semibold text-foreground">{brl(totalPatrimony)}</p>
+               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.patrimonio}</p>
             </CardContent>
           </Card>
-          <Card className="bg-card h-24">
-            <CardContent className="p-3">
+          <Card className="bg-card min-h-32">
+            <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                 <TrendingUp className="h-3.5 w-3.5" /> Receitas {periodLabel}
                </p>
-               <p className="text-xl md:text-2xl font-bold text-[hsl(var(--success))]">{brl(totalRevenue)}</p>
-               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium line-clamp-2">{KPI_DESCRIPTIONS.receitas}</p>
+               <p className="text-xl md:text-2xl font-semibold text-[hsl(var(--success))]">{brl(totalRevenue)}</p>
+               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.receitas}</p>
             </CardContent>
           </Card>
-          <Card className="bg-card h-24">
-            <CardContent className="p-3">
+          <Card className="bg-card min-h-32">
+            <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                 <TrendingDown className="h-3.5 w-3.5" /> Despesas {periodLabel}
                </p>
-               <p className="text-xl md:text-2xl font-bold text-destructive">{brl(totalExpense)}</p>
-               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium line-clamp-2">{KPI_DESCRIPTIONS.despesas}</p>
+               <p className="text-xl md:text-2xl font-semibold text-destructive">{brl(totalExpense)}</p>
+               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.despesas}</p>
             </CardContent>
           </Card>
-          <Card className="bg-card h-24">
-            <CardContent className="p-3">
+          <Card className="bg-card min-h-32">
+            <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider">Saldo do Período</p>
                <p className={cn(
-                 "font-bold text-2xl md:text-3xl leading-tight",
+                 "font-semibold text-xl md:text-2xl leading-tight",
                  totalBalance >= 0 ? "text-[hsl(142,71%,45%)]" : "text-[hsl(0,84%,60%)]"
                )}>
                  {brl(totalBalance)}
                </p>
-               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium line-clamp-2">{KPI_DESCRIPTIONS.saldo}</p>
+               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.saldo}</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Secondary KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="bg-card h-24">
-            <CardContent className="p-3">
+          <Card className="bg-card min-h-32">
+            <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                  <FolderKanban className="h-3.5 w-3.5" /> Projetos Ativos
                </p>
-               <p className="text-xl md:text-2xl font-bold text-foreground">{activeProjects}</p>
-               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium">{KPI_DESCRIPTIONS.projetos}</p>
+               <p className="text-xl md:text-2xl font-semibold text-foreground">{activeProjects}</p>
+               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.projetos}</p>
             </CardContent>
           </Card>
-          <Card className="bg-card h-24">
-            <CardContent className="p-3">
+          <Card className="bg-card min-h-32">
+            <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                  <CheckCircle2 className="h-3.5 w-3.5" /> Tarefas
                </p>
-               <p className="text-xl md:text-2xl font-bold text-foreground">{completedTasks}/{totalTasks}</p>
-               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium">{KPI_DESCRIPTIONS.tarefas}</p>
+               <p className="text-xl md:text-2xl font-semibold text-foreground">{completedTasks}/{totalTasks}</p>
+               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.tarefas}</p>
             </CardContent>
           </Card>
-          <Card className="bg-card h-24">
-            <CardContent className="p-3">
+          <Card className="bg-card min-h-32">
+            <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                  <PiggyBank className="h-3.5 w-3.5" /> Investimentos
                </p>
-               <p className="text-xl md:text-2xl font-bold text-foreground">{brl(totalInvestments)}</p>
-               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium">{KPI_DESCRIPTIONS.investimentos}</p>
+               <p className="text-xl md:text-2xl font-semibold text-foreground">{brl(totalInvestments)}</p>
+               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.investimentos}</p>
             </CardContent>
           </Card>
-          <Card className="bg-card h-24">
-            <CardContent className="p-3">
+          <Card className="bg-card min-h-32">
+            <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                  <Wallet className="h-3.5 w-3.5" /> Caixa
                </p>
-               <p className={cn("text-xl md:text-2xl font-bold", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+               <p className={cn("text-xl md:text-2xl font-semibold", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
                  {brl(totalCash)}
                </p>
-               <p className="text-base text-muted-foreground mt-0.5 leading-5 font-medium">{KPI_DESCRIPTIONS.caixa}</p>
+               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.caixa}</p>
             </CardContent>
           </Card>
         </div>
@@ -284,8 +324,8 @@ export default function DashboardView() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Card className="bg-card md:col-span-2">
             <CardContent className="p-3">
-              <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
-                <BarChart3 className="h-3.5 w-3.5 text-primary" /> Receita × Despesa
+              <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
+                <BarChart3 className="h-4 w-4 text-primary" /> Receita × Despesa
               </p>
               <ResponsiveContainer width="100%" height={180}>
                 <ComposedChart data={monthlyData} barGap={0}>
@@ -293,7 +333,7 @@ export default function DashboardView() {
                   <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
                   <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
                   <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                  <Legend wrapperStyle={{ fontSize: 13 }} />
+                  <Legend wrapperStyle={{ fontSize: 14, fontWeight: 500 }} />
                   <Bar dataKey="receita" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="despesa" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
                   <Line type="monotone" dataKey="acumulado" name="Acumulado" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6" }} />
@@ -304,8 +344,8 @@ export default function DashboardView() {
 
           <Card className="bg-card">
             <CardContent className="p-3">
-              <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
-                <TrendingUp className="h-3.5 w-3.5 text-primary" /> Saldo Mensal
+              <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
+                <TrendingUp className="h-4 w-4 text-primary" /> Saldo Mensal
               </p>
               <ResponsiveContainer width="100%" height={180}>
                 <AreaChart data={monthlyData}>
@@ -327,8 +367,8 @@ export default function DashboardView() {
 
           <Card className="bg-card">
             <CardContent className="p-3">
-              <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
-                <PiggyBank className="h-3.5 w-3.5 text-primary" /> Despesas por Categoria
+              <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
+                <PiggyBank className="h-4 w-4 text-primary" /> Despesas por Categoria
               </p>
               {categoryBreakdown.length > 0 ? (
                 <div className="flex items-center gap-4">
