@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Line, Legend, ComposedChart, AreaChart, Area,
+  PieChart as RechartsPieChart, Pie, Cell, Line, Legend, ComposedChart, AreaChart, Area,
 } from "recharts";
 import { format, startOfYear, endOfYear, eachMonthOfInterval, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import {
   TrendingUp, TrendingDown, Wallet, CheckCircle2, FolderKanban,
   BarChart3, PiggyBank, ArrowUpRight, ArrowDownRight,
-  CalendarCheck, CalendarDays, CalendarX,
+  CalendarCheck, CalendarDays, CalendarX, Building, Banknote, Scale, PieChart as PieChartIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
@@ -261,7 +261,7 @@ export default function DashboardView() {
           <Card className="bg-card min-h-32">
             <CardContent className="p-4 flex flex-col justify-between h-full">
                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <Wallet className="size-7 mr-2 text-muted-foreground" /> Patrimônio
+                <Building size={28} className="text-muted-foreground mr-2" /> Patrimônio
                </p>
                <p className="text-xl md:text-2xl font-semibold text-foreground">{brl(totalPatrimony)}</p>
                <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.patrimonio}</p>
@@ -287,7 +287,7 @@ export default function DashboardView() {
           </Card>
           <Card className="bg-card min-h-32">
             <CardContent className="p-4 flex flex-col justify-between h-full">
-               <p className="text-xs text-muted-foreground uppercase tracking-wider">Saldo do Período</p>
+               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1"><Banknote size={28} className="text-muted-foreground mr-2" /> Saldo do Período</p>
                <p className={cn(
                  "font-semibold text-xl md:text-2xl leading-tight",
                  totalBalance >= 0 ? "text-[hsl(142,71%,45%)]" : "text-[hsl(0,84%,60%)]"
@@ -366,7 +366,7 @@ export default function DashboardView() {
           <Card className="bg-card">
             <CardContent className="p-3">
               <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
-                <TrendingUp className="size-7 mr-2 text-muted-foreground" /> Saldo Mensal
+                <Scale size={28} className="text-muted-foreground mr-2" /> Saldo Mensal
               </p>
               <ResponsiveContainer width="100%" height={180}>
                 <AreaChart data={monthlyData}>
@@ -389,17 +389,17 @@ export default function DashboardView() {
           <Card className="bg-card">
             <CardContent className="p-3">
               <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
-                <PiggyBank className="size-7 mr-2 text-muted-foreground" /> Despesas por Categoria
+                <PieChartIcon className="size-7 mr-2 text-muted-foreground" /> Despesas por Categoria
               </p>
               {categoryBreakdown.length > 0 ? (
                 <div className="flex items-center gap-4">
                   <ResponsiveContainer width={140} height={140}>
-                    <PieChart>
+                    <RechartsPieChart>
                       <Pie data={categoryBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} innerRadius={30} strokeWidth={1}>
                         {categoryBreakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                       </Pie>
                       <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                    </PieChart>
+                    </RechartsPieChart>
                   </ResponsiveContainer>
                   <div className="space-y-1.5 flex-1">
                     {categoryBreakdown.slice(0, 6).map((c, i) => {
