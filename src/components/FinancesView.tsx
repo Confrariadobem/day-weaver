@@ -15,12 +15,14 @@ import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Save,
   Printer, FileDown, FileUp, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
   CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
-  Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign,
+  Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign, Pencil,
 } from "lucide-react";
 import {
   format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
@@ -204,6 +206,13 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [splitLines, setSplitLines] = useState<{ id: string; accountId: string; paymentMethod: string; amount: string }[]>([]);
   const [description, setDescription] = useState("");
+  const [juros, setJuros] = useState("");
+  const [multa, setMulta] = useState("");
+  const [desconto, setDesconto] = useState("");
+  const [realPaymentDate, setRealPaymentDate] = useState("");
+  const [previsaoFilterDate, setPrevisaoFilterDate] = useState<Date | undefined>(undefined);
+  const [colFilterStatus, setColFilterStatus] = useState<string>("all");
+  const [colFilterCounterpart, setColFilterCounterpart] = useState<string>("");
 
   const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
   const splitTotal = splitLines.reduce((s, l) => s + parseNum(l.amount), 0);
@@ -255,6 +264,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     setEditingEntry(null); setAccountId(""); setPaymentMethod(""); setIsPaid(false);
     setCounterpart(""); setIsFixed(false); setAllDay(true); setCostCenterId("");
     setSplitEnabled(false); setSplitLines([]); setCurrency("BRL"); setDescription("");
+    setJuros(""); setMulta(""); setDesconto(""); setRealPaymentDate("");
   };
 
   const resetAccForm = () => {
@@ -289,6 +299,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     setAccountId(entry.account_id || "");
     setPaymentMethod(entry.payment_method || "");
     setIsPaid(entry.is_paid || false);
+    setRealPaymentDate(entry.payment_date || "");
     setCounterpart(entry.counterpart || "");
     setIsFixed(entry.is_fixed || false);
     setInstallments("1");
@@ -390,11 +401,12 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         const group = crypto.randomUUID();
           const entriesToInsert = Array.from({ length: count }, (_, i) => ({
             user_id: user.id,
-            title: `${title} (${i + 1}/${count})`,
+            title: title,
             amount: baseAmount, type,
             category_id: categoryId || null, project_id: projectId || null,
             cost_center_id: costCenterId || null,
             entry_date: format(getNextDate(baseDate, recurrence, i, recurrenceDateMode), "yyyy-MM-dd"),
+            recurrence_type: recurrence,
             installment_group: group, installment_number: i + 1, total_installments: count,
             account_id: splitEnabled ? null : (accountId || null),
             payment_method: splitEnabled ? null : (paymentMethod || null),
@@ -546,6 +558,13 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
           const end = parseEntryDate(customEnd);
           if (d < start || d > end) return false;
         }
+        // Apply previsao date filter
+        if (previsaoFilterDate) {
+          const d = parseEntryDate(e.entry_date);
+          const filterEnd = new Date(previsaoFilterDate);
+          filterEnd.setHours(23, 59, 59, 999);
+          if (d > filterEnd) return false;
+        }
         // Filter by cash flow type
         if (cashFlowFilter === "paid") return e.is_paid;
         if (cashFlowFilter === "payable") return e.type === "expense" && !e.is_paid;
@@ -553,6 +572,17 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         if (cashFlowFilter === "overdue") { const ed = parseEntryDate(e.entry_date); return !e.is_paid && ed < today; }
         // "all" filter: show unpaid only
         return !e.is_paid;
+      })
+      .filter((e) => {
+        // Column filters
+        if (colFilterStatus === "paid" && !e.is_paid) return false;
+        if (colFilterStatus === "pending" && e.is_paid) return false;
+        if (colFilterStatus === "overdue") {
+          const ed = parseEntryDate(e.entry_date);
+          if (e.is_paid || ed >= today) return false;
+        }
+        if (colFilterCounterpart && !(e.counterpart || "").toLowerCase().includes(colFilterCounterpart.toLowerCase())) return false;
+        return true;
       })
       .filter((e) => {
         if (!query) return true;
@@ -605,7 +635,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd]);
+  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, previsaoFilterDate, colFilterStatus, colFilterCounterpart]);
 
   // KPI totals based on current filter
   const kpiData = useMemo(() => {
@@ -1019,9 +1049,9 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   // Entry dialog content (shared)
   const renderEntryDialog = () => (
     <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-      <DialogHeader><DialogTitle>{editingEntry ? "Editar fluxo de caixa" : "Novo lançamento"}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{editingEntry ? "Editar lançamento" : "Novo lançamento"}</DialogTitle></DialogHeader>
       <div className="space-y-3">
-        {/* Identification group */}
+        {/* Identificação */}
         <div className="rounded-lg border border-border/30 p-3 space-y-3">
           <div>
             <Label className="text-xs text-muted-foreground">Título</Label>
@@ -1031,119 +1061,9 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             <Label className="text-xs text-muted-foreground">Descrição</Label>
             <Input placeholder="Descrição (opcional)" value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">Contraparte (Recebedor / Pagador)</Label>
-            <CounterpartAutocomplete
-              value={counterpart}
-              onChange={setCounterpart}
-              entries={entries}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <Label className="text-xs text-muted-foreground">Valor</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">{currency === "USDT" ? "$" : "R$"}</span>
-                <Input type="text" inputMode="decimal" placeholder="0,00" value={amount}
-                  onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
-                  className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-              </div>
-            </div>
-            <div className="w-20">
-              <Label className="text-xs text-muted-foreground">Moeda</Label>
-              <Select value={currency} onValueChange={(v) => setCurrency(v as CurrencyType)}>
-                <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BRL">R$ BRL</SelectItem>
-                  <SelectItem value="USDT">$ USDT</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1">
-              <Label className="text-xs text-muted-foreground">Tipo</Label>
-              <Select value={type} onValueChange={(v) => setType(v as "revenue" | "expense")}>
-                <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="revenue">🟢 Receita</SelectItem>
-                  <SelectItem value="expense">🔴 Despesa</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {!editingEntry && recurrence === "none" && (
-              <div className="w-[90px]">
-                <Label className="text-xs text-muted-foreground">Qtde. / Parcelas</Label>
-                <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="text-xs" />
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Dates & Scheduling group */}
-        <div className="rounded-lg border border-border/30 p-3 space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <Label className="text-xs text-muted-foreground">Vencimento</Label>
-              <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
-            </div>
-            <div className="flex items-center gap-1.5 pt-4">
-              <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday-fin" />
-              <Label htmlFor="allday-fin" className="text-sm whitespace-nowrap">Dia inteiro</Label>
-            </div>
-          </div>
-          {editingEntry && (editingEntry.recurrence_type || (editingEntry.installment_group && editingEntry.total_installments > 1)) && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded p-2">
-              <Repeat className="h-3.5 w-3.5" />
-              {editingEntry.installment_group && editingEntry.total_installments > 1 && (
-                <span>Parcela {editingEntry.installment_number}/{editingEntry.total_installments}</span>
-              )}
-              {editingEntry.recurrence_type && (
-                <span>• Recorrência: {
-                  ({ daily: "Diária", weekly: "Semanal", biweekly: "Quinzenal", monthly: "Mensal",
-                    quarterly: "Trimestral", semiannual: "Semestral", yearly: "Anual" } as any)[editingEntry.recurrence_type] || editingEntry.recurrence_type
-                }</span>
-              )}
-            </div>
-          )}
-          {!editingEntry && (
-            <>
-              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Repeat className="h-3.5 w-3.5" /> Recorrência
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={recurrence} onValueChange={(v) => setRecurrence(v as RecurrenceType)}>
-                  <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhuma</SelectItem>
-                    <SelectItem value="daily">Diária</SelectItem>
-                    <SelectItem value="weekly">Semanal</SelectItem>
-                    <SelectItem value="biweekly">Quinzenal</SelectItem>
-                    <SelectItem value="monthly">Mensal</SelectItem>
-                    <SelectItem value="quarterly">Trimestral</SelectItem>
-                    <SelectItem value="semiannual">Semestral</SelectItem>
-                    <SelectItem value="yearly">Anual</SelectItem>
-                  </SelectContent>
-                </Select>
-                {recurrence !== "none" && (
-                  <Input type="number" placeholder="Quantidade" min="1" value={recurrenceCount} onChange={(e) => setRecurrenceCount(e.target.value)} className="text-xs" />
-                )}
-              </div>
-              {(recurrence === "monthly" || recurrence === "yearly") && (
-                <div className="mt-2">
-                  <Label className="text-xs text-muted-foreground mb-1">Repetir na:</Label>
-                  <Select value={recurrenceDateMode} onValueChange={(v) => setRecurrenceDateMode(v as RecurrenceDateMode)}>
-                    <SelectTrigger className="text-xs h-8"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="same_date">Mesma data</SelectItem>
-                      <SelectItem value="first_business_day">Primeiro dia útil do mês</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Classification group */}
+        {/* Classificação */}
         <div className="rounded-lg border border-border/30 p-3 space-y-2">
           <div>
             <Label className="text-xs text-muted-foreground">Categoria</Label>
@@ -1184,17 +1104,125 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
           </div>
         </div>
 
-        {/* Payment group */}
+        {/* Tipo, Valor, Contraparte */}
         <div className="rounded-lg border border-border/30 p-3 space-y-2">
-          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <Wallet className="h-3.5 w-3.5" /> Pagamento {isPaid && <span className="text-destructive">*</span>}
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <Label className="text-xs text-muted-foreground">Tipo</Label>
+              <Select value={type} onValueChange={(v) => setType(v as "revenue" | "expense")}>
+                <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="revenue">🟢 Receita</SelectItem>
+                  <SelectItem value="expense">🔴 Despesa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1">
+              <Label className="text-xs text-muted-foreground">Valor</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">{currency === "USDT" ? "$" : "R$"}</span>
+                <Input type="text" inputMode="decimal" placeholder="0,00" value={amount}
+                  onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
+                  className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              </div>
+            </div>
+            <div className="w-20">
+              <Label className="text-xs text-muted-foreground">Moeda</Label>
+              <Select value={currency} onValueChange={(v) => setCurrency(v as CurrencyType)}>
+                <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BRL">R$ BRL</SelectItem>
+                  <SelectItem value="USDT">$ USDT</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Contraparte (Recebedor / Pagador)</Label>
+            <CounterpartAutocomplete value={counterpart} onChange={setCounterpart} entries={entries} />
+          </div>
+        </div>
+
+        {/* Datas */}
+        <div className="rounded-lg border border-border/30 p-3 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs text-muted-foreground">Data Vencimento</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal text-sm", !entryDate && "text-muted-foreground")}>
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {entryDate ? format(parseEntryDate(entryDate), "dd/MM/yyyy") : "Selecionar"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={entryDate ? parseEntryDate(entryDate) : undefined}
+                    onSelect={(d) => { if (d) setEntryDate(format(d, "yyyy-MM-dd")); }}
+                    className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Data Pagamento Real</Label>
+              <Input type="date" value={realPaymentDate} onChange={(e) => setRealPaymentDate(e.target.value)} />
+            </div>
+          </div>
+          {editingEntry && (editingEntry.recurrence_type || (editingEntry.installment_group && editingEntry.total_installments > 1)) && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded p-2">
+              <Repeat className="h-3.5 w-3.5" />
+              {editingEntry.installment_group && editingEntry.total_installments > 1 && !editingEntry.recurrence_type && (
+                <span>Parcela {editingEntry.installment_number}/{editingEntry.total_installments}</span>
+              )}
+              {editingEntry.recurrence_type && (
+                <span>Recorrência: {
+                  ({ daily: "Diária", weekly: "Semanal", biweekly: "Quinzenal", monthly: "Mensal",
+                    quarterly: "Trimestral", semiannual: "Semestral", yearly: "Anual" } as any)[editingEntry.recurrence_type] || editingEntry.recurrence_type
+                }</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Juros, Multa, Desconto */}
+        <div className="rounded-lg border border-border/30 p-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <Label className="text-xs text-muted-foreground">Juros</Label>
+              <Input type="text" inputMode="decimal" placeholder="0,00" value={juros}
+                onChange={(e) => setJuros(e.target.value.replace(/[^0-9.,]/g, ""))} className="text-xs" />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Multa</Label>
+              <Input type="text" inputMode="decimal" placeholder="0,00" value={multa}
+                onChange={(e) => setMulta(e.target.value.replace(/[^0-9.,]/g, ""))} className="text-xs" />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Desconto</Label>
+              <Input type="text" inputMode="decimal" placeholder="0,00" value={desconto}
+                onChange={(e) => setDesconto(e.target.value.replace(/[^0-9.,]/g, ""))} className="text-xs" />
+            </div>
+          </div>
+        </div>
+
+        {/* Toggles & Payment */}
+        <div className="rounded-lg border border-border/30 p-3 space-y-2">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <Switch checked={isFixed} onCheckedChange={setIsFixed} />
+              <Label className="text-xs whitespace-nowrap">Conta fixa</Label>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Switch checked={splitEnabled} onCheckedChange={(c) => { setSplitEnabled(c); if (!c) setSplitLines([]); }} />
+              <Label className="text-xs whitespace-nowrap">Múltiplas carteiras</Label>
+            </div>
+          </div>
+
           {!splitEnabled && (
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs text-muted-foreground">Carteira</Label>
                 <Select value={accountId} onValueChange={setAccountId}>
-                  <SelectTrigger className={cn("text-xs", isPaid && !accountId && "border-destructive")}><SelectValue placeholder={isPaid ? "Conta (obrigatório)" : "Conta (opcional)"} /></SelectTrigger>
+                  <SelectTrigger className="text-xs"><SelectValue placeholder="Conta (opcional)" /></SelectTrigger>
                   <SelectContent>
                     {accounts.filter(a => a.is_active).map(a => (
                       <SelectItem key={a.id} value={a.id}>
@@ -1210,7 +1238,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               <div>
                 <Label className="text-xs text-muted-foreground">Forma de pagamento</Label>
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger className={cn("text-xs", isPaid && !paymentMethod && "border-destructive")}><SelectValue placeholder={isPaid ? "Obrigatório" : "Opcional"} /></SelectTrigger>
+                  <SelectTrigger className="text-xs"><SelectValue placeholder="Opcional" /></SelectTrigger>
                   <SelectContent>
                     {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                   </SelectContent>
@@ -1219,22 +1247,6 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
             </div>
           )}
 
-          <div className="flex items-center gap-4 pt-1">
-            <div className="flex items-center gap-1.5">
-              <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="fixed-fin" />
-              <Label htmlFor="fixed-fin" className="text-xs whitespace-nowrap">Conta fixa</Label>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="paid-fin" />
-              <Label htmlFor="paid-fin" className="text-xs whitespace-nowrap">Baixar conta</Label>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Checkbox checked={splitEnabled} onCheckedChange={(c) => { setSplitEnabled(!!c); if (!c) setSplitLines([]); }} id="split-fin" />
-              <Label htmlFor="split-fin" className="text-xs whitespace-nowrap">Múltiplas carteiras</Label>
-            </div>
-          </div>
-
-          {/* Split lines */}
           {splitEnabled && (
             <div className="space-y-2 pt-2 border-t border-border/20">
               <div className="flex items-center justify-between">
@@ -1268,12 +1280,8 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                       {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Input
-                    type="text" inputMode="decimal" placeholder="Valor"
-                    value={line.amount}
-                    onChange={(e) => updateSplitLine(line.id, "amount", e.target.value)}
-                    className="text-xs w-24"
-                  />
+                  <Input type="text" inputMode="decimal" placeholder="Valor" value={line.amount}
+                    onChange={(e) => updateSplitLine(line.id, "amount", e.target.value)} className="text-xs w-24" />
                   <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-destructive/60 hover:text-destructive" onClick={() => removeSplitLine(line.id)}>
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -1281,9 +1289,59 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               ))}
             </div>
           )}
+
+          {/* Recorrente vs Parcelado */}
+          {!editingEntry && (
+            <div className="pt-2 border-t border-border/20 space-y-2">
+              <div className="flex items-center gap-3">
+                <Button size="sm" variant={recurrence !== "none" ? "default" : "outline"}
+                  className="h-7 text-xs rounded-full gap-1"
+                  onClick={() => { if (recurrence !== "none") { setRecurrence("none"); } else { setRecurrence("monthly"); setRecurrenceCount("120"); setInstallments("1"); } }}>
+                  <Repeat className="h-3 w-3" /> Recorrente
+                </Button>
+                <Button size="sm" variant={recurrence === "none" && parseInt(installments) > 1 ? "default" : "outline"}
+                  className="h-7 text-xs rounded-full gap-1"
+                  onClick={() => { setRecurrence("none"); setInstallments(parseInt(installments) > 1 ? "1" : "12"); }}>
+                  <CalendarDays className="h-3 w-3" /> Parcelado
+                </Button>
+              </div>
+              {recurrence !== "none" && (
+                <div className="space-y-2">
+                  <Select value={recurrence} onValueChange={(v) => setRecurrence(v as RecurrenceType)}>
+                    <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Diária</SelectItem>
+                      <SelectItem value="weekly">Semanal</SelectItem>
+                      <SelectItem value="biweekly">Quinzenal</SelectItem>
+                      <SelectItem value="monthly">Mensal</SelectItem>
+                      <SelectItem value="quarterly">Trimestral</SelectItem>
+                      <SelectItem value="semiannual">Semestral</SelectItem>
+                      <SelectItem value="yearly">Anual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(recurrence === "monthly" || recurrence === "yearly") && (
+                    <Select value={recurrenceDateMode} onValueChange={(v) => setRecurrenceDateMode(v as RecurrenceDateMode)}>
+                      <SelectTrigger className="text-xs h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="same_date">Mesma data</SelectItem>
+                        <SelectItem value="first_business_day">Primeiro dia útil do mês</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <p className="text-[10px] text-muted-foreground">Recorrência indeterminada (sem fim)</p>
+                </div>
+              )}
+              {parseInt(installments) > 1 && recurrence === "none" && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Quantidade de parcelas</Label>
+                  <Input type="number" min="2" value={installments} onChange={(e) => setInstallments(e.target.value)} className="text-xs w-32" />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
-      {/* Standardized footer */}
+      {/* Footer */}
       <div className="flex items-center gap-2 pt-4 border-t border-border/20">
         {editingEntry && (
           <Button variant="destructive" size="sm" className="gap-1.5"
@@ -1293,7 +1351,15 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         )}
         <div className="flex gap-2 ml-auto">
           <Button variant="outline" size="sm" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancelar</Button>
-          <Button size="sm" onClick={createOrUpdateEntry} className="gap-1.5"><Save className="h-3.5 w-3.5" /> Salvar</Button>
+          {!isPaid && (
+            <Button size="sm" variant="secondary" className="gap-1.5"
+              onClick={() => setIsPaid(true)}>
+              <Check className="h-3.5 w-3.5" /> Marcar paga
+            </Button>
+          )}
+          <Button size="sm" onClick={createOrUpdateEntry} className="gap-1.5">
+            <Save className="h-3.5 w-3.5" /> {isPaid ? "Salvar e Baixar" : "Salvar"}
+          </Button>
         </div>
       </div>
     </DialogContent>
@@ -1362,7 +1428,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         {/* ============ FLUXO DE CAIXA ============ */}
         {viewTab === "previsao" && (
           <>
-            {/* Quick filters + search + bulk actions */}
+            {/* Quick filters + DatePicker */}
             <div className="mb-3 flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 flex-wrap">
                 {([
@@ -1378,24 +1444,27 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                     onClick={() => setCashFlowFilter(prev => prev === f.key ? "all" : f.key)}
                   >{f.label}</Button>
                 ))}
-
-                {/* Custom period toggle */}
-                <Button size="sm"
-                  variant={customPeriodEnabled ? "default" : "ghost"}
-                  className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", !customPeriodEnabled && "text-muted-foreground hover:text-foreground")}
-                  onClick={() => setCustomPeriodEnabled(!customPeriodEnabled)}
-                >
-                  <Filter className="h-3 w-3" /> Período
-                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button size="sm" variant="outline"
+                      className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", previsaoFilterDate && "border-primary text-primary")}>
+                      <CalendarDays className="h-3 w-3" />
+                      {previsaoFilterDate ? format(previsaoFilterDate, "dd/MM/yyyy") : "Período"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={previsaoFilterDate}
+                      onSelect={setPrevisaoFilterDate}
+                      className="p-3 pointer-events-auto" />
+                    <div className="flex items-center gap-1.5 p-3 pt-0">
+                      <Button size="sm" variant="secondary" className="h-7 text-xs flex-1"
+                        onClick={() => setPrevisaoFilterDate(new Date())}>Hoje</Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs flex-1"
+                        onClick={() => setPrevisaoFilterDate(undefined)}>Limpar</Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
-
-              {customPeriodEnabled && (
-                <div className="flex items-center gap-1.5">
-                  <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="h-7 text-xs w-32" />
-                  <span className="text-xs text-muted-foreground">a</span>
-                  <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="h-7 text-xs w-32" />
-                </div>
-              )}
 
               <div className="flex items-center gap-1.5 ml-auto">
                 {/* Search field */}
@@ -1499,122 +1568,178 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
               </div>
             </div>
 
-            {/* Table with sticky header */}
-            <div className="rounded-lg overflow-auto max-h-[calc(100vh-320px)]">
+            {/* Table */}
+            <div className="rounded-lg overflow-auto max-h-[calc(100vh-320px)] border border-border/30">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10 bg-background">
-                  <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
-                    <th className="text-left py-2 px-2 w-8">
-                      <Checkbox
-                        checked={filtered.length > 0 && selectedIds.size === filtered.length}
-                        onCheckedChange={(c) => {
-                          if (c) setSelectedIds(new Set(filtered.map(e => e.id)));
-                          else setSelectedIds(new Set());
-                        }}
-                        className="h-3.5 w-3.5"
-                      />
+                <thead className="sticky top-0 z-10 bg-muted/50">
+                  <tr className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("entry_date")}>
+                      Vencimento <SortIcon field="entry_date" />
                     </th>
-                    <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("entry_date")}>Data <SortIcon field="entry_date" /></th>
-                    <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("title")}>Título <SortIcon field="title" /></th>
-                    <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("counterpart")}>Contraparte <SortIcon field="counterpart" /></th>
-                    <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("category")}>Categoria <SortIcon field="category" /></th>
-                    <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("cost_center")}>C. Custo <SortIcon field="cost_center" /></th>
-                    <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("type")}>Tipo <SortIcon field="type" /></th>
-                    <th className="text-right py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("amount")}>Valor <SortIcon field="amount" /></th>
-                    {cashFlowFilter !== "paid" && (
-                      <th className="text-right py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("balance")}>Saldo <SortIcon field="balance" /></th>
-                    )}
-                    {cashFlowFilter === "paid" && (
-                      <th className="text-left py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("payment_date")}>Pgto <SortIcon field="payment_date" /></th>
-                    )}
-                    <th className="text-center py-2 px-2 cursor-pointer select-none" onClick={() => toggleSort("is_paid")}>Status <SortIcon field="is_paid" /></th>
-                    <th className="text-center py-2 px-2">Fixa</th>
+                    <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("title")}>
+                      Título <SortIcon field="title" />
+                    </th>
+                    <th className="text-left py-2.5 px-3">
+                      <div className="flex items-center gap-1">
+                        <span className="cursor-pointer select-none" onClick={() => toggleSort("counterpart")}>Contraparte <SortIcon field="counterpart" /></span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className={cn("p-0.5 rounded hover:bg-accent", colFilterCounterpart && "text-primary")}>
+                              <Filter className="h-3 w-3" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-52 p-2" align="start">
+                            <Input placeholder="Filtrar contraparte..." value={colFilterCounterpart}
+                              onChange={(e) => setColFilterCounterpart(e.target.value)} className="h-7 text-xs" />
+                            {colFilterCounterpart && (
+                              <Button size="sm" variant="ghost" className="h-6 text-xs w-full mt-1" onClick={() => setColFilterCounterpart("")}>Limpar</Button>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </th>
+                    <th className="text-right py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("amount")}>
+                      Valor <SortIcon field="amount" />
+                    </th>
+                    <th className="text-center py-2.5 px-3">
+                      <div className="flex items-center gap-1 justify-center">
+                        <span className="cursor-pointer select-none" onClick={() => toggleSort("is_paid")}>Status <SortIcon field="is_paid" /></span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className={cn("p-0.5 rounded hover:bg-accent", colFilterStatus !== "all" && "text-primary")}>
+                              <Filter className="h-3 w-3" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-40 p-1" align="center">
+                            {[
+                              { key: "all", label: "Todos" },
+                              { key: "pending", label: "Pendente" },
+                              { key: "paid", label: "Pago" },
+                              { key: "overdue", label: "Atrasado" },
+                            ].map(opt => (
+                              <button key={opt.key}
+                                className={cn("w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent", colFilterStatus === opt.key && "bg-accent font-medium")}
+                                onClick={() => setColFilterStatus(opt.key)}>
+                                {opt.label}
+                              </button>
+                            ))}
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </th>
+                    <th className="text-center py-2.5 px-3">Recorrência</th>
+                    <th className="text-center py-2.5 px-3">Parcela</th>
+                    <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("payment_date")}>
+                      Pgto Real <SortIcon field="payment_date" />
+                    </th>
+                    <th className="text-center py-2.5 px-3">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={12} className="text-center text-muted-foreground/40 py-12">
-                      {cashFlowFilter === "paid" ? "Sem lançamentos baixados" : "Sem lançamentos pendentes"}
+                    <tr><td colSpan={9} className="text-center text-muted-foreground/40 py-12">
+                      Sem lançamentos no período
                     </td></tr>
                   )}
                   {filtered.map((e, idx) => {
-                    const cat = categories.find(c => c.id === e.category_id);
-                    const runningBal = runningBalances.balanceMap.get(e.id) ?? 0;
-                    const isBreakEven = runningBalances.breakEvenId === e.id;
                     const today = new Date(); today.setHours(0,0,0,0);
                     const entDate = parseEntryDate(e.entry_date);
                     const isOverdue = !e.is_paid && entDate < today;
                     const overdueDays = isOverdue ? differenceInDays(today, entDate) : 0;
-                    const isSelected = selectedIds.has(e.id);
-                    const isPaidItem = cashFlowFilter === "paid";
+                    const isRecurrent = !!e.recurrence_type;
+                    const isInstallment = !isRecurrent && e.installment_group && e.total_installments > 1;
                     return (
                       <tr key={e.id}
                         className={cn(
-                          "group cursor-pointer transition-colors hover:bg-muted/20",
+                          "group transition-colors hover:bg-primary/5",
                           idx > 0 && "border-t border-border/10",
-                          !isPaidItem && isBreakEven && "bg-primary/5",
-                          !isPaidItem && isOverdue && !isBreakEven && e.type === "expense" && "bg-destructive/15",
-                          !isPaidItem && isOverdue && !isBreakEven && e.type === "revenue" && "bg-[hsl(var(--success)/0.12)]",
-                          isPaidItem && "opacity-60",
-                          isSelected && "bg-primary/10"
+                          isOverdue && e.type === "expense" && "bg-destructive/10",
+                          isOverdue && e.type === "revenue" && "bg-[hsl(var(--success)/0.08)]",
+                          e.is_paid && "opacity-60",
                         )}
-                        onClick={() => handleRowClick(e)}
+                        onDoubleClick={() => {
+                          if ((e.installment_group && e.total_installments > 1) || e.recurrence_type) {
+                            setRecurrenceEditDialog({ entry: e, mode: null });
+                          } else {
+                            openEditDialog(e);
+                          }
+                        }}
                       >
-                        <td className="py-2.5 px-2">
-                          <Checkbox checked={isSelected}
-                            onCheckedChange={(c) => {
-                              const next = new Set(selectedIds);
-                              if (c) next.add(e.id); else next.delete(e.id);
-                              setSelectedIds(next);
-                            }}
-                            onClick={(ev) => ev.stopPropagation()} className="h-3.5 w-3.5" />
+                        <td className="py-2.5 px-3 text-muted-foreground text-xs">{format(entDate, "dd/MM/yy")}</td>
+                        <td className={cn("py-2.5 px-3 font-medium", e.is_paid && "line-through text-muted-foreground")}>
+                          {e.title}
                         </td>
-                        <td className="py-2.5 px-2 text-muted-foreground">{format(entDate, "dd/MM/yy")}</td>
-                        <td className={cn("py-2.5 px-2", isPaidItem && "line-through text-muted-foreground")}>
-                          <span>{e.title}</span>
-                        </td>
-                        <td className="py-2.5 px-2 text-muted-foreground/60 truncate max-w-[120px]">{e.counterpart || "—"}</td>
-                        <td className="py-2.5 px-2 text-muted-foreground/60">{cat?.name || "—"}</td>
-                        <td className="py-2.5 px-2 text-muted-foreground/60 text-xs truncate max-w-[100px]">{costCenters.find((cc: any) => cc.id === e.cost_center_id)?.name || "—"}</td>
-                        <td className="py-2.5 px-2">
-                          <span className={cn("text-xs font-medium", e.type === "revenue" ? "text-success" : "text-destructive")}>
-                            {e.type === "revenue" ? "Receita" : "Despesa"}
-                          </span>
-                        </td>
-                        <td className={cn("py-2.5 px-2 text-right font-medium tabular-nums", e.type === "revenue" ? "text-success" : "text-destructive")}>
+                        <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[140px]">{e.counterpart || "—"}</td>
+                        <td className={cn("py-2.5 px-3 text-right font-semibold tabular-nums",
+                          e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
                         </td>
-                        {cashFlowFilter !== "paid" && (
-                          <td className={cn("py-2.5 px-2 text-right font-semibold tabular-nums", runningBal >= 0 ? "text-success" : "text-destructive")}>
-                            {brl(runningBal)}
-                          </td>
-                        )}
-                        {cashFlowFilter === "paid" && (
-                          <td className="py-2.5 px-2 text-muted-foreground text-xs">
-                            {e.payment_date ? format(parseEntryDate(e.payment_date), "dd/MM/yy") : "—"}
-                          </td>
-                        )}
-                        <td className="py-2.5 px-2 text-center">
-                          {isPaidItem ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-success/60">
+                        <td className="py-2.5 px-3 text-center">
+                          {e.is_paid ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-[hsl(var(--success))] bg-[hsl(var(--success)/0.1)] px-2 py-0.5 rounded-full">
                               <Check className="h-2.5 w-2.5" /> Pago
                             </span>
                           ) : isOverdue ? (
-                            <button onClick={(ev) => { ev.stopPropagation(); togglePaid(e); }}
-                              className="inline-flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors">
+                            <span className="inline-flex items-center gap-1 text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
                               <AlertTriangle className="h-2.5 w-2.5" /> {overdueDays}d
-                            </button>
+                            </span>
                           ) : (
-                            <button onClick={(ev) => { ev.stopPropagation(); togglePaid(e); }}
-                              className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-success transition-colors">
-                              <CircleDollarSign className="h-2.5 w-2.5" /> Baixa
-                            </button>
+                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+                              Pendente
+                            </span>
                           )}
                         </td>
-                        <td className="py-2.5 px-2 text-center">
-                          {(e.is_fixed || e.total_installments === 0) && (
-                            <span className="text-[10px] text-muted-foreground/60 font-medium">✓</span>
+                        <td className="py-2.5 px-3 text-center">
+                          {isRecurrent && (
+                            <Tooltip delayDuration={200}>
+                              <TooltipTrigger>
+                                <Repeat className="h-3.5 w-3.5 text-primary mx-auto" />
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">
+                                {({ daily: "Diária", weekly: "Semanal", biweekly: "Quinzenal", monthly: "Mensal",
+                                  quarterly: "Trimestral", semiannual: "Semestral", yearly: "Anual" } as any)[e.recurrence_type] || "Recorrente"}
+                              </TooltipContent>
+                            </Tooltip>
                           )}
+                        </td>
+                        <td className="py-2.5 px-3 text-center text-xs text-muted-foreground">
+                          {isInstallment ? `${e.installment_number}/${e.total_installments}` : ""}
+                        </td>
+                        <td className="py-2.5 px-3 text-xs text-muted-foreground">
+                          {e.payment_date ? format(parseEntryDate(e.payment_date), "dd/MM/yy") : "—"}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-0.5 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Tooltip delayDuration={200}>
+                              <TooltipTrigger asChild>
+                                <Button size="icon" variant="ghost" className="h-6 w-6"
+                                  onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }}>
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">Editar</TooltipContent>
+                            </Tooltip>
+                            {!e.is_paid && (
+                              <Tooltip delayDuration={200}>
+                                <TooltipTrigger asChild>
+                                  <Button size="icon" variant="ghost" className="h-6 w-6 text-[hsl(var(--success))]"
+                                    onClick={(ev) => { ev.stopPropagation(); togglePaid(e); }}>
+                                    <Check className="h-3 w-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs">Baixar</TooltipContent>
+                              </Tooltip>
+                            )}
+                            <Tooltip delayDuration={200}>
+                              <TooltipTrigger asChild>
+                                <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive"
+                                  onClick={(ev) => { ev.stopPropagation(); setDeleteEntryConfirm(e.id); }}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">Excluir</TooltipContent>
+                            </Tooltip>
+                          </div>
                         </td>
                       </tr>
                     );
