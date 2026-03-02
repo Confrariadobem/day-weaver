@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import {
   TrendingUp, TrendingDown, Wallet, CheckCircle2, FolderKanban,
   BarChart3, PiggyBank, ArrowUpRight, ArrowDownRight,
-  CalendarCheck, CalendarDays, CalendarX, Building, Banknote, Scale, PieChart as PieChartIcon,
+  CalendarCheck, CalendarDays, CalendarX, Building, Banknote, Scale, PieChart as PieChartIcon, Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
@@ -258,85 +258,125 @@ export default function DashboardView() {
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="bg-card min-h-32">
-            <CardContent className="p-4 flex flex-col justify-between h-full">
-               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <Building size={28} className="text-muted-foreground mr-2" /> Patrimônio
-               </p>
-               <p className="text-xl md:text-2xl font-semibold text-foreground">{brl(totalPatrimony)}</p>
-               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.patrimonio}</p>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Banknote size={28} className="text-muted-foreground mr-2" /> Patrimônio
+                </p>
+                <Popover>
+                  <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Info size={16} /></Button></PopoverTrigger>
+                  <PopoverContent className="text-sm w-64">{KPI_DESCRIPTIONS.patrimonio}</PopoverContent>
+                </Popover>
+              </div>
+              <p className="text-2xl md:text-3xl font-semibold text-foreground mt-2 overflow-hidden truncate">{brl(totalPatrimony)}</p>
             </CardContent>
           </Card>
-          <Card className="bg-card min-h-32">
-            <CardContent className="p-4 flex flex-col justify-between h-full">
-               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <TrendingUp className="size-7 mr-2 text-muted-foreground" /> Receitas {periodLabel}
-               </p>
-               <p className="text-xl md:text-2xl font-semibold text-[hsl(var(--success))]">{brl(totalRevenue)}</p>
-               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.receitas}</p>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <TrendingUp className="size-7 mr-2 text-muted-foreground" /> Receitas {periodLabel}
+                </p>
+                <Popover>
+                  <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Info size={16} /></Button></PopoverTrigger>
+                  <PopoverContent className="text-sm w-64">{KPI_DESCRIPTIONS.receitas}</PopoverContent>
+                </Popover>
+              </div>
+              <p className="text-2xl md:text-3xl font-semibold text-[hsl(var(--success))] mt-2 overflow-hidden truncate">{brl(totalRevenue)}</p>
             </CardContent>
           </Card>
-          <Card className="bg-card min-h-32">
-            <CardContent className="p-4 flex flex-col justify-between h-full">
-               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <TrendingDown className="size-7 mr-2 text-muted-foreground" /> Despesas {periodLabel}
-               </p>
-               <p className="text-xl md:text-2xl font-semibold text-destructive">{brl(totalExpense)}</p>
-               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.despesas}</p>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <TrendingDown className="size-7 mr-2 text-muted-foreground" /> Despesas {periodLabel}
+                </p>
+                <Popover>
+                  <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Info size={16} /></Button></PopoverTrigger>
+                  <PopoverContent className="text-sm w-64">{KPI_DESCRIPTIONS.despesas}</PopoverContent>
+                </Popover>
+              </div>
+              <p className="text-2xl md:text-3xl font-semibold text-destructive mt-2 overflow-hidden truncate">{brl(totalExpense)}</p>
             </CardContent>
           </Card>
-          <Card className="bg-card min-h-32">
-            <CardContent className="p-4 flex flex-col justify-between h-full">
-               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1"><Banknote size={28} className="text-muted-foreground mr-2" /> Saldo do Período</p>
-               <p className={cn(
-                 "font-semibold text-xl md:text-2xl leading-tight",
-                 totalBalance >= 0 ? "text-[hsl(142,71%,45%)]" : "text-[hsl(0,84%,60%)]"
-               )}>
-                 {brl(totalBalance)}
-               </p>
-               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.saldo}</p>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1"><Banknote size={28} className="text-muted-foreground mr-2" /> Saldo do Período</p>
+                <Popover>
+                  <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Info size={16} /></Button></PopoverTrigger>
+                  <PopoverContent className="text-sm w-64">{KPI_DESCRIPTIONS.saldo}</PopoverContent>
+                </Popover>
+              </div>
+              <p className={cn(
+                "font-semibold text-2xl md:text-3xl mt-2 overflow-hidden truncate",
+                totalBalance >= 0 ? "text-[hsl(142,71%,45%)]" : "text-[hsl(0,84%,60%)]"
+              )}>
+                {brl(totalBalance)}
+              </p>
             </CardContent>
           </Card>
         </div>
 
         {/* Secondary KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="bg-card min-h-32">
-            <CardContent className="p-4 flex flex-col justify-between h-full">
-               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                 <FolderKanban className="size-7 mr-2 text-muted-foreground" /> Projetos Ativos
-               </p>
-               <p className="text-xl md:text-2xl font-semibold text-foreground">{activeProjects}</p>
-               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.projetos}</p>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <FolderKanban className="size-7 mr-2 text-muted-foreground" /> Projetos Ativos
+                </p>
+                <Popover>
+                  <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Info size={16} /></Button></PopoverTrigger>
+                  <PopoverContent className="text-sm w-64">{KPI_DESCRIPTIONS.projetos}</PopoverContent>
+                </Popover>
+              </div>
+              <p className="text-2xl md:text-3xl font-semibold text-foreground mt-2">{activeProjects}</p>
             </CardContent>
           </Card>
-          <Card className="bg-card min-h-32">
-            <CardContent className="p-4 flex flex-col justify-between h-full">
-               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                 <CheckCircle2 className="size-7 mr-2 text-muted-foreground" /> Tarefas
-               </p>
-               <p className="text-xl md:text-2xl font-semibold text-foreground">{completedTasks}/{totalTasks}</p>
-               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.tarefas}</p>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <CheckCircle2 className="size-7 mr-2 text-muted-foreground" /> Tarefas
+                </p>
+                <Popover>
+                  <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Info size={16} /></Button></PopoverTrigger>
+                  <PopoverContent className="text-sm w-64">{KPI_DESCRIPTIONS.tarefas}</PopoverContent>
+                </Popover>
+              </div>
+              <p className="text-2xl md:text-3xl font-semibold text-foreground mt-2">{completedTasks}/{totalTasks}</p>
             </CardContent>
           </Card>
-          <Card className="bg-card min-h-32">
-            <CardContent className="p-4 flex flex-col justify-between h-full">
-               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                 <PiggyBank className="size-7 mr-2 text-muted-foreground" /> Investimentos
-               </p>
-               <p className="text-xl md:text-2xl font-semibold text-foreground">{brl(totalInvestments)}</p>
-               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.investimentos}</p>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <PiggyBank className="size-7 mr-2 text-muted-foreground" /> Investimentos
+                </p>
+                <Popover>
+                  <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Info size={16} /></Button></PopoverTrigger>
+                  <PopoverContent className="text-sm w-64">{KPI_DESCRIPTIONS.investimentos}</PopoverContent>
+                </Popover>
+              </div>
+              <p className="text-2xl md:text-3xl font-semibold text-foreground mt-2">{brl(totalInvestments)}</p>
             </CardContent>
           </Card>
-          <Card className="bg-card min-h-32">
-            <CardContent className="p-4 flex flex-col justify-between h-full">
-               <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                 <Wallet className="size-7 mr-2 text-muted-foreground" /> Caixa
-               </p>
-               <p className={cn("text-xl md:text-2xl font-semibold", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
-                 {brl(totalCash)}
-               </p>
-               <p className="text-sm text-muted-foreground mt-1 leading-tight font-medium overflow-hidden line-clamp-2">{KPI_DESCRIPTIONS.caixa}</p>
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Wallet className="size-7 mr-2 text-muted-foreground" /> Caixa
+                </p>
+                <Popover>
+                  <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Info size={16} /></Button></PopoverTrigger>
+                  <PopoverContent className="text-sm w-64">{KPI_DESCRIPTIONS.caixa}</PopoverContent>
+                </Popover>
+              </div>
+              <p className={cn("text-2xl md:text-3xl font-semibold mt-2", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                {brl(totalCash)}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -419,6 +459,55 @@ export default function DashboardView() {
               )}
             </CardContent>
           </Card>
+        </div>
+
+        <hr className="my-8 border-muted" />
+
+        <div className="mt-6 space-y-4">
+          {periodKey === "today" && (
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Hoje</h3>
+              {filteredEntries.length > 0 ? (
+                filteredEntries.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between p-2 rounded-lg bg-muted mb-1">
+                    <span className="text-sm truncate flex-1">{e.title}</span>
+                    <span className="text-sm font-medium ml-2">{brl(Number(e.amount))}</span>
+                    <Button variant="outline" size="sm" className="ml-2 h-7 text-xs">Baixar</Button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-muted-foreground">Sem itens nesse período</p>
+              )}
+            </div>
+          )}
+          {periodKey === "3days" && (
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Próximos 3 dias</h3>
+              {filteredEntries.length > 0 ? (
+                filteredEntries.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between p-2 rounded-lg bg-muted mb-1">
+                    <span className="text-sm truncate flex-1">{e.title}</span>
+                    <span className="text-sm font-medium ml-2">{brl(Number(e.amount))}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-muted-foreground">Sem itens nesse período</p>
+              )}
+              <div className="mt-4 p-4 border border-dashed border-muted-foreground/30 rounded-lg text-center text-muted-foreground text-sm">
+                Mini-gráfico aqui
+              </div>
+            </div>
+          )}
+          {periodKey === "month" && (
+            <div className="p-4 border border-dashed border-muted-foreground/30 rounded-lg text-center text-muted-foreground text-sm">
+              Gráficos completos do mês aqui
+            </div>
+          )}
+          {periodKey === "custom" && (
+            <div className="p-4 border border-dashed border-muted-foreground/30 rounded-lg text-center text-muted-foreground text-sm">
+              Custom range aqui
+            </div>
+          )}
         </div>
       </div>
     </ScrollArea>
