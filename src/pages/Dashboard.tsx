@@ -223,6 +223,13 @@ export default function Dashboard() {
             <UnifiedSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
           )}
         </div>
+
+        {/* Selo do Propósito */}
+        <footer className="flex-shrink-0 border-t border-border/20 px-4 py-1.5 text-right">
+          <p className="text-[11px] text-muted-foreground/60 leading-tight">
+            Organize sua vida financeira — do que você tem hoje ao que você quer amanhã. <span className="font-medium">(Confraria do Bem)</span>
+          </p>
+        </footer>
       </main>
 
       {/* Global FAB */}

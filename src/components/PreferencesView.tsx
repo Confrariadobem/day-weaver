@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useTheme, type ThemeMode } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,9 +12,16 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Moon, Sun, Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp, Plus, DollarSign, FolderKanban, Eye, EyeOff } from "lucide-react";
+import { Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp, Plus, DollarSign, FolderKanban, Eye, EyeOff, Sparkles, Sunset, Flower2, Waves } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LAUNCH_TYPE_ICONS, DATA_MODULE_ICONS, CATEGORY_ICON_MAP, CATEGORY_ICON_KEYS, INVESTMENT_TYPE_ICONS } from "@/lib/icons";
+
+const THEME_OPTIONS: { key: ThemeMode; label: string; icon: React.ReactNode; gradient: string }[] = [
+  { key: "soul", label: "Soul", icon: <Sparkles className="h-5 w-5" />, gradient: "from-amber-100 to-amber-200" },
+  { key: "dusk", label: "Dusk", icon: <Sunset className="h-5 w-5" />, gradient: "from-purple-300 to-purple-400" },
+  { key: "zen", label: "Zen", icon: <Flower2 className="h-5 w-5" />, gradient: "from-emerald-300 to-emerald-400" },
+  { key: "ocean", label: "Ocean", icon: <Waves className="h-5 w-5" />, gradient: "from-sky-300 to-sky-400" },
+];
 import { MODULE_REGISTRY, getModuleDef } from "@/config/moduleRegistry";
 import { useModulePreferences } from "@/hooks/useModulePreferences";
 
@@ -355,7 +362,7 @@ function FinancesPrefsTab({
 }
 export default function PreferencesView() {
   const { user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme: setAppTheme } = useTheme();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<PrefTab>("calendar");
   const { prefs, setTabEnabled, saving: moduleSaving } = useModulePreferences();
@@ -728,17 +735,31 @@ export default function PreferencesView() {
 
           {/* ═══ GERAL ═══ */}
           {activeTab === "general" && (
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">Aparência, idioma, moeda e formato numérico.</p>
+          <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">Tema visual, idioma, moeda e formato numérico.</p>
+
+              {/* Theme Selector - segmented bar */}
               <Card className="border-border/40">
                 <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs flex items-center gap-2">
-                      {theme === "dark" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
-                      Modo Escuro
-                    </Label>
-                    <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} />
+                  <Label className="text-xs font-semibold">Tema Visual</Label>
+                  <div className="flex items-center gap-1 rounded-xl bg-muted/50 p-1">
+                    {THEME_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.key}
+                        onClick={() => setAppTheme(opt.key)}
+                        className={cn(
+                          "flex-1 flex flex-col items-center gap-1 rounded-lg py-2.5 transition-all duration-300 relative",
+                          theme === opt.key
+                            ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                      >
+                        {opt.icon}
+                        <span className="text-[10px] font-medium">{opt.label}</span>
+                      </button>
+                    ))}
                   </div>
+
                   <div className="grid grid-cols-3 gap-3 pt-1">
                     <div>
                       <Label className="text-xs">Idioma</Label>
