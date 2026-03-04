@@ -151,7 +151,7 @@ const PROJECT_TABS = [
   { key: "tasks", label: "Tarefas", desc: "Tarefas avulsas e vinculadas" },
 ];
 
-const CC_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
+const CC_COLORS = ["#ef4444", "#3b82f6", "#10b981", "#fbbf24", "#a855f7", "#f97316", "#ec4899", "#14b8a6", "#6b7280", "#6366f1", "#84cc16", "#d946ef"];
 
 // ─── Searchable section keys ────────────────────────────────────────────────
 
