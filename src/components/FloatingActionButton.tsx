@@ -141,22 +141,17 @@ export default function FloatingActionButton({ activeModule }: FloatingActionBut
       {/* FAB Menu */}
       <Popover open={menuOpen} onOpenChange={setMenuOpen}>
         <PopoverTrigger asChild>
-          <Tooltip delayDuration={200}>
-            <TooltipTrigger asChild>
-              <button
-                className={cn(
-                  "fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full",
-                  "bg-primary text-primary-foreground shadow-lg",
-                  "transition-all duration-200 hover:scale-110 hover:shadow-xl",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-                )}
-                aria-label="Novo"
-              >
-                <Plus className={cn("h-7 w-7 transition-transform duration-200", menuOpen && "rotate-45")} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="left" sideOffset={12}>Novo</TooltipContent>
-          </Tooltip>
+          <button
+            className={cn(
+              "fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full",
+              "bg-primary text-primary-foreground shadow-lg",
+              "transition-all duration-200 hover:scale-110 hover:shadow-xl",
+              "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            )}
+            aria-label="Novo"
+          >
+            <Plus className={cn("h-7 w-7 transition-transform duration-200", menuOpen && "rotate-45")} />
+          </button>
         </PopoverTrigger>
         <PopoverContent side="top" align="end" className="w-48 p-1.5 space-y-0.5" sideOffset={8}>
           {FAB_OPTIONS.map(opt => (
