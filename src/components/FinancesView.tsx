@@ -175,7 +175,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   const [expenseCollapsed, setExpenseCollapsed] = useState(false);
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
-  const [cashFlowFilter, setCashFlowFilter] = useState<CashFlowFilter>("all");
+  const [cashFlowFilter, setCashFlowFilter] = useState<CashFlowFilter>("payable");
   const [searchQuery, setSearchQuery] = useState("");
   const [doarSearchQuery, setDoarSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -569,11 +569,11 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         }
         // Filter by cash flow type
         if (cashFlowFilter === "paid") return e.is_paid;
-        if (cashFlowFilter === "payable") return e.type === "expense" && !e.is_paid;
-        if (cashFlowFilter === "receivable") return e.type === "revenue" && !e.is_paid;
+        if (cashFlowFilter === "payable") return !e.is_paid;
+        if (cashFlowFilter === "receivable") return e.is_paid;
         if (cashFlowFilter === "overdue") { const ed = parseEntryDate(e.entry_date); return !e.is_paid && ed < today; }
-        // "all" filter: show unpaid only
-        return !e.is_paid;
+        // "all" filter: show everything
+        return true;
       })
       .filter((e) => {
         // Column filters
@@ -1367,25 +1367,155 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     </DialogContent>
   );
 
+  // Toolbar renderer (context-sensitive, right of tabs)
+  const renderToolbar = () => {
+    const isPrevisao = viewTab === "previsao";
+    const isDoar = viewTab === "doar";
+    const isIndicadores = viewTab === "indicadores";
+    const isCentro = viewTab === "centrocusto";
+
+    return (
+      <div className="flex items-center gap-1.5">
+        {/* Interval (all tabs except previsao which has its own date filter) */}
+        {!isPrevisao && renderPeriodFilter()}
+
+        {/* Search (previsao, doar, centrocusto) */}
+        {isPrevisao && (
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-7 pl-8 text-xs w-36 rounded-xl" />
+          </div>
+        )}
+        {isDoar && (
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input placeholder="Pesquisar..." value={doarSearchQuery} onChange={(e) => setDoarSearchQuery(e.target.value)}
+              className="h-7 pl-8 text-xs w-36 rounded-xl" />
+          </div>
+        )}
+        {isCentro && (
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input placeholder="Pesquisar centros..." value={ccReportSearch} onChange={(e) => setCcReportSearch(e.target.value)}
+              className="h-7 pl-8 text-xs w-36 rounded-xl" />
+          </div>
+        )}
+
+        {/* Import (previsao only) */}
+        {isPrevisao && (
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="outline" className="h-7 w-7 rounded-xl border-border hover:border-primary hover:text-primary"
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file"; input.accept = ".csv";
+                  input.onchange = async (ev: any) => {
+                    const file = ev.target.files?.[0];
+                    if (!file || !user) return;
+                    const text = await file.text();
+                    const lines = text.split("\n").filter(Boolean);
+                    if (lines.length < 2) return;
+                    const rows = lines.slice(1).map(line => {
+                      const cols = line.split(",").map(c => c.replace(/"/g, "").trim());
+                      return {
+                        user_id: user.id, entry_date: cols[0] || format(new Date(), "yyyy-MM-dd"),
+                        title: cols[1] || "Importado", type: cols[2]?.toLowerCase().includes("receita") ? "revenue" as const : "expense" as const,
+                        amount: parseFloat(cols[cols.length - 1]) || 0, is_paid: false,
+                      };
+                    }).filter(r => r.amount > 0);
+                    if (rows.length > 0) {
+                      await supabase.from("financial_entries").insert(rows);
+                      fetchData();
+                    }
+                  };
+                  input.click();
+                }}
+              ><FileDown className="h-3.5 w-3.5" /></Button>
+            </TooltipTrigger>
+            <TooltipContent>Importar CSV</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Export (previsao, indicadores) */}
+        {(isPrevisao || isIndicadores) && (
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="outline" className="h-7 w-7 rounded-xl border-border hover:border-primary hover:text-primary"
+                onClick={handleExportCSV}><FileUp className="h-3.5 w-3.5" /></Button>
+            </TooltipTrigger>
+            <TooltipContent>Exportar CSV</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Print */}
+        <Tooltip delayDuration={200}>
+          <TooltipTrigger asChild>
+            <Button size="icon" variant="outline" className="h-7 w-7 rounded-xl border-border hover:border-primary hover:text-primary"
+              onClick={isDoar ? handlePrintDOAR : handlePrint}><Printer className="h-3.5 w-3.5" /></Button>
+          </TooltipTrigger>
+          <TooltipContent>Imprimir</TooltipContent>
+        </Tooltip>
+
+        {/* Expand/Collapse (doar only) */}
+        {isDoar && (
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="outline" className="h-7 w-7 rounded-xl border-border hover:border-primary hover:text-primary"
+                onClick={cycleDoarExpand}><ChevronsUpDown className="h-3.5 w-3.5" /></Button>
+            </TooltipTrigger>
+            <TooltipContent>Expandir/Recolher (Nível {doarExpandLevel}/3)</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* CC filter (centrocusto only) */}
+        {isCentro && (
+          <Select value={ccReportFilterIds.size === 0 ? "all" : Array.from(ccReportFilterIds)[0] || "all"} onValueChange={(v) => {
+            if (v === "all") setCcReportFilterIds(new Set());
+            else setCcReportFilterIds(new Set([v]));
+          }}>
+            <SelectTrigger className="h-7 w-40 text-xs rounded-xl"><SelectValue placeholder="Centro de Custo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Centros</SelectItem>
+              {costCenters.map((cc: any) => (
+                <SelectItem key={cc.id} value={cc.id}>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color || "#6b7280" }} />
+                    {cc.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+    );
+  };
+
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
-      {/* Tab buttons */}
+      {/* Tab buttons + Toolbar on same line */}
       <div className="flex items-center gap-2 overflow-x-auto">
-        {([
-          { key: "indicadores" as ViewTab, label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
-          { key: "previsao" as ViewTab, label: "Fluxo de Caixa", icon: <CircleDollarSign className="h-3 w-3" /> },
-          { key: "doar" as ViewTab, label: "DOAR", icon: <Landmark className="h-3 w-3" /> },
-          { key: "centrocusto" as ViewTab, label: "Centro de Custo", icon: <FolderKanban className="h-3 w-3" /> },
-        ]).filter(tab => tab.key === "centrocusto" || visibleTabs.includes(tab.key)).map(tab => (
-          <Button key={tab.key} size="sm"
-            variant={viewTab === tab.key ? "default" : "ghost"}
-            className={cn("h-7 text-xs px-3 rounded-full gap-1.5", viewTab !== tab.key && "text-muted-foreground")}
-            onClick={() => setViewTab(tab.key)}
-          >
-            {tab.icon} {tab.label}
-          </Button>
-        ))}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {([
+            { key: "indicadores" as ViewTab, label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
+            { key: "previsao" as ViewTab, label: "Fluxo de Caixa", icon: <CircleDollarSign className="h-3 w-3" /> },
+            { key: "doar" as ViewTab, label: "DOAR", icon: <Landmark className="h-3 w-3" /> },
+            { key: "centrocusto" as ViewTab, label: "Centro de Custo", icon: <FolderKanban className="h-3 w-3" /> },
+          ]).filter(tab => tab.key === "centrocusto" || visibleTabs.includes(tab.key)).map(tab => (
+            <Button key={tab.key} size="sm"
+              variant={viewTab === tab.key ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", viewTab !== tab.key && "text-muted-foreground")}
+              onClick={() => setViewTab(tab.key)}
+            >
+              {tab.icon} {tab.label}
+            </Button>
+          ))}
+        </div>
+        <div className="ml-auto">
+          {renderToolbar()}
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -1430,28 +1560,29 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         {/* ============ FLUXO DE CAIXA ============ */}
         {viewTab === "previsao" && (
           <>
-            {/* Quick filters + DatePicker */}
+            {/* Quick filters */}
             <div className="mb-3 flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 flex-wrap">
                 {([
-                  { key: "payable" as CashFlowFilter, label: "A Pagar" },
-                  { key: "receivable" as CashFlowFilter, label: "A Receber" },
-                  { key: "paid" as CashFlowFilter, label: "Baixados" },
+                  { key: "all" as CashFlowFilter, label: "Todos" },
+                  { key: "payable" as CashFlowFilter, label: "Pendentes" },
+                  { key: "paid" as CashFlowFilter, label: "Pagos/Recebidos" },
+                  { key: "overdue" as CashFlowFilter, label: "Baixados" },
                 ]).map(f => (
                   <Button key={f.key} size="sm"
                     variant={cashFlowFilter === f.key ? "default" : "ghost"}
                     className={cn("h-7 text-xs px-2.5 gap-1 rounded-full",
                       cashFlowFilter !== f.key && "text-muted-foreground hover:text-foreground"
                     )}
-                    onClick={() => setCashFlowFilter(prev => prev === f.key ? "all" : f.key)}
+                    onClick={() => setCashFlowFilter(f.key)}
                   >{f.label}</Button>
                 ))}
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button size="sm" variant="outline"
-                      className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", previsaoFilterDate && "border-primary text-primary")}>
+                      className={cn("h-7 text-xs px-2.5 gap-1 rounded-xl border-border hover:border-primary", previsaoFilterDate && "border-primary text-primary")}>
                       <CalendarDays className="h-3 w-3" />
-                      {previsaoFilterDate ? format(previsaoFilterDate, "dd/MM/yyyy") : "Período"}
+                      {previsaoFilterDate ? format(previsaoFilterDate, "dd/MM/yyyy") : "Intervalo"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -1468,113 +1599,58 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                 </Popover>
               </div>
 
-              <div className="flex items-center gap-1.5 ml-auto">
-                {/* Search field */}
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar lançamentos..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-7 pl-8 text-xs w-44"
-                  />
+              {/* Batch actions */}
+              {selectedIds.size > 0 && (
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <span className="text-xs text-muted-foreground">{selectedIds.size} selecionados</span>
+                  <Button size="sm" variant="ghost"
+                    className="h-7 px-2.5 text-xs gap-1 text-[hsl(var(--success))] hover:text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] rounded-full"
+                    onClick={async () => {
+                      const ids = Array.from(selectedIds);
+                      await supabase.from("financial_entries").update({
+                        is_paid: true, payment_date: format(new Date(), "yyyy-MM-dd"),
+                      }).in("id", ids);
+                      setSelectedIds(new Set());
+                      fetchData();
+                    }}
+                  ><Check className="h-3 w-3" /> Baixar</Button>
+                  <Button size="sm" variant="ghost"
+                    className="h-7 px-2.5 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10 rounded-full"
+                    onClick={handleBatchCopy}
+                  ><Copy className="h-3 w-3" /> Duplicar</Button>
+                  <Button size="sm" variant="ghost"
+                    className="h-7 px-2.5 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                    onClick={async () => {
+                      const ids = Array.from(selectedIds);
+                      await supabase.from("financial_entries").delete().in("id", ids);
+                      setSelectedIds(new Set());
+                      fetchData();
+                    }}
+                  ><Trash2 className="h-3 w-3" /> Excluir</Button>
                 </div>
-
-                {selectedIds.size > 0 && (
-                  <>
-                    <span className="text-xs text-muted-foreground">{selectedIds.size} selecionados</span>
-                    <Button size="sm" variant="ghost"
-                      className="h-7 px-2.5 text-xs gap-1 text-[hsl(var(--success))] hover:text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] rounded-full"
-                      onClick={async () => {
-                        const ids = Array.from(selectedIds);
-                        await supabase.from("financial_entries").update({
-                          is_paid: true, payment_date: format(new Date(), "yyyy-MM-dd"),
-                        }).in("id", ids);
-                        setSelectedIds(new Set());
-                        fetchData();
-                      }}
-                    ><Check className="h-3 w-3" /> Baixar contas</Button>
-                    <Button size="sm" variant="ghost"
-                      className="h-7 px-2.5 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10 rounded-full"
-                      onClick={handleBatchCopy}
-                    ><Copy className="h-3 w-3" /> Copiar</Button>
-                    <Button size="sm" variant="ghost"
-                      className="h-7 px-2.5 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
-                      onClick={async () => {
-                        const ids = Array.from(selectedIds);
-                        await supabase.from("financial_entries").delete().in("id", ids);
-                        setSelectedIds(new Set());
-                        fetchData();
-                      }}
-                    ><Trash2 className="h-3 w-3" /> Excluir</Button>
-                  </>
-                )}
-                {/* Import/Export/Print */}
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                      onClick={() => {
-                        const input = document.createElement("input");
-                        input.type = "file"; input.accept = ".csv";
-                        input.onchange = async (ev: any) => {
-                          const file = ev.target.files?.[0];
-                          if (!file || !user) return;
-                          const text = await file.text();
-                          const lines = text.split("\n").filter(Boolean);
-                          if (lines.length < 2) return;
-                          const rows = lines.slice(1).map(line => {
-                            const cols = line.split(",").map(c => c.replace(/"/g, "").trim());
-                            return {
-                              user_id: user.id, entry_date: cols[0] || format(new Date(), "yyyy-MM-dd"),
-                              title: cols[1] || "Importado", type: cols[2]?.toLowerCase().includes("receita") ? "revenue" as const : "expense" as const,
-                              amount: parseFloat(cols[cols.length - 1]) || 0, is_paid: false,
-                            };
-                          }).filter(r => r.amount > 0);
-                          if (rows.length > 0) {
-                            await supabase.from("financial_entries").insert(rows);
-                            fetchData();
-                          }
-                        };
-                        input.click();
-                      }}
-                    >
-                      <FileDown className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Importar CSV</TooltipContent>
-                </Tooltip>
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                      onClick={handleExportCSV}
-                    >
-                      <FileUp className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Exportar CSV</TooltipContent>
-                </Tooltip>
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                      onClick={handlePrint}
-                    >
-                      <Printer className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Imprimir</TooltipContent>
-                </Tooltip>
-
-                <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
-                  {renderEntryDialog()}
-                </Dialog>
-              </div>
+              )}
             </div>
+
+            {/* Entry edit dialog */}
+            <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
+              {renderEntryDialog()}
+            </Dialog>
 
             {/* Table */}
             <div className="rounded-lg overflow-auto max-h-[calc(100vh-320px)] border border-border/30">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10 bg-muted/50">
+                <thead className="sticky top-0 z-10 bg-card border-b border-border">
                   <tr className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <th className="py-2.5 px-2 w-8">
+                      <Checkbox
+                        checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                        onCheckedChange={(c) => {
+                          if (c) setSelectedIds(new Set(filtered.map(e => e.id)));
+                          else setSelectedIds(new Set());
+                        }}
+                        className="h-3.5 w-3.5"
+                      />
+                    </th>
                     <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("entry_date")}>
                       Vencimento <SortIcon field="entry_date" />
                     </th>
@@ -1629,17 +1705,14 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                         </Popover>
                       </div>
                     </th>
-                    <th className="text-center py-2.5 px-3">Recorrência</th>
-                    <th className="text-center py-2.5 px-3">Parcela</th>
                     <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("payment_date")}>
                       Pgto Real <SortIcon field="payment_date" />
                     </th>
-                    <th className="text-center py-2.5 px-3">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={9} className="text-center text-muted-foreground/40 py-12">
+                    <tr><td colSpan={7} className="text-center text-muted-foreground/40 py-12">
                       Sem lançamentos no período
                     </td></tr>
                   )}
@@ -1650,6 +1723,10 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                     const overdueDays = isOverdue ? differenceInDays(today, entDate) : 0;
                     const isRecurrent = !!e.recurrence_type;
                     const isInstallment = !isRecurrent && e.installment_group && e.total_installments > 1;
+                    const recLabel = isRecurrent
+                      ? ({ daily: "Diária", weekly: "Semanal", biweekly: "Quinzenal", monthly: "Mensal",
+                           quarterly: "Trimestral", semiannual: "Semestral", yearly: "Anual" } as any)[e.recurrence_type] || "Recorrente"
+                      : null;
                     return (
                       <tr key={e.id}
                         className={cn(
@@ -1667,81 +1744,102 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                           }
                         }}
                       >
+                        <td className="py-2.5 px-2">
+                          <Checkbox
+                            checked={selectedIds.has(e.id)}
+                            onCheckedChange={(c) => {
+                              setSelectedIds(prev => {
+                                const next = new Set(prev);
+                                if (c) next.add(e.id); else next.delete(e.id);
+                                return next;
+                              });
+                            }}
+                            className="h-3.5 w-3.5"
+                          />
+                        </td>
                         <td className="py-2.5 px-3 text-muted-foreground text-xs">{format(entDate, "dd/MM/yy")}</td>
                         <td className={cn("py-2.5 px-3 font-medium", e.is_paid && "line-through text-muted-foreground")}>
-                          {e.title}
+                          <span className="inline-flex items-center gap-1.5">
+                            {e.title}
+                            {isRecurrent && (
+                              <Tooltip delayDuration={200}>
+                                <TooltipTrigger>
+                                  <Repeat className="h-[0.6rem] w-[0.6rem] opacity-60" />
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs">{recLabel}</TooltipContent>
+                              </Tooltip>
+                            )}
+                            {isInstallment && (
+                              <span className="text-[10px] text-muted-foreground/60">{e.installment_number}/{e.total_installments}</span>
+                            )}
+                          </span>
                         </td>
                         <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[140px]">{e.counterpart || "—"}</td>
                         <td className={cn("py-2.5 px-3 text-right font-semibold tabular-nums",
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
                         </td>
-                        <td className="py-2.5 px-3 text-center">
-                          {e.is_paid ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-[hsl(var(--success))] bg-[hsl(var(--success)/0.1)] px-2 py-0.5 rounded-full">
-                              <Check className="h-2.5 w-2.5" /> Pago
-                            </span>
-                          ) : isOverdue ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
-                              <AlertTriangle className="h-2.5 w-2.5" /> {overdueDays}d
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-                              Pendente
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          {isRecurrent && (
-                            <Tooltip delayDuration={200}>
-                              <TooltipTrigger>
-                                <Repeat className="h-3.5 w-3.5 text-primary mx-auto" />
-                              </TooltipTrigger>
-                              <TooltipContent className="text-xs">
-                                {({ daily: "Diária", weekly: "Semanal", biweekly: "Quinzenal", monthly: "Mensal",
-                                  quarterly: "Trimestral", semiannual: "Semestral", yearly: "Anual" } as any)[e.recurrence_type] || "Recorrente"}
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-center text-xs text-muted-foreground">
-                          {isInstallment ? `${e.installment_number}/${e.total_installments}` : ""}
-                        </td>
-                        <td className="py-2.5 px-3 text-xs text-muted-foreground">
-                          {e.payment_date ? format(parseEntryDate(e.payment_date), "dd/MM/yy") : "—"}
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <div className="flex items-center gap-0.5 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <td className="py-2.5 px-3 text-center relative">
+                          <div className="group-hover:hidden">
+                            {e.is_paid ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-[hsl(var(--success))] bg-[hsl(var(--success)/0.1)] px-2 py-0.5 rounded-full">
+                                <Check className="h-2.5 w-2.5" /> Pago
+                              </span>
+                            ) : isOverdue ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
+                                <AlertTriangle className="h-2.5 w-2.5" /> {overdueDays}d
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+                                Pendente
+                              </span>
+                            )}
+                          </div>
+                          {/* Hover actions in Status column */}
+                          <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
                             <Tooltip delayDuration={200}>
                               <TooltipTrigger asChild>
                                 <Button size="icon" variant="ghost" className="h-6 w-6"
                                   onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }}>
-                                  <Pencil className="h-3 w-3" />
+                                  <Pencil className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent className="text-xs">Editar</TooltipContent>
                             </Tooltip>
-                            {!e.is_paid && (
-                              <Tooltip delayDuration={200}>
-                                <TooltipTrigger asChild>
-                                  <Button size="icon" variant="ghost" className="h-6 w-6 text-[hsl(var(--success))]"
-                                    onClick={(ev) => { ev.stopPropagation(); togglePaid(e); }}>
-                                    <Check className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent className="text-xs">Baixar</TooltipContent>
-                              </Tooltip>
-                            )}
+                            <Tooltip delayDuration={200}>
+                              <TooltipTrigger asChild>
+                                <Button size="icon" variant="ghost" className="h-6 w-6 text-primary"
+                                  onClick={async (ev) => {
+                                    ev.stopPropagation();
+                                    if (!user) return;
+                                    await supabase.from("financial_entries").insert({
+                                      user_id: user.id, title: e.title, amount: Number(e.amount), type: e.type,
+                                      category_id: e.category_id || null, project_id: e.project_id || null,
+                                      cost_center_id: e.cost_center_id || null, entry_date: e.entry_date,
+                                      account_id: e.account_id || null, payment_method: e.payment_method || null,
+                                      is_paid: false, counterpart: e.counterpart || null, is_fixed: e.is_fixed || false,
+                                      description: e.description || null, currency: e.currency || "BRL",
+                                    });
+                                    fetchData();
+                                  }}>
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">Duplicar</TooltipContent>
+                            </Tooltip>
                             <Tooltip delayDuration={200}>
                               <TooltipTrigger asChild>
                                 <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive"
                                   onClick={(ev) => { ev.stopPropagation(); setDeleteEntryConfirm(e.id); }}>
-                                  <Trash2 className="h-3 w-3" />
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent className="text-xs">Excluir</TooltipContent>
                             </Tooltip>
                           </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-xs text-muted-foreground">
+                          {e.payment_date ? format(parseEntryDate(e.payment_date), "dd/MM/yy") : "—"}
                         </td>
                       </tr>
                     );
@@ -1803,6 +1901,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
 
           return (
           <div className="space-y-4">
+            {/* DOAR quick filters only - toolbar moved to shared bar */}
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 flex-wrap">
                 <Button size="sm"
@@ -1816,31 +1915,6 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                   <Checkbox checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} id="carry-over" className="h-3.5 w-3.5" />
                   <Label htmlFor="carry-over" className="text-xs text-muted-foreground whitespace-nowrap">Saldo anterior</Label>
                 </div>
-                {renderPeriodFilter()}
-              </div>
-              <div className="flex items-center gap-1.5 ml-auto">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input placeholder="Pesquisar categorias..."
-                    value={doarSearchQuery} onChange={(e) => setDoarSearchQuery(e.target.value)}
-                    className="h-7 pl-8 text-xs w-44" />
-                </div>
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={cycleDoarExpand} title={`Nível ${doarExpandLevel}/3`}>
-                      <ChevronsUpDown className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Expandir/Recolher</TooltipContent>
-                </Tooltip>
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handlePrintDOAR}>
-                      <Printer className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Imprimir</TooltipContent>
-                </Tooltip>
               </div>
             </div>
 
@@ -2035,44 +2109,6 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         {/* ============ CENTRO DE CUSTO REPORT ============ */}
         {viewTab === "centrocusto" && (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1 flex-wrap">
-                <Select value={ccReportFilterIds.size === 0 ? "all" : Array.from(ccReportFilterIds)[0] || "all"} onValueChange={(v) => {
-                  if (v === "all") setCcReportFilterIds(new Set());
-                  else setCcReportFilterIds(new Set([v]));
-                }}>
-                  <SelectTrigger className="h-7 w-44 text-xs rounded-full"><SelectValue placeholder="Centros de Custo" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os Centros</SelectItem>
-                    {costCenters.map((cc: any) => (
-                      <SelectItem key={cc.id} value={cc.id}>
-                        <span className="flex items-center gap-1.5">
-                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color || "#6b7280" }} />
-                          {cc.name}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {renderPeriodFilter()}
-              </div>
-              <div className="flex items-center gap-1.5 ml-auto">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input placeholder="Pesquisar centros..."
-                    value={ccReportSearch} onChange={(e) => setCcReportSearch(e.target.value)}
-                    className="h-7 pl-8 text-xs w-44" />
-                </div>
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handlePrint}>
-                      <Printer className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Imprimir</TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
 
             {ccReportData.length === 0 && (
               <div className="text-center text-muted-foreground/40 py-12">Sem dados de centros de custo no período</div>
@@ -2198,29 +2234,6 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         {/* ============ INDICADORES ============ */}
         {viewTab === "indicadores" && (
           <div className="space-y-4" ref={reportRef}>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1 flex-wrap">
-                {renderPeriodFilter()}
-              </div>
-              <div className="ml-auto flex items-center gap-1.5">
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handleExportCSV}>
-                      <FileUp className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Exportar CSV</TooltipContent>
-                </Tooltip>
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handlePrint}>
-                      <Printer className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Imprimir</TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
 
             {/* Summary cards */}
             <Card>
