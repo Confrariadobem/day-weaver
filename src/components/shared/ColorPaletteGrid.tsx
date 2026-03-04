@@ -3,11 +3,9 @@ import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
-const PASTEL_COLORS = [
-  // Row 1 - lighter
-  "#A7C7E7", "#A8D8B9", "#F4C2C2", "#FDFD96", "#C3B1E1", "#FFD1A9",
-  // Row 2 - slightly deeper
-  "#6FA8DC", "#6AA84F", "#E06666", "#F1C232", "#8E7CC3", "#E69138",
+const PALETTE_COLORS = [
+  "#ef4444", "#3b82f6", "#10b981", "#fbbf24", "#a855f7", "#f97316",
+  "#ec4899", "#14b8a6", "#6b7280", "#6366f1", "#84cc16", "#d946ef",
 ];
 
 interface ColorPaletteGridProps {
@@ -48,7 +46,7 @@ export function ColorPaletteGrid({ selected, onSelect, onShowMore }: ColorPalett
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-6 gap-1.5" style={{ gridAutoRows: "auto" }}>
-        {PASTEL_COLORS.map((color) => (
+        {PALETTE_COLORS.map((color) => (
           <button
             key={color}
             type="button"

@@ -134,7 +134,7 @@ interface SplitLine {
   amount: string;
 }
 
-const CC_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
+const CC_COLORS = ["#ef4444", "#3b82f6", "#10b981", "#fbbf24", "#a855f7", "#f97316", "#ec4899", "#14b8a6", "#6b7280", "#6366f1", "#84cc16", "#d946ef"];
 
 // Counterpart autocomplete input component
 function CounterpartInput({ value, onChange, counterpartSuggestions }: { value: string; onChange: (v: string) => void; counterpartSuggestions: { name: string; count: number }[] }) {
@@ -973,11 +973,11 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
               </div>
               <div>
                 <Label className="text-sm">Cor</Label>
-                <div className="mt-1 flex flex-wrap gap-1.5">
+                <div className="mt-1 grid grid-cols-6 gap-1.5">
                   {CC_COLORS.map((c) => (
                     <button key={c} onClick={() => setNewCatColor(c)}
-                      className={cn("h-9 w-9 rounded-md border-2 transition-transform",
-                        newCatColor === c ? "scale-110 border-foreground" : "border-transparent"
+                      className={cn("h-8 w-8 rounded-lg border transition-all duration-200 hover:scale-110",
+                        newCatColor === c ? "border-foreground ring-1 ring-foreground" : "border-transparent"
                       )} style={{ backgroundColor: c }} />
                   ))}
                 </div>
@@ -1004,7 +1004,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
               </div>
               <div>
                 <Label className="text-sm">Cor</Label>
-                <div className="mt-1 flex flex-wrap gap-1.5">
+                <div className="mt-1 grid grid-cols-6 gap-1.5">
                   {CC_COLORS.map((c) => (
                     <button key={c} onClick={() => setCcColor(c)}
                       className={cn("h-8 w-8 rounded-lg border transition-all duration-200 hover:scale-110",
