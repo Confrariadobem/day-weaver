@@ -174,6 +174,37 @@
     @apply bg-background text-foreground;
     transition: background-color 0.5s ease, color 0.5s ease;
   }
+
+  /* ═══ Global input/select/textarea border styling ═══ */
+  input,
+  select,
+  textarea,
+  [role="combobox"],
+  [data-radix-select-trigger] {
+    border-radius: 6px !important;
+    border-width: 1px !important;
+    border-color: hsl(var(--input)) !important;
+    background-color: transparent !important;
+    transition: border-color 0.2s ease-in-out !important;
+  }
+  input:hover,
+  select:hover,
+  textarea:hover,
+  [role="combobox"]:hover,
+  [data-radix-select-trigger]:hover {
+    border-color: hsl(var(--primary)) !important;
+  }
+  input:focus,
+  select:focus,
+  textarea:focus,
+  [role="combobox"]:focus,
+  [data-radix-select-trigger][data-state="open"] {
+    border-color: hsl(var(--primary)) !important;
+    outline: none !important;
+    box-shadow: none !important;
+    --tw-ring-shadow: none !important;
+    --tw-ring-offset-shadow: none !important;
+  }
 }
 
 /* Global icon opacity */

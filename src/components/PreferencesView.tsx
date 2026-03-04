@@ -15,9 +15,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useToast } from "@/hooks/use-toast";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useCurrencyFormatter } from "@/hooks/useCurrencyFormatter";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { ConfigDialog } from "@/components/shared/ConfigDialog";
 import { GlobalSearch } from "@/components/shared/GlobalSearch";
+import { ColorPaletteGrid } from "@/components/shared/ColorPaletteGrid";
 import {
   Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp, Plus, DollarSign,
   FolderKanban, Eye, Sparkles, Sunset, Flower2, Waves, ChevronDown,
@@ -212,6 +214,7 @@ export default function PreferencesView() {
   const { theme, setTheme: setAppTheme } = useTheme();
   const { toast } = useToast();
   const { format: formatCurrency } = useCurrencyFormatter();
+  const { setCurrency: setGlobalCurrency } = useCurrency();
   const { prefs, setTabEnabled, saving: moduleSaving } = useModulePreferences();
 
   // General prefs state
@@ -309,6 +312,7 @@ export default function PreferencesView() {
     // Auto-adjust decimal places
     if (val === "BTC") setDecimalPlaces("8");
     else if (["BRL", "USD", "EUR"].includes(val)) setDecimalPlaces("2");
+    setGlobalCurrency(val);
     toast({ title: `Moeda alterada para ${CURRENCIES.find(c => c.value === val)?.label}` });
   };
 
@@ -508,10 +512,7 @@ export default function PreferencesView() {
                       </AccordionTrigger>
                       <AccordionContent className="px-3 pb-3 pt-3">
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-[11px] text-muted-foreground">Clique duas vezes para editar.</p>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openNewCat}>
-                            <Plus className="h-3.5 w-3.5" />
-                          </Button>
+                          <p className="text-[11px] text-muted-foreground">Clique duas vezes para editar. Use o FAB (+) para criar novas.</p>
                         </div>
                         <div className="space-y-1.5">
                           {categories.map((cat) => (
@@ -837,18 +838,8 @@ export default function PreferencesView() {
         </div>
         <div>
           <Label className="text-xs">Cor</Label>
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {CATEGORY_COLORS.map((color) => (
-              <button key={color} onClick={() => setCatColor(color)}
-                className={cn("h-6 w-6 rounded-full border-2 transition-transform duration-200",
-                  catColor === color ? "scale-110 border-foreground" : "border-transparent"
-                )} style={{ backgroundColor: color }} />
-            ))}
-          </div>
-          {/* Live color preview */}
-          <div className="mt-2 flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg" style={{ backgroundColor: catColor }} />
-            <span className="text-xs text-muted-foreground">{catColor}</span>
+          <div className="mt-1">
+            <ColorPaletteGrid selected={catColor} onSelect={setCatColor} />
           </div>
         </div>
         <div className="space-y-2">
@@ -884,17 +875,8 @@ export default function PreferencesView() {
         </div>
         <div>
           <Label className="text-xs">Cor</Label>
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {CC_COLORS.map((color) => (
-              <button key={color} onClick={() => setCcColor(color)}
-                className={cn("h-6 w-6 rounded-full border-2 transition-transform duration-200",
-                  ccColor === color ? "scale-110 border-foreground" : "border-transparent"
-                )} style={{ backgroundColor: color }} />
-            ))}
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg" style={{ backgroundColor: ccColor }} />
-            <span className="text-xs text-muted-foreground">{ccColor}</span>
+          <div className="mt-1">
+            <ColorPaletteGrid selected={ccColor} onSelect={setCcColor} />
           </div>
         </div>
       </ConfigDialog>
