@@ -55,8 +55,8 @@ interface FinancialAccount {
   currency?: string;
 }
 
-const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-const fmtCurrency = (v: number, cur: CurrencyType = "BRL") => cur === "USDT" ? `$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : brl(v);
+// Currency formatting now uses useCurrency context
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 const ACCOUNT_TYPE_LABELS: Record<AccountType, { label: string; icon: React.ReactNode }> = {
   bank_account: { label: "Conta Bancária", icon: <Landmark className="h-4 w-4" /> },
@@ -145,6 +145,8 @@ function CounterpartAutocomplete({ value, onChange, entries }: { value: string; 
 
 export default function FinancesView({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { user } = useAuth();
+  const { formatCurrency: brl } = useCurrency();
+  const fmtCurrency = (v: number, _cur?: CurrencyType) => brl(v);
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<DBTables<"projects">[]>([]);
   const [categories, setCategories] = useState<DBTables<"categories">[]>([]);

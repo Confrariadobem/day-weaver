@@ -45,12 +45,13 @@ interface EventEditDialogProps {
   defaultEventType?: EventType;
 }
 
-type EventType = "birthday" | "event" | "cashflow" | "investment" | "carteira" | "patrimonio" | "programa" | "project" | "centro_custo";
+type EventType = "birthday" | "event" | "cashflow" | "investment" | "carteira" | "patrimonio" | "programa" | "project" | "centro_custo" | "categoria";
 
 const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
   birthday: <Cake className="h-3.5 w-3.5" />,
   carteira: <Wallet className="h-3.5 w-3.5" />,
   cashflow: <CircleDollarSign className="h-3.5 w-3.5" />,
+  categoria: <Tag className="h-3.5 w-3.5" />,
   centro_custo: <Tag className="h-3.5 w-3.5" />,
   event: <CalendarDays className="h-3.5 w-3.5" />,
   investment: <TrendingUp className="h-3.5 w-3.5" />,
@@ -62,6 +63,7 @@ const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
 const EVENT_TYPES_UNSORTED: { value: EventType; label: string; color: string }[] = [
   { value: "birthday", label: "Aniversário", color: "#ec4899" },
   { value: "carteira", label: "Carteira", color: "#8b5cf6" },
+  { value: "categoria", label: "Categoria", color: "#06b6d4" },
   { value: "cashflow", label: "Fluxo de Caixa", color: "#22c55e" },
   { value: "centro_custo", label: "Centro de Custo", color: "#06b6d4" },
   { value: "event", label: "Evento", color: "#3b82f6" },
@@ -276,6 +278,17 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const [ccDesc, setCcDesc] = useState("");
   const [ccColor, setCcColor] = useState("#3b82f6");
 
+  // Categoria creation
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatDesc, setNewCatDesc] = useState("");
+  const [newCatColor, setNewCatColor] = useState("#A7C7E7");
+  const [newCatIcon, setNewCatIcon] = useState("briefcase");
+  const [newCatBudget, setNewCatBudget] = useState("");
+  const [newCatIsRevenue, setNewCatIsRevenue] = useState(false);
+  const [newCatIsExpense, setNewCatIsExpense] = useState(true);
+  const [newCatIsProject, setNewCatIsProject] = useState(false);
+  const [catNameError, setCatNameError] = useState("");
+
   // Autocomplete state
   const [showSuggestions, setShowSuggestions] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -407,6 +420,15 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setCcName("");
       setCcDesc("");
       setCcColor("#3b82f6");
+      setNewCatName("");
+      setNewCatDesc("");
+      setNewCatColor("#A7C7E7");
+      setNewCatIcon("briefcase");
+      setNewCatBudget("");
+      setNewCatIsRevenue(false);
+      setNewCatIsExpense(true);
+      setNewCatIsProject(false);
+      setCatNameError("");
     }
   }, [item, defaultDate, open, defaultEventType]);
 
@@ -465,6 +487,28 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   };
 
   const handleSave = async () => {
+    // Categoria creation
+    if (eventType === "categoria") {
+      if (!newCatName.trim()) { setCatNameError("Nome obrigatório"); return; }
+      // Check unique name
+      const { data: existing } = await supabase.from("categories").select("id").eq("user_id", userId).ilike("name", newCatName.trim());
+      if (existing && existing.length > 0) { setCatNameError("Já existe uma categoria com esse nome"); return; }
+      const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
+      await supabase.from("categories").insert({
+        user_id: userId,
+        name: newCatName.trim(),
+        color: newCatColor,
+        icon: newCatIcon,
+        budget_amount: parseNum(newCatBudget),
+        is_revenue: newCatIsRevenue,
+        is_expense: newCatIsExpense,
+        is_project: newCatIsProject,
+      });
+      onSaved();
+      onOpenChange(false);
+      return;
+    }
+
     // Centro de Custo creation
     if (eventType === "centro_custo") {
       if (!ccName.trim()) return;
@@ -857,9 +901,9 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   };
 
   // Types that show the main title/description/classification fields
-  const showMainFields = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo";
+  const showMainFields = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo" && eventType !== "categoria";
   // Types that show dates/scheduling
-  const showDates = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo";
+  const showDates = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo" && eventType !== "categoria";
 
   return (
     <>
@@ -897,7 +941,56 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </div>
           )}
 
-          {/* ─── CENTRO DE CUSTO CREATION ─── */}
+          {/* ─── CATEGORIA CREATION ─── */}
+          {eventType === "categoria" && (
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <p className="text-xs text-muted-foreground">Criar nova categoria.</p>
+              <div>
+                <Label className="text-sm">Nome *</Label>
+                <Input
+                  value={newCatName}
+                  onChange={(e) => { setNewCatName(e.target.value); setCatNameError(""); }}
+                  placeholder="Ex: Alimentação"
+                  className={catNameError ? "border-destructive" : ""}
+                />
+                {catNameError && <p className="text-[11px] text-destructive mt-1">{catNameError}</p>}
+              </div>
+              <div>
+                <Label className="text-sm">Descrição</Label>
+                <Input value={newCatDesc} onChange={(e) => setNewCatDesc(e.target.value)} placeholder="Opcional" />
+              </div>
+              <div>
+                <Label className="text-sm">Orçamento Mensal</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
+                  <Input
+                    type="text" inputMode="decimal" placeholder="0,00"
+                    value={newCatBudget}
+                    onChange={(e) => setNewCatBudget(e.target.value.replace(/[^0-9.,]/g, ""))}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Cor</Label>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {CC_COLORS.map((c) => (
+                    <button key={c} onClick={() => setNewCatColor(c)}
+                      className={cn("h-9 w-9 rounded-md border-2 transition-transform",
+                        newCatColor === c ? "scale-110 border-foreground" : "border-transparent"
+                      )} style={{ backgroundColor: c }} />
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Usar em</Label>
+                <div className="flex items-center justify-between"><Label className="text-xs font-normal">Receitas</Label><Checkbox checked={newCatIsRevenue} onCheckedChange={(v) => setNewCatIsRevenue(!!v)} /></div>
+                <div className="flex items-center justify-between"><Label className="text-xs font-normal">Despesas</Label><Checkbox checked={newCatIsExpense} onCheckedChange={(v) => setNewCatIsExpense(!!v)} /></div>
+                <div className="flex items-center justify-between"><Label className="text-xs font-normal">Projetos</Label><Checkbox checked={newCatIsProject} onCheckedChange={(v) => setNewCatIsProject(!!v)} /></div>
+              </div>
+            </div>
+          )}
+
           {eventType === "centro_custo" && (
             <div className="space-y-3 rounded-lg border border-border/30 p-3">
               <p className="text-xs text-muted-foreground">Criar novo centro de custo.</p>

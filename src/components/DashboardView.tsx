@@ -20,7 +20,7 @@ import {
   CalendarCheck, CalendarDays, CalendarX, Building, Banknote, Scale, PieChart as PieChartIcon, Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCurrencyFormatter } from "@/hooks/useCurrencyFormatter";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import type { Tables } from "@/integrations/supabase/types";
 const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
 
@@ -51,7 +51,7 @@ const KPI_DESCRIPTIONS: Record<string, string> = {
 
 export default function DashboardView() {
   const { user } = useAuth();
-  const { format: brl } = useCurrencyFormatter();
+  const { formatCurrency: brl } = useCurrency();
   const [entries, setEntries] = useState<Tables<"financial_entries">[]>([]);
   const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
   const [projects, setProjects] = useState<Tables<"projects">[]>([]);
