@@ -1007,8 +1007,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {CC_COLORS.map((c) => (
                     <button key={c} onClick={() => setCcColor(c)}
-                      className={cn("h-6 w-6 rounded-full border-2 transition-transform",
-                        ccColor === c ? "scale-110 border-foreground" : "border-transparent"
+                      className={cn("h-8 w-8 rounded-lg border transition-all duration-200 hover:scale-110",
+                        ccColor === c ? "border-foreground ring-1 ring-foreground" : "border-transparent"
                       )} style={{ backgroundColor: c }} />
                   ))}
                 </div>
