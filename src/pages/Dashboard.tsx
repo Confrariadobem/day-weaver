@@ -191,7 +191,7 @@ export default function Dashboard() {
       <NavSidebar activeModule={activeModule} onModuleChange={setActiveModule} />
 
       <main className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex items-center gap-3 border-b border-border/30 px-4 py-2.5">
+        <header className="flex items-center gap-3 border-b border-border/30 bg-background px-4 py-2.5">
           <h1 className="text-sm font-bold text-foreground">
             {activeModule === "calendar" && "Calendário"}
             {activeModule === "finances" && "Finanças"}
@@ -225,7 +225,7 @@ export default function Dashboard() {
         </div>
 
         {/* Selo do Propósito */}
-        <footer className="flex-shrink-0 border-t border-border/20 px-4 py-1.5 text-right">
+        <footer className="flex-shrink-0 border-t border-border/20 px-4 py-1.5 text-center">
           <p className="text-[11px] text-muted-foreground/60 leading-tight">
             Organize sua vida financeira — do que você tem hoje ao que você quer amanhã. <span className="font-medium">(Confraria do Bem)</span>
           </p>

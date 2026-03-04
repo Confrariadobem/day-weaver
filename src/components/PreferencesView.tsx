@@ -33,7 +33,7 @@ import { useModulePreferences } from "@/hooks/useModulePreferences";
 
 const THEME_OPTIONS: { key: ThemeMode; label: string; icon: React.ReactNode; gradient: string }[] = [
   { key: "soul", label: "Soul", icon: <Sparkles className="h-5 w-5" />, gradient: "from-amber-100 to-amber-200" },
-  { key: "dusk", label: "Dusk", icon: <Sunset className="h-5 w-5" />, gradient: "from-purple-300 to-purple-400" },
+  { key: "dark", label: "Dark", icon: <Sunset className="h-5 w-5" />, gradient: "from-gray-600 to-gray-800" },
   { key: "zen", label: "Zen", icon: <Flower2 className="h-5 w-5" />, gradient: "from-emerald-300 to-emerald-400" },
   { key: "ocean", label: "Ocean", icon: <Waves className="h-5 w-5" />, gradient: "from-sky-300 to-sky-400" },
 ];
@@ -84,9 +84,8 @@ const SLOT_DURATIONS = [
 ];
 
 const CATEGORY_COLORS = [
-  "#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6",
-  "#ec4899", "#06b6d4", "#f97316", "#14b8a6", "#6366f1",
-  "#a855f7", "#84cc16",
+  "#ef4444", "#f97316", "#fbbf24", "#84cc16", "#10b981", "#14b8a6",
+  "#3b82f6", "#6366f1", "#a855f7", "#d946ef", "#ec4899", "#6b7280",
 ];
 
 const CALENDAR_PALETTE: Record<string, string> = {
@@ -151,12 +150,12 @@ const PROJECT_TABS = [
   { key: "tasks", label: "Tarefas", desc: "Tarefas avulsas e vinculadas" },
 ];
 
-const CC_COLORS = ["#ef4444", "#3b82f6", "#10b981", "#fbbf24", "#a855f7", "#f97316", "#ec4899", "#14b8a6", "#6b7280", "#6366f1", "#84cc16", "#d946ef"];
+const CC_COLORS = ["#ef4444", "#f97316", "#fbbf24", "#84cc16", "#10b981", "#14b8a6", "#3b82f6", "#6366f1", "#a855f7", "#d946ef", "#ec4899", "#6b7280"];
 
 // ─── Searchable section keys ────────────────────────────────────────────────
 
 const SECTION_SEARCH_KEYS: Record<string, string[]> = {
-  general: ["geral", "tema", "idioma", "moeda", "currency", "decimal", "visual", "soul", "dusk", "zen", "ocean", "categorias", "categoria", "dados", "limpar", "avançado"],
+  general: ["geral", "tema", "idioma", "moeda", "currency", "decimal", "visual", "soul", "dark", "zen", "ocean", "categorias", "categoria", "dados", "limpar", "avançado"],
   calendar: ["calendário", "semana", "hora", "visualização", "feriado", "mensal", "semanal", "diário"],
   finances: ["finanças", "fluxo de caixa", "centro de custo", "indicadores", "doar"],
   investments: ["investimentos", "ações", "fii", "cripto", "etf", "renda fixa"],
@@ -433,17 +432,12 @@ export default function PreferencesView() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Search bar */}
-      <div className="px-4 pt-3 pb-2">
-        <GlobalSearch onSearch={setSearchTerm} />
-      </div>
-
       <ScrollArea className="flex-1">
         <div className="max-w-3xl mx-auto pb-8">
           <Accordion
             type="multiple"
             defaultValue={["general"]}
-            className="w-full"
+            className="w-full space-y-16"
           >
             {/* ═══════════ GERAL ═══════════ */}
             {isSectionVisible("general") && (
@@ -451,7 +445,7 @@ export default function PreferencesView() {
                 <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline data-[state=open]:bg-background">
                   <span className="flex items-center gap-2"><Globe className="h-4 w-4 text-primary" /> Geral</span>
                 </AccordionTrigger>
-                <AccordionContent className="px-4 pt-6 pb-4 space-y-6">
+                <AccordionContent className="px-4 pt-6 pb-16 space-y-6">
 
                   {/* Theme Selector */}
                   <div className="space-y-2">
@@ -594,7 +588,7 @@ export default function PreferencesView() {
                 <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
                   <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4" style={{ color: SECTION_COLORS.calendar }} /> Calendário</span>
                 </AccordionTrigger>
-                <AccordionContent className="px-4 pt-6 pb-4 space-y-4">
+                <AccordionContent className="px-4 pt-6 pb-16 space-y-4">
                   {/* Types */}
                   <p className="text-[11px] text-muted-foreground">Tipos de lançamento. Clique duas vezes para editar.</p>
                   <div className="space-y-1.5">
@@ -679,7 +673,7 @@ export default function PreferencesView() {
                 <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
                   <span className="flex items-center gap-2"><DollarSign className="h-4 w-4" style={{ color: SECTION_COLORS.finances }} /> Finanças</span>
                 </AccordionTrigger>
-                <AccordionContent className="px-4 pt-6 pb-4 space-y-4">
+                <AccordionContent className="px-4 pt-6 pb-16 space-y-4">
                   <p className="text-[11px] text-muted-foreground">Abas e configurações do módulo financeiro.</p>
                   <div className="space-y-1.5">
                     {FINANCE_TABS.map((tab) => (
@@ -729,7 +723,7 @@ export default function PreferencesView() {
                 <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
                   <span className="flex items-center gap-2"><TrendingUp className="h-4 w-4" style={{ color: SECTION_COLORS.investments }} /> Investimentos</span>
                 </AccordionTrigger>
-                <AccordionContent className="px-4 pt-6 pb-4 space-y-4">
+                <AccordionContent className="px-4 pt-6 pb-16 space-y-4">
                   <p className="text-[11px] text-muted-foreground">Tipos de ativos. Clique duas vezes para editar.</p>
                   <div className="space-y-1.5">
                     <ToggleRow
@@ -773,7 +767,7 @@ export default function PreferencesView() {
                 <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
                   <span className="flex items-center gap-2"><FolderKanban className="h-4 w-4" style={{ color: SECTION_COLORS.projects }} /> Projetos</span>
                 </AccordionTrigger>
-                <AccordionContent className="px-4 pt-6 pb-4 space-y-4">
+                <AccordionContent className="px-4 pt-6 pb-16 space-y-4">
                   <p className="text-[11px] text-muted-foreground">Abas e configurações do módulo de projetos.</p>
                   <div className="space-y-1.5">
                     {PROJECT_TABS.map((tab) => (
