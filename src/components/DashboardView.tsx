@@ -6,21 +6,25 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart as RechartsPieChart, Pie, Cell, Line, Legend, ComposedChart, AreaChart, Area,
 } from "recharts";
 import { format, startOfYear, endOfYear, eachMonthOfInterval, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Input } from "@/components/ui/input";
 import {
   TrendingUp, TrendingDown, Wallet, PiggyBank,
   BarChart3, Building2,
   CalendarCheck, CalendarDays, CalendarX, Scale, PieChart as PieChartIcon,
+  ArrowRightLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useCurrencyConversion } from "@/hooks/useCurrencyConversion";
 import type { Tables } from "@/integrations/supabase/types";
+
 const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
 
 type PeriodKey = "today" | "3days" | "month" | "custom" | "year";
@@ -38,11 +42,13 @@ function getPeriodRange(key: PeriodKey): { start: Date; end: Date } {
 
 export default function DashboardView() {
   const { user } = useAuth();
-  const { formatCurrency: brl } = useCurrency();
+  const { formatCurrency: brl, currency } = useCurrency();
+  const { rates, loading: ratesLoading, convert } = useCurrencyConversion();
   const [entries, setEntries] = useState<Tables<"financial_entries">[]>([]);
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [showConversion, setShowConversion] = useState(false);
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>("year");
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>(getPeriodRange("year"));
@@ -83,6 +89,9 @@ export default function DashboardView() {
       if (aRes.data) setAccounts(aRes.data);
     };
     fetch();
+    const handler = () => fetch();
+    window.addEventListener("lovable:data-changed", handler);
+    return () => window.removeEventListener("lovable:data-changed", handler);
   }, [user]);
 
   // Clear old localStorage keys
@@ -129,10 +138,16 @@ export default function DashboardView() {
 
   const totalRevenue = filteredEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
   const totalExpense = filteredEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
-  const totalBalance = totalRevenue - totalExpense;
   const totalCash = accounts.reduce((s: number, a: any) => s + Number(a.current_balance || 0), 0);
   const totalInvestments = investments.reduce((s: number, i: any) => s + (Number(i.current_price) || 0) * (Number(i.quantity) || 0), 0);
   const totalPatrimony = totalCash + totalInvestments;
+
+  const fmtOther = (v: number, cur: string) => {
+    if (cur === "BTC") return `₿ ${v.toFixed(8)}`;
+    if (cur === "USD") return `US$ ${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (cur === "EUR") return `€ ${v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
 
   const periodButtons: { key: PeriodKey; label: string; icon: typeof CalendarCheck }[] = [
     { key: "today", label: "Hoje", icon: CalendarCheck },
@@ -226,6 +241,35 @@ export default function DashboardView() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Conversion card toggle + card */}
+        <div className="flex items-center gap-2">
+          <Switch checked={showConversion} onCheckedChange={setShowConversion} id="show-conversion" />
+          <Label htmlFor="show-conversion" className="text-xs text-muted-foreground cursor-pointer">Mostrar conversão de moeda</Label>
+        </div>
+
+        {showConversion && (
+          <Card className="bg-card border-primary/20">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <ArrowRightLeft className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold">Conversão de Moeda</span>
+                {ratesLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Carregando...</span>}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {(["USD", "EUR", "BTC"] as const).filter(c => c !== currency).map(cur => (
+                  <div key={cur} className="rounded-lg border border-border p-3 space-y-1">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Patrimônio em {cur}</p>
+                    <p className="text-lg font-bold text-foreground">{fmtOther(convert(totalPatrimony, cur), cur)}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      1 {cur} = R$ {cur === "BTC" ? rates[cur].toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : rates[cur].toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
