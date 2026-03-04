@@ -47,14 +47,14 @@ export function ColorPaletteGrid({ selected, onSelect, onShowMore }: ColorPalett
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-6 gap-1.5">
+      <div className="grid grid-cols-6 gap-1.5" style={{ gridAutoRows: "auto" }}>
         {PASTEL_COLORS.map((color) => (
           <button
             key={color}
             type="button"
             onClick={() => handleClick(color)}
             className={cn(
-              "relative h-9 w-9 rounded-md border transition-all duration-200 hover:scale-110",
+              "relative h-8 w-8 rounded-lg border transition-all duration-200 hover:scale-110",
               selected === color ? "border-foreground ring-1 ring-foreground" : "border-transparent"
             )}
             style={{ backgroundColor: color }}

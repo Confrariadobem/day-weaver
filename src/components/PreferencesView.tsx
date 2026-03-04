@@ -829,10 +829,10 @@ export default function PreferencesView() {
           <Label className="text-xs">Ícone</Label>
           <div className="mt-1 flex flex-wrap gap-1.5">
             {CATEGORY_ICON_KEYS.map((key) => (
-              <button key={key} onClick={() => setCatIcon(key)}
-                className={cn("flex h-9 w-9 items-center justify-center rounded-lg border transition-colors duration-200",
-                  catIcon === key ? "border-primary bg-primary/10 text-primary" : "border-border/40 hover:border-muted-foreground text-muted-foreground"
-                )}>{CATEGORY_ICON_MAP[key]}</button>
+                <button key={key} onClick={() => setCatIcon(key)}
+                  className={cn("flex h-8 w-8 items-center justify-center rounded-lg border transition-colors duration-200",
+                    catIcon === key ? "border-primary bg-primary/10 text-primary" : "border-border/40 hover:border-muted-foreground text-muted-foreground"
+                  )}>{CATEGORY_ICON_MAP[key]}</button>
             ))}
           </div>
         </div>
