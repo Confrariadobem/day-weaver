@@ -18,7 +18,7 @@ import { useCurrencyFormatter } from "@/hooks/useCurrencyFormatter";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { ConfigDialog } from "@/components/shared/ConfigDialog";
-import { GlobalSearch } from "@/components/shared/GlobalSearch";
+
 import { ColorPaletteGrid } from "@/components/shared/ColorPaletteGrid";
 import {
   Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp, Plus, DollarSign,
@@ -154,13 +154,6 @@ const CC_COLORS = ["#ef4444", "#f97316", "#fbbf24", "#84cc16", "#10b981", "#14b8
 
 // ─── Searchable section keys ────────────────────────────────────────────────
 
-const SECTION_SEARCH_KEYS: Record<string, string[]> = {
-  general: ["geral", "tema", "idioma", "moeda", "currency", "decimal", "visual", "soul", "dark", "zen", "ocean", "categorias", "categoria", "dados", "limpar", "avançado"],
-  calendar: ["calendário", "semana", "hora", "visualização", "feriado", "mensal", "semanal", "diário"],
-  finances: ["finanças", "fluxo de caixa", "centro de custo", "indicadores", "doar"],
-  investments: ["investimentos", "ações", "fii", "cripto", "etf", "renda fixa"],
-  projects: ["projetos", "programas", "tarefas", "dashboard"],
-};
 
 // ─── ToggleRow ──────────────────────────────────────────────────────────────
 
@@ -254,8 +247,6 @@ export default function PreferencesView() {
   // Data management
   const [dataToggles, setDataToggles] = useState<Record<string, boolean>>({});
 
-  // Search
-  const [searchTerm, setSearchTerm] = useState("");
 
   // Placeholder dialogs
   const [calEditDialog, setCalEditDialog] = useState<{ open: boolean; label: string; color: string } | null>(null);
@@ -419,16 +410,10 @@ export default function PreferencesView() {
     return mod?.tabs.find(t => t.key === tabKey)?.locked ?? false;
   };
 
-  // ─── Search filter ────────────────────────────────────────────────────────
-
-  const isSectionVisible = (key: string) => {
-    if (!searchTerm) return true;
-    return SECTION_SEARCH_KEYS[key]?.some(k => k.includes(searchTerm)) ?? false;
-  };
 
   // ─── Accordion default ───────────────────────────────────────────────────
 
-  const visibleSections = ["general", "calendar", "finances", "investments", "projects"].filter(isSectionVisible);
+  
 
   return (
     <div className="flex h-full flex-col">
@@ -440,7 +425,7 @@ export default function PreferencesView() {
             className="w-full space-y-16"
           >
             {/* ═══════════ GERAL ═══════════ */}
-            {isSectionVisible("general") && (
+            {(
               <AccordionItem value="general" className="border-none">
                 <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline data-[state=open]:bg-background">
                   <span className="flex items-center gap-2"><Globe className="h-4 w-4 text-primary" /> Geral</span>
@@ -583,7 +568,7 @@ export default function PreferencesView() {
             )}
 
             {/* ═══════════ CALENDÁRIO ═══════════ */}
-            {isSectionVisible("calendar") && (
+            {(
               <AccordionItem value="calendar" className="border-none">
                 <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
                   <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4" style={{ color: SECTION_COLORS.calendar }} /> Calendário</span>
@@ -668,7 +653,7 @@ export default function PreferencesView() {
             )}
 
             {/* ═══════════ FINANÇAS ═══════════ */}
-            {isSectionVisible("finances") && (
+            {(
               <AccordionItem value="finances" className="border-none">
                 <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
                   <span className="flex items-center gap-2"><DollarSign className="h-4 w-4" style={{ color: SECTION_COLORS.finances }} /> Finanças</span>
@@ -718,7 +703,7 @@ export default function PreferencesView() {
             )}
 
             {/* ═══════════ INVESTIMENTOS ═══════════ */}
-            {isSectionVisible("investments") && (
+            {(
               <AccordionItem value="investments" className="border-none">
                 <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
                   <span className="flex items-center gap-2"><TrendingUp className="h-4 w-4" style={{ color: SECTION_COLORS.investments }} /> Investimentos</span>
@@ -762,7 +747,7 @@ export default function PreferencesView() {
             )}
 
             {/* ═══════════ PROJETOS ═══════════ */}
-            {isSectionVisible("projects") && (
+            {(
               <AccordionItem value="projects" className="border-none">
                 <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
                   <span className="flex items-center gap-2"><FolderKanban className="h-4 w-4" style={{ color: SECTION_COLORS.projects }} /> Projetos</span>
