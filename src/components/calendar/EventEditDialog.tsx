@@ -192,14 +192,14 @@ function CounterpartInput({ value, onChange, counterpartSuggestions }: { value: 
 }
 
 /** Clearable Select wrapper - allows user to clear value */
-function ClearableSelect({ value, onValueChange, placeholder, children }: {
+const ClearableSelect = React.forwardRef<HTMLDivElement, {
   value: string;
   onValueChange: (v: string) => void;
   placeholder: string;
   children: React.ReactNode;
-}) {
+}>(({ value, onValueChange, placeholder, children }, ref) => {
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       <Select value={value} onValueChange={onValueChange}>
         <SelectTrigger>
           <SelectValue placeholder={placeholder} />
@@ -213,7 +213,8 @@ function ClearableSelect({ value, onValueChange, placeholder, children }: {
       </Select>
     </div>
   );
-}
+});
+ClearableSelect.displayName = "ClearableSelect";
 
 export default function EventEditDialog({ open, onOpenChange, item, defaultDate, userId, onSaved, defaultEventType }: EventEditDialogProps) {
   const [eventType, setEventType] = useState<EventType>("event");
