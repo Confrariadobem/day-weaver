@@ -3,7 +3,7 @@ import { toast } from "@/hooks/use-toast";
 
 /**
  * Auto-save hook with debounce. Calls saveFn when state changes (deep comparison).
- * Shows a discrete toast on save. Skips the initial render.
+ * Shows a compact green toast on save. Skips the initial render.
  */
 export function useAutoSave<T>(
   state: T,
@@ -33,7 +33,11 @@ export function useAutoSave<T>(
     timer.current = setTimeout(async () => {
       try {
         await saveFnRef.current(state);
-        toast({ title: "Alterações salvas!" });
+        toast({
+          title: "✓ Salvo!",
+          className: "bg-[hsl(160_60%_45%/0.9)] text-white border-border max-w-[280px] rounded-lg shadow-md",
+          duration: 2000,
+        });
       } catch {
         toast({ title: "Erro ao salvar", variant: "destructive" });
       }
