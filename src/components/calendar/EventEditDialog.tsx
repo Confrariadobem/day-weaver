@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -134,7 +135,7 @@ interface SplitLine {
   amount: string;
 }
 
-const CC_COLORS = ["#ef4444", "#3b82f6", "#10b981", "#fbbf24", "#a855f7", "#f97316", "#ec4899", "#14b8a6", "#6b7280", "#6366f1", "#84cc16", "#d946ef"];
+const CC_COLORS = ["#ef4444", "#f97316", "#fbbf24", "#84cc16", "#10b981", "#14b8a6", "#3b82f6", "#6366f1", "#a855f7", "#d946ef", "#ec4899", "#6b7280"];
 
 // Counterpart autocomplete input component
 function CounterpartInput({ value, onChange, counterpartSuggestions }: { value: string; onChange: (v: string) => void; counterpartSuggestions: { name: string; count: number }[] }) {
@@ -984,9 +985,9 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
               </div>
               <div className="space-y-2">
                 <Label className="text-sm">Usar em</Label>
-                <div className="flex items-center justify-between"><Label className="text-xs font-normal">Receitas</Label><Checkbox checked={newCatIsRevenue} onCheckedChange={(v) => setNewCatIsRevenue(!!v)} /></div>
-                <div className="flex items-center justify-between"><Label className="text-xs font-normal">Despesas</Label><Checkbox checked={newCatIsExpense} onCheckedChange={(v) => setNewCatIsExpense(!!v)} /></div>
-                <div className="flex items-center justify-between"><Label className="text-xs font-normal">Projetos</Label><Checkbox checked={newCatIsProject} onCheckedChange={(v) => setNewCatIsProject(!!v)} /></div>
+                <div className="flex items-center justify-between"><Label className="text-xs font-normal">Receitas</Label><Switch checked={newCatIsRevenue} onCheckedChange={(v) => setNewCatIsRevenue(!!v)} /></div>
+                <div className="flex items-center justify-between"><Label className="text-xs font-normal">Despesas</Label><Switch checked={newCatIsExpense} onCheckedChange={(v) => setNewCatIsExpense(!!v)} /></div>
+                <div className="flex items-center justify-between"><Label className="text-xs font-normal">Projetos</Label><Switch checked={newCatIsProject} onCheckedChange={(v) => setNewCatIsProject(!!v)} /></div>
               </div>
             </div>
           )}

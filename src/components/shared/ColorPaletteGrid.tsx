@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 const PALETTE_COLORS = [
-  "#ef4444", "#3b82f6", "#10b981", "#fbbf24", "#a855f7", "#f97316",
-  "#ec4899", "#14b8a6", "#6b7280", "#6366f1", "#84cc16", "#d946ef",
+  "#ef4444", "#f97316", "#fbbf24", "#84cc16", "#10b981", "#14b8a6",
+  "#3b82f6", "#6366f1", "#a855f7", "#d946ef", "#ec4899", "#6b7280",
 ];
 
 interface ColorPaletteGridProps {
@@ -34,7 +34,6 @@ export function ColorPaletteGrid({ selected, onSelect, onShowMore }: ColorPalett
     });
   };
 
-  // Determine if check should be white or black based on luminance
   const getCheckColor = (hex: string) => {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
@@ -45,7 +44,7 @@ export function ColorPaletteGrid({ selected, onSelect, onShowMore }: ColorPalett
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-6 gap-1.5" style={{ gridAutoRows: "auto" }}>
+      <div className="grid grid-cols-6 gap-1.5">
         {PALETTE_COLORS.map((color) => (
           <button
             key={color}
@@ -53,7 +52,7 @@ export function ColorPaletteGrid({ selected, onSelect, onShowMore }: ColorPalett
             onClick={() => handleClick(color)}
             className={cn(
               "relative h-8 w-8 rounded-lg border transition-all duration-200 hover:scale-110",
-              selected === color ? "border-foreground ring-1 ring-foreground" : "border-transparent"
+              selected === color ? "border-foreground ring-1 ring-foreground" : "border-border"
             )}
             style={{ backgroundColor: color }}
           >
@@ -67,7 +66,6 @@ export function ColorPaletteGrid({ selected, onSelect, onShowMore }: ColorPalett
         ))}
       </div>
 
-      {/* Selected color hex */}
       {selected && (
         <div className="flex items-center gap-1.5">
           <div className="h-5 w-5 rounded" style={{ backgroundColor: selected }} />
