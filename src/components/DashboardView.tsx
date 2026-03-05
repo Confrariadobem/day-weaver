@@ -18,7 +18,7 @@ import {
   TrendingUp, TrendingDown, Wallet, PiggyBank,
   BarChart3, Building2,
   CalendarCheck, CalendarDays, CalendarRange, Scale, PieChart as PieChartIcon,
-  ArrowRightLeft, GripVertical, Brush,
+  ArrowRightLeft, GripVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
@@ -106,7 +106,7 @@ export default function DashboardView() {
   const { user } = useAuth();
   const { formatCurrency: brl, currency } = useCurrency();
   const { rates, loading: ratesLoading, convert } = useCurrencyConversion();
-  const { formatDate, parseDate, placeholder: datePlaceholder } = useDateFormat();
+  const { dateFormat, formatDate, parseDate, placeholder: datePlaceholder } = useDateFormat();
   const [entries, setEntries] = useState<Tables<"financial_entries">[]>([]);
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
@@ -165,13 +165,27 @@ export default function DashboardView() {
     setIntervalOpen(false);
   };
 
+  const normalizeAndParse = (raw: string): Date | null => {
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length === 8) {
+      let formatted: string;
+      if (dateFormat === "YYYY/MM/DD") {
+        formatted = `${digits.slice(0,4)}/${digits.slice(4,6)}/${digits.slice(6,8)}`;
+      } else {
+        formatted = `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4,8)}`;
+      }
+      return parseDate(formatted);
+    }
+    return parseDate(raw);
+  };
+
   const handleFromBlur = () => {
-    const d = parseDate(fromText);
-    if (d) handleCustomFrom(d);
+    const d = normalizeAndParse(fromText);
+    if (d) { handleCustomFrom(d); setFromText(formatDate(d)); }
   };
   const handleToBlur = () => {
-    const d = parseDate(toText);
-    if (d) handleCustomTo(d);
+    const d = normalizeAndParse(toText);
+    if (d) { handleCustomTo(d); setToText(formatDate(d)); }
   };
 
   useEffect(() => {
@@ -425,8 +439,8 @@ export default function DashboardView() {
                         value={fromText}
                         onChange={(e) => setFromText(e.target.value)}
                         onBlur={handleFromBlur}
-                        placeholder={datePlaceholder}
-                        className="h-8 text-xs rounded-md border-border"
+                       placeholder={datePlaceholder}
+                        className={cn("h-8 text-xs rounded-md border-border", !fromText && "placeholder:text-muted-foreground/40")}
                         style={{ width: 150 }}
                       />
                     </div>
@@ -437,7 +451,7 @@ export default function DashboardView() {
                         onChange={(e) => setToText(e.target.value)}
                         onBlur={handleToBlur}
                         placeholder={datePlaceholder}
-                        className="h-8 text-xs rounded-md border-border"
+                        className={cn("h-8 text-xs rounded-md border-border", !toText && "placeholder:text-muted-foreground/40")}
                         style={{ width: 150 }}
                       />
                     </div>
@@ -445,10 +459,9 @@ export default function DashboardView() {
                   <div className="flex justify-end">
                     <button
                       onClick={handleClearInterval}
-                      className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
                       style={{ minWidth: 80, height: 32 }}
                     >
-                      <Brush className="size-4" />
                       Limpar
                     </button>
                   </div>
