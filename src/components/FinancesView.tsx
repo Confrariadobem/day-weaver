@@ -175,7 +175,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [expenseCollapsed, setExpenseCollapsed] = useState(false);
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
-  const [cashFlowFilter, setCashFlowFilter] = useState<CashFlowFilter>("payable");
+  const [cashFlowFilter, setCashFlowFilter] = useState<CashFlowFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [doarSearchQuery, setDoarSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -213,6 +213,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [desconto, setDesconto] = useState("");
   const [realPaymentDate, setRealPaymentDate] = useState("");
   const [previsaoFilterDate, setPrevisaoFilterDate] = useState<Date | undefined>(undefined);
+  const [fluxoDateFrom, setFluxoDateFrom] = useState("");
+  const [fluxoDateTo, setFluxoDateTo] = useState("");
   const [colFilterStatus, setColFilterStatus] = useState<string>("all");
   const [colFilterCounterpart, setColFilterCounterpart] = useState<string>("");
 
@@ -546,6 +548,24 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const now = new Date();
   const periodYear = new Date(periodStart).getFullYear();
 
+  // Parse DD/MM/YYYY to Date
+  const parseDMY = (s: string): Date | null => {
+    const clean = s.replace(/[^0-9]/g, "");
+    if (clean.length < 8) return null;
+    const d = parseInt(clean.slice(0, 2));
+    const m = parseInt(clean.slice(2, 4)) - 1;
+    const y = parseInt(clean.slice(4, 8));
+    if (isNaN(d) || isNaN(m) || isNaN(y) || d < 1 || d > 31 || m < 0 || m > 11 || y < 1900) return null;
+    return new Date(y, m, d);
+  };
+
+  const normalizeDateInput = (val: string): string => {
+    const digits = val.replace(/[^0-9]/g, "");
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return digits.slice(0, 2) + "/" + digits.slice(2);
+    return digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4, 8);
+  };
+
   // Highlight helper for search matches
   const highlightMatch = (text: string, query: string) => {
     if (!query) return text;
@@ -569,12 +589,13 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           const end = parseEntryDate(customEnd);
           if (d < start || d > end) return false;
         }
-        // Apply previsao date filter
-        if (previsaoFilterDate) {
+        // Apply date range filter (new Dashboard-style)
+        const fromDate = parseDMY(fluxoDateFrom);
+        const toDate = parseDMY(fluxoDateTo);
+        if (fromDate || toDate) {
           const d = parseEntryDate(e.entry_date);
-          const filterEnd = new Date(previsaoFilterDate);
-          filterEnd.setHours(23, 59, 59, 999);
-          if (d > filterEnd) return false;
+          if (fromDate && d < fromDate) return false;
+          if (toDate) { const endD = new Date(toDate); endD.setHours(23,59,59,999); if (d > endD) return false; }
         }
         // Filter by cash flow type
         if (cashFlowFilter === "paid") return e.is_paid;
@@ -640,7 +661,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, previsaoFilterDate, colFilterStatus, colFilterCounterpart, walletFilter]);
+  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter]);
 
   // KPI totals based on current filter
   const kpiData = useMemo(() => {
@@ -932,7 +953,24 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     });
   }, [periodFilteredEntries, costCenters, categories, periodYear, ccReportFilterIds, ccReportSearch]);
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    const style = document.createElement("style");
+    style.id = "fluxo-print-style";
+    style.textContent = `
+      @media print {
+        @page { size: landscape; margin: 1cm; }
+        body * { visibility: hidden !important; }
+        .print-fluxo-area, .print-fluxo-area * { visibility: visible !important; }
+        .print-fluxo-area { position: absolute; left: 0; top: 0; width: 100%; }
+        .print-fluxo-area nav, .print-fluxo-area button, .print-fluxo-area .no-print { display: none !important; }
+        .print-fluxo-area table thead { background: #f3f4f6 !important; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+        .print-fluxo-area table { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      }
+    `;
+    document.head.appendChild(style);
+    window.print();
+    setTimeout(() => document.getElementById("fluxo-print-style")?.remove(), 500);
+  };
 
   const handleExportCSV = () => {
     const allItems = filtered;
@@ -1382,19 +1420,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         {/* Interval (all tabs except previsao which has its own date filter) */}
         {!isPrevisao && renderPeriodFilter()}
 
-        {/* Search (previsao, doar, centrocusto) */}
-        {isPrevisao && (
-          <div className="relative flex-1 max-w-[400px]">
-            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input placeholder="Buscar título, categoria, contraparte, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-7 pl-8 pr-7 text-xs rounded-xl" />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-2 top-2 text-[#9ca3af] hover:text-foreground">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        )}
+        {/* Search (doar, centrocusto) - previsao has its own inline search */}
         {isDoar && (
           <div className="relative">
             <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
@@ -1410,67 +1436,37 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           </div>
         )}
 
-        {/* Import (previsao only) */}
-        {isPrevisao && (
+        {/* Export (indicadores only - previsao has inline toolbar) */}
+        {isIndicadores && (
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="outline" className="h-7 w-7 rounded-xl border-border hover:border-primary hover:text-primary"
-                onClick={() => {
-                  const input = document.createElement("input");
-                  input.type = "file"; input.accept = ".csv";
-                  input.onchange = async (ev: any) => {
-                    const file = ev.target.files?.[0];
-                    if (!file || !user) return;
-                    const text = await file.text();
-                    const lines = text.split("\n").filter(Boolean);
-                    if (lines.length < 2) return;
-                    const rows = lines.slice(1).map(line => {
-                      const cols = line.split(",").map(c => c.replace(/"/g, "").trim());
-                      return {
-                        user_id: user.id, entry_date: cols[0] || format(new Date(), "yyyy-MM-dd"),
-                        title: cols[1] || "Importado", type: cols[2]?.toLowerCase().includes("receita") ? "revenue" as const : "expense" as const,
-                        amount: parseFloat(cols[cols.length - 1]) || 0, is_paid: false,
-                      };
-                    }).filter(r => r.amount > 0);
-                    if (rows.length > 0) {
-                      await supabase.from("financial_entries").insert(rows);
-                      fetchData();
-                    }
-                  };
-                  input.click();
-                }}
-              ><FileDown className="h-3.5 w-3.5" /></Button>
-            </TooltipTrigger>
-            <TooltipContent>Importar CSV</TooltipContent>
-          </Tooltip>
-        )}
-
-        {/* Export (previsao, indicadores) */}
-        {(isPrevisao || isIndicadores) && (
-          <Tooltip delayDuration={200}>
-            <TooltipTrigger asChild>
-              <Button size="icon" variant="outline" className="h-7 w-7 rounded-xl border-border hover:border-primary hover:text-primary"
-                onClick={handleExportCSV}><FileUp className="h-3.5 w-3.5" /></Button>
+              <button onClick={handleExportCSV} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                <FileUp className="h-5 w-5" />
+              </button>
             </TooltipTrigger>
             <TooltipContent>Exportar CSV</TooltipContent>
           </Tooltip>
         )}
 
-        {/* Print */}
-        <Tooltip delayDuration={200}>
-          <TooltipTrigger asChild>
-            <Button size="icon" variant="outline" className="h-7 w-7 rounded-xl border-border hover:border-primary hover:text-primary"
-              onClick={isDoar ? handlePrintDOAR : handlePrint}><Printer className="h-3.5 w-3.5" /></Button>
-          </TooltipTrigger>
-          <TooltipContent>Imprimir</TooltipContent>
-        </Tooltip>
+        {/* Print (non-previsao tabs) */}
+        {!isPrevisao && (
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <button onClick={isDoar ? handlePrintDOAR : handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                <Printer className="h-5 w-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Imprimir</TooltipContent>
+          </Tooltip>
+        )}
 
         {/* Expand/Collapse (doar only) */}
         {isDoar && (
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="outline" className="h-7 w-7 rounded-xl border-border hover:border-primary hover:text-primary"
-                onClick={cycleDoarExpand}><ChevronsUpDown className="h-3.5 w-3.5" /></Button>
+              <button onClick={cycleDoarExpand} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                <ChevronsUpDown className="h-5 w-5" />
+              </button>
             </TooltipTrigger>
             <TooltipContent>Expandir/Recolher (Nível {doarExpandLevel}/3)</TooltipContent>
           </Tooltip>
@@ -1502,7 +1498,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4 print-fluxo-area">
       {/* Tab buttons + Toolbar on same line */}
       <div className="flex items-center gap-2 overflow-x-auto">
         <div className="flex items-center gap-1.5 shrink-0">
@@ -1547,7 +1543,23 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         <Card className="bg-card">
           <CardContent className="p-3">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <Wallet className="h-3 w-3" /> Saldo
+              <TrendingUp className="h-4 w-4" /> Contas a Receber
+            </p>
+            <p className="text-lg font-bold text-[#10b981]">{brl(kpiData.totalRevenue)}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              <TrendingDown className="h-4 w-4" /> Contas a Pagar
+            </p>
+            <p className="text-lg font-bold text-[#ef4444]">{brl(kpiData.totalExpense)}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              <Wallet className="h-4 w-4" /> Saldo
             </p>
             <p className={cn("text-lg font-bold", kpiData.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(kpiData.balance)}</p>
           </CardContent>
@@ -1555,7 +1567,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         <Card className="bg-card">
           <CardContent className="p-3">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <Landmark className="h-3 w-3" /> Caixa Disponível
+              <Landmark className="h-4 w-4" /> Caixa Disponível
             </p>
             <p className={cn("text-lg font-bold", totalAvailable >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(totalAvailable)}</p>
           </CardContent>
@@ -1577,43 +1589,109 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               </div>
             )}
 
-            {/* Quick filters */}
-            <div className="mb-3 flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1 flex-wrap">
-                {([
-                  { key: "all" as CashFlowFilter, label: "Todos" },
-                  { key: "payable" as CashFlowFilter, label: "Pendentes" },
-                  { key: "paid" as CashFlowFilter, label: "Pagos/Recebidos" },
-                  { key: "overdue" as CashFlowFilter, label: "Baixados" },
-                ]).map(f => (
-                  <Button key={f.key} size="sm"
-                    variant={cashFlowFilter === f.key ? "default" : "ghost"}
-                    className={cn("h-7 text-xs px-2.5 gap-1 rounded-full",
-                      cashFlowFilter !== f.key && "text-muted-foreground hover:text-foreground"
-                    )}
-                    onClick={() => setCashFlowFilter(f.key)}
-                  >{f.label}</Button>
-                ))}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button size="sm" variant="outline"
-                      className={cn("h-7 text-xs px-2.5 gap-1 rounded-xl border-border hover:border-primary", previsaoFilterDate && "border-primary text-primary")}>
-                      <CalendarDays className="h-3 w-3" />
-                      {previsaoFilterDate ? format(previsaoFilterDate, "dd/MM/yyyy") : "Intervalo"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={previsaoFilterDate}
-                      onSelect={setPrevisaoFilterDate}
-                      className="p-3 pointer-events-auto" />
-                    <div className="flex items-center gap-1.5 p-3 pt-0">
-                      <Button size="sm" variant="secondary" className="h-7 text-xs flex-1"
-                        onClick={() => setPrevisaoFilterDate(new Date())}>Hoje</Button>
-                      <Button size="sm" variant="ghost" className="h-7 text-xs flex-1"
-                        onClick={() => setPrevisaoFilterDate(undefined)}>Limpar</Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+            {/* Quick filters: dropdown + search + date range + toolbar icons */}
+            <div className="mb-3 flex items-center gap-4 flex-wrap">
+              <Select value={cashFlowFilter} onValueChange={(v) => setCashFlowFilter(v as CashFlowFilter)}>
+                <SelectTrigger className="h-7 w-40 text-xs rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="payable">Pendentes</SelectItem>
+                  <SelectItem value="paid">Pagos/Recebidos</SelectItem>
+                  <SelectItem value="overdue">Baixados</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Search */}
+              <div className="relative" style={{ width: 400 }}>
+                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input placeholder="Buscar título, categoria, contraparte, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-7 pl-8 pr-7 text-xs rounded-lg" />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="absolute right-2 top-2 text-[#9ca3af] hover:text-foreground">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Dashboard-style date range */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">De:</span>
+                <Input
+                  value={fluxoDateFrom}
+                  onChange={(e) => setFluxoDateFrom(normalizeDateInput(e.target.value))}
+                  onBlur={() => setFluxoDateFrom(prev => normalizeDateInput(prev))}
+                  placeholder="DD/MM/AAAA"
+                  className="h-7 text-xs w-28 rounded-lg"
+                  maxLength={10}
+                />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Até:</span>
+                <Input
+                  value={fluxoDateTo}
+                  onChange={(e) => setFluxoDateTo(normalizeDateInput(e.target.value))}
+                  onBlur={() => setFluxoDateTo(prev => normalizeDateInput(prev))}
+                  placeholder="DD/MM/AAAA"
+                  className="h-7 text-xs w-28 rounded-lg"
+                  maxLength={10}
+                />
+                {(fluxoDateFrom || fluxoDateTo) && (
+                  <button
+                    onClick={() => { setFluxoDateFrom(""); setFluxoDateTo(""); }}
+                    className="text-xs text-muted-foreground border border-[#d1d5db] rounded-lg px-2 py-0.5 hover:border-primary hover:text-primary transition-colors"
+                  >Limpar</button>
+                )}
+              </div>
+
+              {/* Toolbar icons - no borders, just icons */}
+              <div className="flex items-center gap-3 ml-auto">
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file"; input.accept = ".csv";
+                      input.onchange = async (ev: any) => {
+                        const file = ev.target.files?.[0];
+                        if (!file || !user) return;
+                        const text = await file.text();
+                        const lines = text.split("\n").filter(Boolean);
+                        if (lines.length < 2) return;
+                        const rows = lines.slice(1).map(line => {
+                          const cols = line.split(",").map(c => c.replace(/"/g, "").trim());
+                          return {
+                            user_id: user.id, entry_date: cols[0] || format(new Date(), "yyyy-MM-dd"),
+                            title: cols[1] || "Importado", type: cols[2]?.toLowerCase().includes("receita") ? "revenue" as const : "expense" as const,
+                            amount: parseFloat(cols[cols.length - 1]) || 0, is_paid: false,
+                          };
+                        }).filter(r => r.amount > 0);
+                        if (rows.length > 0) {
+                          await supabase.from("financial_entries").insert(rows);
+                          fetchData();
+                        }
+                      };
+                      input.click();
+                    }} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                      <FileDown className="h-5 w-5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Importar CSV</TooltipContent>
+                </Tooltip>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button onClick={handleExportCSV} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                      <FileUp className="h-5 w-5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Exportar CSV</TooltipContent>
+                </Tooltip>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button onClick={handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                      <Printer className="h-5 w-5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Imprimir</TooltipContent>
+                </Tooltip>
               </div>
 
               {/* Batch actions */}
@@ -1728,11 +1806,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <th className="text-center py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("type")}>
                       Pagar / Receber
                     </th>
+                    <th className="w-20 py-2.5 px-3"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">
+                    <tr><td colSpan={9} className="text-center text-muted-foreground/40 py-12">
                       Sem lançamentos no período
                     </td></tr>
                   )}
@@ -1802,69 +1881,53 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
                         </td>
-                        <td className="py-2.5 px-3 text-center relative">
-                          <div className="group-hover:hidden">
-                            {e.is_paid ? (
-                              <span className="inline-flex items-center gap-1 text-xs text-[hsl(var(--success))] bg-[hsl(var(--success)/0.1)] px-2 py-0.5 rounded-full">
-                                <Check className="h-2.5 w-2.5" /> Pago
-                              </span>
-                            ) : isOverdue ? (
-                              <span className="inline-flex items-center gap-1 text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
-                                <AlertTriangle className="h-2.5 w-2.5" /> {overdueDays}d
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-                                Pendente
-                              </span>
-                            )}
-                          </div>
-                          {/* Hover actions in Status column */}
-                          <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
-                            <Tooltip delayDuration={200}>
-                              <TooltipTrigger asChild>
-                                <Button size="icon" variant="ghost" className="h-6 w-6"
-                                  onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }}>
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="text-xs">Editar</TooltipContent>
-                            </Tooltip>
-                            <Tooltip delayDuration={200}>
-                              <TooltipTrigger asChild>
-                                <Button size="icon" variant="ghost" className="h-6 w-6 text-primary"
-                                  onClick={async (ev) => {
-                                    ev.stopPropagation();
-                                    if (!user) return;
-                                    await supabase.from("financial_entries").insert({
-                                      user_id: user.id, title: e.title, amount: Number(e.amount), type: e.type,
-                                      category_id: e.category_id || null, project_id: e.project_id || null,
-                                      cost_center_id: e.cost_center_id || null, entry_date: e.entry_date,
-                                      account_id: e.account_id || null, payment_method: e.payment_method || null,
-                                      is_paid: false, counterpart: e.counterpart || null, is_fixed: e.is_fixed || false,
-                                      description: e.description || null, currency: e.currency || "BRL",
-                                    });
-                                    fetchData();
-                                  }}>
-                                  <Copy className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="text-xs">Duplicar</TooltipContent>
-                            </Tooltip>
-                            <Tooltip delayDuration={200}>
-                              <TooltipTrigger asChild>
-                                <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive"
-                                  onClick={(ev) => { ev.stopPropagation(); setDeleteEntryConfirm(e.id); }}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="text-xs">Excluir</TooltipContent>
-                            </Tooltip>
-                          </div>
+                        <td className="py-2.5 px-3 text-center">
+                          {e.is_paid ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-[hsl(var(--success))]">
+                              <Check className="h-4 w-4" />
+                            </span>
+                          ) : isOverdue ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-destructive">
+                              <X className="h-4 w-4" />
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs text-amber-500">
+                              <CalendarDays className="h-4 w-4" />
+                            </span>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           <span className={cn("text-[1rem] font-bold", e.type === "expense" ? "text-[#ef4444]" : "text-[#10b981]")}>
                             {e.type === "expense" ? "Pagar" : "Receber"}
                           </span>
+                        </td>
+                        {/* Invisible actions column - icons only on hover */}
+                        <td className="py-2.5 px-2 w-20 bg-card">
+                          <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
+                            <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }}
+                              className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                              <Pencil className="h-5 w-5" />
+                            </button>
+                            <button onClick={async (ev) => {
+                              ev.stopPropagation();
+                              if (!user) return;
+                              await supabase.from("financial_entries").insert({
+                                user_id: user.id, title: e.title, amount: Number(e.amount), type: e.type,
+                                category_id: e.category_id || null, project_id: e.project_id || null,
+                                cost_center_id: e.cost_center_id || null, entry_date: e.entry_date,
+                                account_id: e.account_id || null, payment_method: e.payment_method || null,
+                                is_paid: false, counterpart: e.counterpart || null, is_fixed: e.is_fixed || false,
+                                description: e.description || null, currency: e.currency || "BRL",
+                              });
+                              fetchData();
+                            }} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                              <Copy className="h-5 w-5" />
+                            </button>
+                            <button onClick={(ev) => { ev.stopPropagation(); setDeleteEntryConfirm(e.id); }}
+                              className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                              <X className="h-5 w-5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
