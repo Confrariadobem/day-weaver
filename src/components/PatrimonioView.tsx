@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import {
   Wallet, TrendingUp, TrendingDown, Landmark, CreditCard, PiggyBank,
   BarChart3, AlertTriangle, Lock, ArrowUpRight, ArrowDownRight,
-  Banknote, WalletCards, Bitcoin, Star, Save, Trash2, Eye,
+  Banknote, WalletCards, Bitcoin, Star, Save, Trash2, Eye, EyeOff,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area,
@@ -31,12 +31,12 @@ type AccountType = "bank_account" | "credit_card" | "investment" | "wallet" | "c
 const ALLOC_COLORS = ["#3b82f6", "#22c55e", "#a855f7", "#f59e0b", "#ec4899", "#06b6d4", "#ef4444", "#84cc16"];
 
 const ACCOUNT_ICONS: Record<string, React.ReactNode> = {
-  bank_account: <Landmark className="h-4 w-4" />,
-  credit_card: <CreditCard className="h-4 w-4" />,
-  investment: <PiggyBank className="h-4 w-4" />,
-  wallet: <WalletCards className="h-4 w-4" />,
-  cash: <Banknote className="h-4 w-4" />,
-  crypto: <Bitcoin className="h-4 w-4" />,
+  bank_account: <Landmark className="h-5 w-5" />,
+  credit_card: <CreditCard className="h-5 w-5" />,
+  investment: <PiggyBank className="h-5 w-5" />,
+  wallet: <WalletCards className="h-5 w-5" />,
+  cash: <Banknote className="h-5 w-5" />,
+  crypto: <Bitcoin className="h-5 w-5" />,
 };
 
 const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
@@ -160,6 +160,11 @@ export default function PatrimonioView() {
 
   const reactivateAccount = async (accId: string) => {
     await supabase.from("financial_accounts").update({ is_active: true }).eq("id", accId);
+    fetchData();
+  };
+
+  const deactivateAccount = async (accId: string) => {
+    await supabase.from("financial_accounts").update({ is_active: false }).eq("id", accId);
     fetchData();
   };
 
@@ -493,32 +498,40 @@ export default function PatrimonioView() {
                       onClick={() => handleAccountClick(acc)}>
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleDefault(acc); }}
-                        className="absolute top-2 right-2 p-0.5 rounded hover:bg-accent/50 transition-colors"
+                        className="absolute top-2 right-2 p-0.5 rounded transition-colors group/star"
                         title="Favoritar como padrão"
                       >
-                        <Star className={cn("h-3.5 w-3.5", acc.is_default ? "fill-warning text-warning" : "text-muted-foreground/30")} />
+                        <Star className={cn("h-5 w-5 transition-colors", acc.is_default ? "fill-warning text-warning" : "text-[#6b7280] group-hover/star:text-[#3b82f6]")} />
                       </button>
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                          {ACCOUNT_ICONS[acc.type] || <Wallet className="h-4 w-4" />}
+                        <div className="flex h-8 w-8 items-center justify-center text-[#6b7280]">
+                          {ACCOUNT_ICONS[acc.type] || <Wallet className="h-5 w-5" />}
                         </div>
-                        <p className="text-sm font-medium truncate pr-6">{acc.name}</p>
+                        <p className="text-[0.9rem] text-[#374151] truncate pr-6">{acc.name}</p>
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-[0.9rem] text-[#6b7280]">
                           Saldo Inicial: {brl(Number(acc.initial_balance))}
                         </p>
-                        <p className={cn("text-[1rem] font-medium", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
+                        <p className={cn("text-[0.9rem]", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
                           Movimentos: {movement >= 0 ? "+" : ""}{brl(movement)}
                         </p>
                         <p className={cn("text-[1.2rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
                           Saldo Atual: {brl(Number(acc.current_balance))}
                         </p>
                         {creditAvailable !== null && (
-                          <p className={cn("text-[0.8rem]", creditAvailable >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
+                          <p className={cn("text-[0.9rem]", creditAvailable >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
                             Limite disponível: {brl(creditAvailable)}
                           </p>
                         )}
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-border/20">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deactivateAccount(acc.id); }}
+                          className="text-[0.9rem] text-[#ef4444] border border-[#ef4444] rounded-lg px-3 py-1 hover:bg-[#fee2e2] transition-colors"
+                        >
+                          Desativar
+                        </button>
                       </div>
                     </div>
                   );
@@ -533,40 +546,42 @@ export default function PatrimonioView() {
               <div className="mt-3">
                 <button
                   onClick={() => setShowInactive(!showInactive)}
-                  className="text-[0.85rem] text-[#9ca3af] opacity-60 hover:underline hover:opacity-100 transition-opacity"
+                  className="flex items-center gap-1.5 text-[0.9rem] text-[#9ca3af] opacity-70 hover:underline hover:opacity-100 transition-opacity group/inactive"
                 >
-                  {showInactive ? "Ocultar carteiras inativas" : `Ver carteiras inativas (${inactiveAccounts.length})`}
+                  <EyeOff className="h-5 w-5 text-[#9ca3af] group-hover/inactive:text-[#3b82f6] transition-colors" />
+                  Inativas ({inactiveAccounts.length})
                 </button>
 
                 {showInactive && (
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 mt-2">
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 mt-2 animate-in slide-in-from-top-2 duration-200">
                     {sortedInactive.map(acc => {
                       const movement = monthlyMovements[acc.id] || 0;
                       return (
                         <div key={acc.id} className="relative rounded-lg border border-border/30 p-3 bg-[#f3f4f6] dark:bg-muted/10">
                           <div className="flex items-center gap-2 mb-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                              {ACCOUNT_ICONS[acc.type] || <Wallet className="h-4 w-4" />}
+                            <div className="flex h-8 w-8 items-center justify-center text-[#6b7280] opacity-60">
+                              {ACCOUNT_ICONS[acc.type] || <Wallet className="h-5 w-5" />}
                             </div>
-                            <p className="text-sm font-medium truncate flex-1 opacity-60">{acc.name}</p>
-                            <button
-                              onClick={() => reactivateAccount(acc.id)}
-                              className="flex items-center justify-center h-8 w-8 rounded border border-border/50 hover:border-[#3b82f6] hover:text-[#3b82f6] transition-colors"
-                              title="Reativar carteira"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </button>
+                            <p className="text-[0.9rem] text-[#374151] truncate flex-1 opacity-60">{acc.name}</p>
                           </div>
                           <div className="space-y-0.5 opacity-60">
                             <p className="text-[0.9rem] text-[#6b7280]">
                               Saldo Inicial: {brl(Number(acc.initial_balance))}
                             </p>
-                            <p className={cn("text-[1rem] font-medium", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
+                            <p className={cn("text-[0.9rem]", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
                               Movimentos: {movement >= 0 ? "+" : ""}{brl(movement)}
                             </p>
                             <p className={cn("text-[1.2rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
                               Saldo Atual: {brl(Number(acc.current_balance))}
                             </p>
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-border/20">
+                            <button
+                              onClick={() => reactivateAccount(acc.id)}
+                              className="text-[0.9rem] text-[#10b981] border border-[#10b981] rounded-lg px-3 py-1 hover:bg-[#d1fae5] transition-colors"
+                            >
+                              Ativar
+                            </button>
                           </div>
                         </div>
                       );
