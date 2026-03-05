@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useCurrencyFormatter } from "@/hooks/useCurrencyFormatter";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useDateFormat, type DateFormatType } from "@/contexts/DateFormatContext";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { ConfigDialog } from "@/components/shared/ConfigDialog";
 
@@ -57,6 +58,11 @@ const DECIMAL_OPTIONS = [
   { value: "3", label: "3 casas" },
   { value: "4", label: "4 casas" },
   { value: "8", label: "8 casas" },
+];
+
+const DATE_FORMAT_OPTIONS = [
+  { value: "DD/MM/YYYY", label: "Dia/Mês/Ano (DD/MM/YYYY)" },
+  { value: "YYYY/MM/DD", label: "Ano/Mês/Dia (YYYY/MM/DD)" },
 ];
 
 const WEEK_STARTS = [
@@ -207,6 +213,7 @@ export default function PreferencesView() {
   const { toast } = useToast();
   const { format: formatCurrency } = useCurrencyFormatter();
   const { setCurrency: setGlobalCurrency } = useCurrency();
+  const { dateFormat, setDateFormat: setGlobalDateFormat } = useDateFormat();
   const { prefs, setTabEnabled, saving: moduleSaving } = useModulePreferences();
 
   // General prefs state
@@ -481,6 +488,15 @@ export default function PreferencesView() {
                         <SelectContent>{DECIMAL_OPTIONS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  {/* Date format */}
+                  <div className="max-w-xs">
+                    <Label className="text-xs">Formato de data preferido</Label>
+                    <Select value={dateFormat} onValueChange={(v) => setGlobalDateFormat(v as DateFormatType)}>
+                      <SelectTrigger className="mt-1 h-9 text-sm rounded-lg"><SelectValue /></SelectTrigger>
+                      <SelectContent>{DATE_FORMAT_OPTIONS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
+                    </Select>
                   </div>
 
                   {/* ── Categorias (subseção) ── */}

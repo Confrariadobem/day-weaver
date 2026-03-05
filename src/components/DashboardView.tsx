@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -17,10 +18,11 @@ import {
   TrendingUp, TrendingDown, Wallet, PiggyBank,
   BarChart3, Building2,
   CalendarCheck, CalendarDays, CalendarRange, Scale, PieChart as PieChartIcon,
-  ArrowRightLeft, GripVertical,
+  ArrowRightLeft, GripVertical, Brush,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyConversion } from "@/hooks/useCurrencyConversion";
 import type { Tables } from "@/integrations/supabase/types";
 import {
@@ -104,6 +106,7 @@ export default function DashboardView() {
   const { user } = useAuth();
   const { formatCurrency: brl, currency } = useCurrency();
   const { rates, loading: ratesLoading, convert } = useCurrencyConversion();
+  const { formatDate, parseDate, placeholder: datePlaceholder } = useDateFormat();
   const [entries, setEntries] = useState<Tables<"financial_entries">[]>([]);
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
@@ -119,6 +122,8 @@ export default function DashboardView() {
   const [customFrom, setCustomFrom] = useState<Date | undefined>(undefined);
   const [customTo, setCustomTo] = useState<Date | undefined>(undefined);
   const [intervalOpen, setIntervalOpen] = useState(false);
+  const [fromText, setFromText] = useState("");
+  const [toText, setToText] = useState("");
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -138,18 +143,35 @@ export default function DashboardView() {
 
   const handleCustomFrom = (d: Date | undefined) => {
     setCustomFrom(d);
-    if (d) setCustomRange(prev => ({ ...prev, start: d }));
+    if (d) {
+      setCustomRange(prev => ({ ...prev, start: d }));
+      setFromText(formatDate(d));
+    }
   };
   const handleCustomTo = (d: Date | undefined) => {
     setCustomTo(d);
-    if (d) setCustomRange(prev => ({ ...prev, end: d }));
+    if (d) {
+      setCustomRange(prev => ({ ...prev, end: d }));
+      setToText(formatDate(d));
+    }
   };
 
   const handleClearInterval = () => {
     setCustomFrom(undefined);
     setCustomTo(undefined);
+    setFromText("");
+    setToText("");
     handlePeriodChange("year");
     setIntervalOpen(false);
+  };
+
+  const handleFromBlur = () => {
+    const d = parseDate(fromText);
+    if (d) handleCustomFrom(d);
+  };
+  const handleToBlur = () => {
+    const d = parseDate(toText);
+    if (d) handleCustomTo(d);
   };
 
   useEffect(() => {
@@ -383,7 +405,7 @@ export default function DashboardView() {
                 </button>
               </PopoverTrigger>
               {key === "custom" && (
-                <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-2" align="start">
+                <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-3" align="start">
                   <Calendar
                     mode="range"
                     locale={ptBR}
@@ -395,12 +417,38 @@ export default function DashboardView() {
                     }}
                     className="pointer-events-auto"
                   />
+                  {/* Manual date inputs */}
+                  <div className="space-y-2 border-t border-border/30 pt-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold w-8 shrink-0">De:</span>
+                      <Input
+                        value={fromText}
+                        onChange={(e) => setFromText(e.target.value)}
+                        onBlur={handleFromBlur}
+                        placeholder={datePlaceholder}
+                        className="h-8 text-xs rounded-md border-border"
+                        style={{ width: 150 }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold w-8 shrink-0">Até:</span>
+                      <Input
+                        value={toText}
+                        onChange={(e) => setToText(e.target.value)}
+                        onBlur={handleToBlur}
+                        placeholder={datePlaceholder}
+                        className="h-8 text-xs rounded-md border-border"
+                        style={{ width: 150 }}
+                      />
+                    </div>
+                  </div>
                   <div className="flex justify-end">
                     <button
                       onClick={handleClearInterval}
-                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
+                      className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
                       style={{ minWidth: 80, height: 32 }}
                     >
+                      <Brush className="size-4" />
                       Limpar
                     </button>
                   </div>
