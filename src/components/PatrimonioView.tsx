@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import {
   Wallet, TrendingUp, TrendingDown, Landmark, CreditCard, PiggyBank,
   BarChart3, AlertTriangle, Lock, ArrowUpRight, ArrowDownRight,
-  Banknote, WalletCards, Bitcoin, Star, Save, Trash2,
+  Banknote, WalletCards, Bitcoin, Star, Save, Trash2, Eye,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area,
@@ -69,15 +69,20 @@ export default function PatrimonioView() {
   const [accDue, setAccDue] = useState("");
   const [accIsActive, setAccIsActive] = useState(true);
 
+  const [inactiveAccounts, setInactiveAccounts] = useState<any[]>([]);
+  const [showInactive, setShowInactive] = useState(false);
+
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [accRes, entRes, invRes, projRes] = await Promise.all([
+    const [accRes, inactiveRes, entRes, invRes, projRes] = await Promise.all([
       supabase.from("financial_accounts").select("*").eq("user_id", user.id).eq("is_active", true),
+      supabase.from("financial_accounts").select("*").eq("user_id", user.id).eq("is_active", false),
       supabase.from("financial_entries").select("*").eq("user_id", user.id),
       supabase.from("investments").select("*").eq("user_id", user.id).eq("is_active", true),
       supabase.from("projects").select("*").eq("user_id", user.id),
     ]);
     if (accRes.data) setAccounts(accRes.data);
+    if (inactiveRes.data) setInactiveAccounts(inactiveRes.data);
     if (entRes.data) setEntries(entRes.data);
     if (invRes.data) setInvestments(invRes.data);
     if (projRes.data) setProjects(projRes.data);
@@ -148,12 +153,44 @@ export default function PatrimonioView() {
   };
 
   const toggleDefault = async (acc: any) => {
-    // First unset all defaults for this user's accounts of the same type
-    await supabase.from("financial_accounts").update({ is_default: false } as any).eq("user_id", user!.id).eq("type", acc.type);
-    // Then set this one as default
+    await supabase.from("financial_accounts").update({ is_default: false } as any).eq("user_id", user!.id);
     await supabase.from("financial_accounts").update({ is_default: !acc.is_default } as any).eq("id", acc.id);
     fetchData();
   };
+
+  const reactivateAccount = async (accId: string) => {
+    await supabase.from("financial_accounts").update({ is_active: true }).eq("id", accId);
+    fetchData();
+  };
+
+  // Monthly movements per account
+  const monthlyMovements = useMemo(() => {
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+    const result: Record<string, number> = {};
+    entries.forEach(e => {
+      if (!e.account_id) return;
+      const d = new Date(e.entry_date + "T12:00:00");
+      if (d < monthStart || d > monthEnd) return;
+      const sign = e.type === "revenue" ? 1 : -1;
+      result[e.account_id] = (result[e.account_id] || 0) + sign * Number(e.amount);
+    });
+    return result;
+  }, [entries]);
+
+  // Sorted accounts: favorites first (alphabetical), then non-favorites (alphabetical)
+  const sortedAccounts = useMemo(() => {
+    return [...accounts].sort((a, b) => {
+      if (a.is_default && !b.is_default) return -1;
+      if (!a.is_default && b.is_default) return 1;
+      return a.name.localeCompare(b.name, "pt-BR");
+    });
+  }, [accounts]);
+
+  const sortedInactive = useMemo(() => {
+    return [...inactiveAccounts].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [inactiveAccounts]);
 
   // Weekly bullet chart data
   const weeklyBullet = useMemo(() => {
@@ -444,37 +481,99 @@ export default function PatrimonioView() {
             <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
               <Landmark className="h-3.5 w-3.5 text-primary" /> Carteiras e Saldos
             </p>
-            {accounts.length > 0 ? (
+            {sortedAccounts.length > 0 ? (
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {accounts.map(acc => (
-                  <div key={acc.id} className="relative flex items-center gap-3 rounded-lg border border-border/30 p-3 cursor-pointer hover:bg-muted/20 transition-colors"
-                    onClick={() => handleAccountClick(acc)}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); toggleDefault(acc); }}
-                      className="absolute top-2 right-2 p-0.5 rounded hover:bg-accent/50 transition-colors"
-                      title="Favoritar como padrão"
-                    >
-                      <Star className={cn("h-3.5 w-3.5", acc.is_default ? "fill-warning text-warning" : "text-muted-foreground/30")} />
-                    </button>
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                      {ACCOUNT_ICONS[acc.type] || <Wallet className="h-4 w-4" />}
+                {sortedAccounts.map(acc => {
+                  const movement = monthlyMovements[acc.id] || 0;
+                  const creditAvailable = acc.type === "credit_card" && acc.credit_limit
+                    ? Number(acc.credit_limit) + Number(acc.current_balance)
+                    : null;
+                  return (
+                    <div key={acc.id} className="relative rounded-lg border border-border/30 p-3 cursor-pointer hover:bg-muted/20 transition-colors"
+                      onClick={() => handleAccountClick(acc)}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleDefault(acc); }}
+                        className="absolute top-2 right-2 p-0.5 rounded hover:bg-accent/50 transition-colors"
+                        title="Favoritar como padrão"
+                      >
+                        <Star className={cn("h-3.5 w-3.5", acc.is_default ? "fill-warning text-warning" : "text-muted-foreground/30")} />
+                      </button>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                          {ACCOUNT_ICONS[acc.type] || <Wallet className="h-4 w-4" />}
+                        </div>
+                        <p className="text-sm font-medium truncate pr-6">{acc.name}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[0.9rem] text-[#6b7280]">
+                          Saldo Inicial: {brl(Number(acc.initial_balance))}
+                        </p>
+                        <p className={cn("text-[1rem] font-medium", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
+                          Movimentos: {movement >= 0 ? "+" : ""}{brl(movement)}
+                        </p>
+                        <p className={cn("text-[1.2rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
+                          Saldo Atual: {brl(Number(acc.current_balance))}
+                        </p>
+                        {creditAvailable !== null && (
+                          <p className={cn("text-[0.8rem]", creditAvailable >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
+                            Limite disponível: {brl(creditAvailable)}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{acc.name}</p>
-                      <p className={cn("text-sm font-bold", Number(acc.current_balance) >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
-                        {brl(Number(acc.current_balance))}
-                      </p>
-                    </div>
-                    {acc.credit_limit && (
-                      <Badge variant="outline" className="text-[10px] shrink-0">
-                        Limite: {brl(Number(acc.credit_limit))}
-                      </Badge>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-xs text-muted-foreground text-center py-4">Nenhuma carteira cadastrada. Adicione carteiras na Central de Lançamentos.</p>
+            )}
+
+            {/* Link para carteiras inativas */}
+            {inactiveAccounts.length > 0 && (
+              <div className="mt-3">
+                <button
+                  onClick={() => setShowInactive(!showInactive)}
+                  className="text-[0.85rem] text-[#9ca3af] opacity-60 hover:underline hover:opacity-100 transition-opacity"
+                >
+                  {showInactive ? "Ocultar carteiras inativas" : `Ver carteiras inativas (${inactiveAccounts.length})`}
+                </button>
+
+                {showInactive && (
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 mt-2">
+                    {sortedInactive.map(acc => {
+                      const movement = monthlyMovements[acc.id] || 0;
+                      return (
+                        <div key={acc.id} className="relative rounded-lg border border-border/30 p-3 bg-[#f3f4f6] dark:bg-muted/10">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                              {ACCOUNT_ICONS[acc.type] || <Wallet className="h-4 w-4" />}
+                            </div>
+                            <p className="text-sm font-medium truncate flex-1 opacity-60">{acc.name}</p>
+                            <button
+                              onClick={() => reactivateAccount(acc.id)}
+                              className="flex items-center justify-center h-8 w-8 rounded border border-border/50 hover:border-[#3b82f6] hover:text-[#3b82f6] transition-colors"
+                              title="Reativar carteira"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div className="space-y-0.5 opacity-60">
+                            <p className="text-[0.9rem] text-[#6b7280]">
+                              Saldo Inicial: {brl(Number(acc.initial_balance))}
+                            </p>
+                            <p className={cn("text-[1rem] font-medium", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
+                              Movimentos: {movement >= 0 ? "+" : ""}{brl(movement)}
+                            </p>
+                            <p className={cn("text-[1.2rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
+                              Saldo Atual: {brl(Number(acc.current_balance))}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -531,10 +630,6 @@ export default function PatrimonioView() {
                 </div>
               </>
             )}
-            <div className="flex items-center gap-2">
-              <Checkbox checked={accIsActive} onCheckedChange={(c) => setAccIsActive(!!c)} id="acc-active" />
-              <label htmlFor="acc-active" className="text-sm">Ativa</label>
-            </div>
           </div>
           <div className="flex gap-2 justify-end pt-3 border-t border-border/20">
             <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
