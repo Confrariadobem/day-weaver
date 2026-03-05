@@ -579,6 +579,16 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
                               Saldo Atual: {brl(Number(acc.current_balance))}
                             </p>
                           </div>
+                          {onNavigateToFluxo && (
+                            <div className="flex items-center mt-2 opacity-60">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onNavigateToFluxo({ id: acc.id, name: acc.name }); }}
+                                className="text-[0.9rem] text-[#6b7280] border border-[#d1d5db] rounded-md px-3 py-1 hover:text-primary hover:border-primary transition-colors ml-auto"
+                              >
+                                Ver Fluxo
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
