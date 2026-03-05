@@ -9,6 +9,7 @@ import DashboardView from "@/components/DashboardView";
 import ProgramsProjectsView from "@/components/ProgramsProjectsView";
 import InvestmentsView from "@/components/InvestmentsView";
 import PatrimonioView from "@/components/PatrimonioView";
+import ProjectsDesejosView from "@/components/ProjectsDesejosView";
 import FloatingActionButton from "@/components/FloatingActionButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -202,6 +203,7 @@ export default function Dashboard() {
             {activeModule === "programs" && "Projetos"}
             {activeModule === "investments" && "Investimentos"}
             {activeModule === "patrimonio" && "Patrimônio"}
+            {activeModule === "desejos" && "Projetos & Desejos"}
           </h1>
           <div className="ml-auto">
             {renderBulletChart()}
@@ -216,6 +218,7 @@ export default function Dashboard() {
             {activeModule === "programs" && <ProgramsProjectsView onTabChange={setProjectTab} />}
             {activeModule === "investments" && <InvestmentsView onTabChange={setInvestmentTab} />}
             {activeModule === "patrimonio" && <PatrimonioView onNavigateToFluxo={(acc) => { setWalletFilter(acc); setActiveModule("finances"); }} />}
+            {activeModule === "desejos" && <ProjectsDesejosView />}
             {activeModule === "profile" && <ProfileView />}
             {activeModule === "preferences" && <PreferencesView />}
           </div>
