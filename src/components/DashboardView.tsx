@@ -347,8 +347,8 @@ export default function DashboardView() {
           </div>
 
           {/* Câmbio widget – fixed right */}
-          <Card className="bg-card shrink-0" style={{ width: 243 }}>
-            <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+          <Card className="bg-card shrink-0 transition-all duration-300" style={{ width: 243 }}>
+            <CardContent className={cn("p-3 flex flex-col", !showConversion && "min-h-[80px] justify-center")}>
               <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                 <ArrowRightLeft className="size-6 mr-1 text-muted-foreground" /> Câmbio
                 <Switch
