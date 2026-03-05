@@ -22,7 +22,7 @@ import {
   Printer, FileDown, FileUp, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
   CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
-  Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign, Pencil, X,
+  Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign, Pencil, X, CalendarRange,
 } from "lucide-react";
 import {
   format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
@@ -1408,6 +1408,30 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     </DialogContent>
   );
 
+  // Fluxo Intervalo state
+  const [fluxoIntervalOpen, setFluxoIntervalOpen] = useState(false);
+  const [fluxoCustomFrom, setFluxoCustomFrom] = useState<Date | undefined>(undefined);
+  const [fluxoCustomTo, setFluxoCustomTo] = useState<Date | undefined>(undefined);
+
+  const handleFluxoIntervalSelect = (range: any) => {
+    if (range?.from) {
+      setFluxoCustomFrom(range.from);
+      setFluxoDateFrom(format(range.from, "dd/MM/yyyy"));
+    }
+    if (range?.to) {
+      setFluxoCustomTo(range.to);
+      setFluxoDateTo(format(range.to, "dd/MM/yyyy"));
+    }
+  };
+
+  const handleClearFluxoInterval = () => {
+    setFluxoCustomFrom(undefined);
+    setFluxoCustomTo(undefined);
+    setFluxoDateFrom("");
+    setFluxoDateTo("");
+    setFluxoIntervalOpen(false);
+  };
+
   // Toolbar renderer (context-sensitive, right of tabs)
   const renderToolbar = () => {
     const isPrevisao = viewTab === "previsao";
@@ -1416,11 +1440,109 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     const isCentro = viewTab === "centrocusto";
 
     return (
-      <div className="flex items-center gap-1.5">
-        {/* Interval (all tabs except previsao which has its own date filter) */}
+      <div className="flex items-center gap-3">
         {!isPrevisao && renderPeriodFilter()}
 
-        {/* Search (doar, centrocusto) - previsao has its own inline search */}
+        {isPrevisao && (
+          <>
+            <div className="relative" style={{ width: 400 }}>
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input placeholder="Buscar título, categoria, contraparte, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-7 pl-8 pr-7 text-xs rounded-lg" />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")} className="absolute right-2 top-2 text-[#9ca3af] hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  onClick={() => setFluxoIntervalOpen(true)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                    (fluxoDateFrom || fluxoDateTo)
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:border-primary/80 hover:bg-primary/5"
+                  )}
+                >
+                  <CalendarRange className="size-4" />
+                  <span className="text-xs font-medium">Intervalo</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-3" align="start">
+                <Calendar mode="range" locale={ptBR} showOutsideDays={false}
+                  selected={{ from: fluxoCustomFrom, to: fluxoCustomTo }}
+                  onSelect={handleFluxoIntervalSelect}
+                  className="pointer-events-auto" />
+                <div className="space-y-2 border-t border-border/30 pt-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold w-8 shrink-0">De:</span>
+                    <Input value={fluxoDateFrom}
+                      onChange={(e) => setFluxoDateFrom(normalizeDateInput(e.target.value))}
+                      onBlur={() => { const d = parseDMY(fluxoDateFrom); if (d) { setFluxoCustomFrom(d); setFluxoDateFrom(format(d, "dd/MM/yyyy")); } }}
+                      placeholder="DD/MM/AAAA" className="h-8 text-xs rounded-md border-border" style={{ width: 150 }} maxLength={10} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold w-8 shrink-0">Até:</span>
+                    <Input value={fluxoDateTo}
+                      onChange={(e) => setFluxoDateTo(normalizeDateInput(e.target.value))}
+                      onBlur={() => { const d = parseDMY(fluxoDateTo); if (d) { setFluxoCustomTo(d); setFluxoDateTo(format(d, "dd/MM/yyyy")); } }}
+                      placeholder="DD/MM/AAAA" className="h-8 text-xs rounded-md border-border" style={{ width: 150 }} maxLength={10} />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button onClick={handleClearFluxoInterval}
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
+                    style={{ minWidth: 80, height: 32 }}>Limpar</button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file"; input.accept = ".csv";
+                  input.onchange = async (ev: any) => {
+                    const file = ev.target.files?.[0];
+                    if (!file || !user) return;
+                    const text = await file.text();
+                    const lines = text.split("\n").filter(Boolean);
+                    if (lines.length < 2) return;
+                    const rows = lines.slice(1).map(line => {
+                      const cols = line.split(",").map(c => c.replace(/"/g, "").trim());
+                      return { user_id: user.id, entry_date: cols[0] || format(new Date(), "yyyy-MM-dd"),
+                        title: cols[1] || "Importado", type: cols[2]?.toLowerCase().includes("receita") ? "revenue" as const : "expense" as const,
+                        amount: parseFloat(cols[cols.length - 1]) || 0, is_paid: false };
+                    }).filter(r => r.amount > 0);
+                    if (rows.length > 0) { await supabase.from("financial_entries").insert(rows); fetchData(); }
+                  };
+                  input.click();
+                }} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                  <FileDown className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Importar CSV</TooltipContent>
+            </Tooltip>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={handleExportCSV} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                  <FileUp className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Exportar CSV</TooltipContent>
+            </Tooltip>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                  <Printer className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Imprimir</TooltipContent>
+            </Tooltip>
+          </>
+        )}
+
         {isDoar && (
           <div className="relative">
             <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
@@ -1435,8 +1557,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               className="h-7 pl-8 text-xs w-36 rounded-xl" />
           </div>
         )}
-
-        {/* Export (indicadores only - previsao has inline toolbar) */}
         {isIndicadores && (
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
@@ -1447,8 +1567,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <TooltipContent>Exportar CSV</TooltipContent>
           </Tooltip>
         )}
-
-        {/* Print (non-previsao tabs) */}
         {!isPrevisao && (
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
@@ -1459,8 +1577,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <TooltipContent>Imprimir</TooltipContent>
           </Tooltip>
         )}
-
-        {/* Expand/Collapse (doar only) */}
         {isDoar && (
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
@@ -1471,8 +1587,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <TooltipContent>Expandir/Recolher (Nível {doarExpandLevel}/3)</TooltipContent>
           </Tooltip>
         )}
-
-        {/* CC filter (centrocusto only) */}
         {isCentro && (
           <Select value={ccReportFilterIds.size === 0 ? "all" : Array.from(ccReportFilterIds)[0] || "all"} onValueChange={(v) => {
             if (v === "all") setCcReportFilterIds(new Set());
@@ -1527,22 +1641,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         <Card className="bg-card">
           <CardContent className="p-3">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <TrendingUp className="h-3 w-3" /> Receitas
-            </p>
-            <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(kpiData.totalRevenue)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <TrendingDown className="h-3 w-3" /> Despesas
-            </p>
-            <p className="text-lg font-bold text-destructive">{brl(kpiData.totalExpense)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
               <TrendingUp className="h-4 w-4" /> Contas a Receber
             </p>
             <p className="text-lg font-bold text-[#10b981]">{brl(kpiData.totalRevenue)}</p>
@@ -1589,142 +1687,36 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               </div>
             )}
 
-            {/* Quick filters: dropdown + search + date range + toolbar icons */}
-            <div className="mb-3 flex items-center gap-4 flex-wrap">
-              <Select value={cashFlowFilter} onValueChange={(v) => setCashFlowFilter(v as CashFlowFilter)}>
-                <SelectTrigger className="h-7 w-40 text-xs rounded-lg">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="payable">Pendentes</SelectItem>
-                  <SelectItem value="paid">Pagos/Recebidos</SelectItem>
-                  <SelectItem value="overdue">Baixados</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Search */}
-              <div className="relative" style={{ width: 400 }}>
-                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input placeholder="Buscar título, categoria, contraparte, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-7 pl-8 pr-7 text-xs rounded-lg" />
-                {searchQuery && (
-                  <button onClick={() => setSearchQuery("")} className="absolute right-2 top-2 text-[#9ca3af] hover:text-foreground">
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+            {/* Batch actions */}
+            {selectedIds.size > 0 && (
+              <div className="mb-3 flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">{selectedIds.size} selecionados</span>
+                <Button size="sm" variant="ghost"
+                  className="h-7 px-2.5 text-xs gap-1 text-[hsl(var(--success))] hover:text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] rounded-full"
+                  onClick={async () => {
+                    const ids = Array.from(selectedIds);
+                    await supabase.from("financial_entries").update({
+                      is_paid: true, payment_date: format(new Date(), "yyyy-MM-dd"),
+                    }).in("id", ids);
+                    setSelectedIds(new Set());
+                    fetchData();
+                  }}
+                ><Check className="h-3 w-3" /> Baixar</Button>
+                <Button size="sm" variant="ghost"
+                  className="h-7 px-2.5 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10 rounded-full"
+                  onClick={handleBatchCopy}
+                ><Copy className="h-3 w-3" /> Duplicar</Button>
+                <Button size="sm" variant="ghost"
+                  className="h-7 px-2.5 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                  onClick={async () => {
+                    const ids = Array.from(selectedIds);
+                    await supabase.from("financial_entries").delete().in("id", ids);
+                    setSelectedIds(new Set());
+                    fetchData();
+                  }}
+                ><Trash2 className="h-3 w-3" /> Excluir</Button>
               </div>
-
-              {/* Dashboard-style date range */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">De:</span>
-                <Input
-                  value={fluxoDateFrom}
-                  onChange={(e) => setFluxoDateFrom(normalizeDateInput(e.target.value))}
-                  onBlur={() => setFluxoDateFrom(prev => normalizeDateInput(prev))}
-                  placeholder="DD/MM/AAAA"
-                  className="h-7 text-xs w-28 rounded-lg"
-                  maxLength={10}
-                />
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Até:</span>
-                <Input
-                  value={fluxoDateTo}
-                  onChange={(e) => setFluxoDateTo(normalizeDateInput(e.target.value))}
-                  onBlur={() => setFluxoDateTo(prev => normalizeDateInput(prev))}
-                  placeholder="DD/MM/AAAA"
-                  className="h-7 text-xs w-28 rounded-lg"
-                  maxLength={10}
-                />
-                {(fluxoDateFrom || fluxoDateTo) && (
-                  <button
-                    onClick={() => { setFluxoDateFrom(""); setFluxoDateTo(""); }}
-                    className="text-xs text-muted-foreground border border-[#d1d5db] rounded-lg px-2 py-0.5 hover:border-primary hover:text-primary transition-colors"
-                  >Limpar</button>
-                )}
-              </div>
-
-              {/* Toolbar icons - no borders, just icons */}
-              <div className="flex items-center gap-3 ml-auto">
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <button onClick={() => {
-                      const input = document.createElement("input");
-                      input.type = "file"; input.accept = ".csv";
-                      input.onchange = async (ev: any) => {
-                        const file = ev.target.files?.[0];
-                        if (!file || !user) return;
-                        const text = await file.text();
-                        const lines = text.split("\n").filter(Boolean);
-                        if (lines.length < 2) return;
-                        const rows = lines.slice(1).map(line => {
-                          const cols = line.split(",").map(c => c.replace(/"/g, "").trim());
-                          return {
-                            user_id: user.id, entry_date: cols[0] || format(new Date(), "yyyy-MM-dd"),
-                            title: cols[1] || "Importado", type: cols[2]?.toLowerCase().includes("receita") ? "revenue" as const : "expense" as const,
-                            amount: parseFloat(cols[cols.length - 1]) || 0, is_paid: false,
-                          };
-                        }).filter(r => r.amount > 0);
-                        if (rows.length > 0) {
-                          await supabase.from("financial_entries").insert(rows);
-                          fetchData();
-                        }
-                      };
-                      input.click();
-                    }} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
-                      <FileDown className="h-5 w-5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Importar CSV</TooltipContent>
-                </Tooltip>
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <button onClick={handleExportCSV} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
-                      <FileUp className="h-5 w-5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Exportar CSV</TooltipContent>
-                </Tooltip>
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <button onClick={handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
-                      <Printer className="h-5 w-5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Imprimir</TooltipContent>
-                </Tooltip>
-              </div>
-
-              {/* Batch actions */}
-              {selectedIds.size > 0 && (
-                <div className="flex items-center gap-1.5 ml-auto">
-                  <span className="text-xs text-muted-foreground">{selectedIds.size} selecionados</span>
-                  <Button size="sm" variant="ghost"
-                    className="h-7 px-2.5 text-xs gap-1 text-[hsl(var(--success))] hover:text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] rounded-full"
-                    onClick={async () => {
-                      const ids = Array.from(selectedIds);
-                      await supabase.from("financial_entries").update({
-                        is_paid: true, payment_date: format(new Date(), "yyyy-MM-dd"),
-                      }).in("id", ids);
-                      setSelectedIds(new Set());
-                      fetchData();
-                    }}
-                  ><Check className="h-3 w-3" /> Baixar</Button>
-                  <Button size="sm" variant="ghost"
-                    className="h-7 px-2.5 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10 rounded-full"
-                    onClick={handleBatchCopy}
-                  ><Copy className="h-3 w-3" /> Duplicar</Button>
-                  <Button size="sm" variant="ghost"
-                    className="h-7 px-2.5 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
-                    onClick={async () => {
-                      const ids = Array.from(selectedIds);
-                      await supabase.from("financial_entries").delete().in("id", ids);
-                      setSelectedIds(new Set());
-                      fetchData();
-                    }}
-                  ><Trash2 className="h-3 w-3" /> Excluir</Button>
-                </div>
-              )}
-            </div>
+            )}
 
             {/* Entry edit dialog */}
             <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
@@ -1755,58 +1747,19 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("title")}>
                       Título <SortIcon field="title" />
                     </th>
-                    <th className="text-left py-2.5 px-3">
-                      <div className="flex items-center gap-1">
-                        <span className="cursor-pointer select-none" onClick={() => toggleSort("counterpart")}>Contraparte <SortIcon field="counterpart" /></span>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <button className={cn("p-0.5 rounded hover:bg-accent", colFilterCounterpart && "text-primary")}>
-                              <Filter className="h-3 w-3" />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-52 p-2" align="start">
-                            <Input placeholder="Filtrar contraparte..." value={colFilterCounterpart}
-                              onChange={(e) => setColFilterCounterpart(e.target.value)} className="h-7 text-xs" />
-                            {colFilterCounterpart && (
-                              <Button size="sm" variant="ghost" className="h-6 text-xs w-full mt-1" onClick={() => setColFilterCounterpart("")}>Limpar</Button>
-                            )}
-                          </PopoverContent>
-                        </Popover>
-                      </div>
+                    <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("counterpart")}>
+                      Contraparte <SortIcon field="counterpart" />
                     </th>
                     <th className="text-right py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("amount")}>
                       Valor <SortIcon field="amount" />
                     </th>
-                    <th className="text-center py-2.5 px-3">
-                      <div className="flex items-center gap-1 justify-center">
-                        <span className="cursor-pointer select-none" onClick={() => toggleSort("is_paid")}>Status <SortIcon field="is_paid" /></span>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <button className={cn("p-0.5 rounded hover:bg-accent", colFilterStatus !== "all" && "text-primary")}>
-                              <Filter className="h-3 w-3" />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-40 p-1" align="center">
-                            {[
-                              { key: "all", label: "Todos" },
-                              { key: "pending", label: "Pendente" },
-                              { key: "paid", label: "Pago" },
-                              { key: "overdue", label: "Atrasado" },
-                            ].map(opt => (
-                              <button key={opt.key}
-                                className={cn("w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent", colFilterStatus === opt.key && "bg-accent font-medium")}
-                                onClick={() => setColFilterStatus(opt.key)}>
-                                {opt.label}
-                              </button>
-                            ))}
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </th>
                     <th className="text-center py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("type")}>
-                      Pagar / Receber
+                      Tipo <SortIcon field="type" />
                     </th>
-                    <th className="w-20 py-2.5 px-3"></th>
+                    <th className="text-center py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("is_paid")}>
+                      Status <SortIcon field="is_paid" />
+                    </th>
+                    <th className="w-14 py-2.5 px-1"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1826,6 +1779,20 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       ? ({ daily: "Diária", weekly: "Semanal", biweekly: "Quinzenal", monthly: "Mensal",
                            quarterly: "Trimestral", semiannual: "Semestral", yearly: "Anual" } as any)[e.recurrence_type] || "Recorrente"
                       : null;
+
+                    const getStatusText = () => {
+                      if (e.is_paid && e.type === "revenue") return "Recebido";
+                      if (e.is_paid && e.type === "expense") return "Pago";
+                      if (e.payment_date && e.is_paid) return "Baixado";
+                      if (isOverdue) return "Atrasado";
+                      return "Pendente";
+                    };
+                    const statusText = getStatusText();
+                    const statusColor = statusText === "Pago" || statusText === "Recebido" || statusText === "Baixado"
+                      ? "text-[hsl(var(--success))]"
+                      : statusText === "Atrasado" ? "text-destructive"
+                      : "text-amber-500";
+
                     return (
                       <tr key={e.id}
                         className={cn(
@@ -1857,7 +1824,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           />
                         </td>
                         <td className="py-2.5 px-3 text-muted-foreground text-xs">{format(entDate, "dd/MM/yy")}</td>
-                        <td className="py-2.5 px-3 text-xs text-muted-foreground truncate max-w-[120px]">
+                        <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[140px]">
                           {categories.find(c => c.id === e.category_id)?.name || "—"}
                         </td>
                         <td className={cn("py-2.5 px-3 font-medium", e.is_paid && "line-through text-muted-foreground")}>
@@ -1881,32 +1848,17 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
                         </td>
-                        <td className="py-2.5 px-3 text-center">
-                          {e.is_paid ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-[hsl(var(--success))]">
-                              <Check className="h-4 w-4" />
-                            </span>
-                          ) : isOverdue ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-destructive">
-                              <X className="h-4 w-4" />
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-xs text-amber-500">
-                              <CalendarDays className="h-4 w-4" />
-                            </span>
-                          )}
+                        <td className="py-2.5 px-3 text-center text-muted-foreground">
+                          {e.type === "expense" ? "Despesa" : "Receita"}
                         </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className={cn("text-[1rem] font-bold", e.type === "expense" ? "text-[#ef4444]" : "text-[#10b981]")}>
-                            {e.type === "expense" ? "Pagar" : "Receber"}
-                          </span>
+                        <td className={cn("py-2.5 px-3 text-center", statusColor)}>
+                          {statusText}
                         </td>
-                        {/* Invisible actions column - icons only on hover */}
-                        <td className="py-2.5 px-2 w-20 bg-card">
+                        <td className="py-2.5 px-1 w-14">
                           <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
                             <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }}
-                              className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
-                              <Pencil className="h-5 w-5" />
+                              className="text-[hsl(var(--success))] hover:text-primary transition-colors">
+                              <Pencil className="h-4 w-4" />
                             </button>
                             <button onClick={async (ev) => {
                               ev.stopPropagation();
@@ -1920,12 +1872,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 description: e.description || null, currency: e.currency || "BRL",
                               });
                               fetchData();
-                            }} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
-                              <Copy className="h-5 w-5" />
+                            }} className="text-primary hover:text-primary/80 transition-colors">
+                              <Copy className="h-4 w-4" />
                             </button>
                             <button onClick={(ev) => { ev.stopPropagation(); setDeleteEntryConfirm(e.id); }}
-                              className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
-                              <X className="h-5 w-5" />
+                              className="text-destructive hover:text-destructive/80 transition-colors">
+                              <X className="h-4 w-4" />
                             </button>
                           </div>
                         </td>
