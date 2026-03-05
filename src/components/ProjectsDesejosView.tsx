@@ -423,7 +423,8 @@ export default function ProjectsDesejosView() {
             const progress = getProjectProgress(project.tasks);
             const totalCost = getProjectCost(project.tasks);
             const pendingCost = project.tasks.filter(t => !t.is_completed).reduce((s, t) => s + t.estimated_cost, 0);
-            const status = (project.status as ProjectStatus) || "pending";
+            const rawStatus = project.status as string;
+            const status: ProjectStatus = (rawStatus in STATUS_LABELS ? rawStatus : rawStatus === "active" ? "in_progress" : "pending") as ProjectStatus;
             const statusInfo = STATUS_LABELS[status];
             const cc = costCenters.find((c: any) => c.id === project.cost_center_id);
             const filteredTasks = getFilteredTasks(project.tasks);

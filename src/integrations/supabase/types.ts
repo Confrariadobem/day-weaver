@@ -560,6 +560,7 @@ export type Database = {
         Row: {
           budget: number | null
           category_id: string | null
+          cost_center_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -573,6 +574,7 @@ export type Database = {
         Insert: {
           budget?: number | null
           category_id?: string | null
+          cost_center_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -586,6 +588,7 @@ export type Database = {
         Update: {
           budget?: number | null
           category_id?: string | null
+          cost_center_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -605,6 +608,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "projects_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "projects_program_id_fkey"
             columns: ["program_id"]
             isOneToOne: false
@@ -619,6 +629,7 @@ export type Database = {
           category_id: string | null
           created_at: string
           description: string | null
+          estimated_cost: number | null
           id: string
           is_completed: boolean | null
           is_favorite: boolean | null
@@ -635,6 +646,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           description?: string | null
+          estimated_cost?: number | null
           id?: string
           is_completed?: boolean | null
           is_favorite?: boolean | null
@@ -651,6 +663,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           description?: string | null
+          estimated_cost?: number | null
           id?: string
           is_completed?: boolean | null
           is_favorite?: boolean | null
