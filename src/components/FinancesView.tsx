@@ -143,7 +143,7 @@ function CounterpartAutocomplete({ value, onChange, entries }: { value: string; 
   );
 }
 
-export default function FinancesView({ onTabChange, walletFilter, onClearWalletFilter }: { onTabChange?: (tab: string) => void; walletFilter?: { id: string; name: string } | null; onClearWalletFilter?: () => void }) {
+export default function FinancesView({ onTabChange, walletFilter, onClearWalletFilter, onNavigateToPatrimonio }: { onTabChange?: (tab: string) => void; walletFilter?: { id: string; name: string } | null; onClearWalletFilter?: () => void; onNavigateToPatrimonio?: () => void }) {
   const { user } = useAuth();
   const { formatCurrency: brl } = useCurrency();
   const fmtCurrency = (v: number, _cur?: CurrencyType) => brl(v);
@@ -1706,6 +1706,16 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         </div>
       </div>
 
+      {/* Wallet filter banner - below toolbar */}
+      {viewTab === "previsao" && walletFilter && (
+        <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-lg px-3 py-2">
+          <span className="text-xs font-medium text-primary">CARTEIRA: {walletFilter.name}</span>
+          <span className="text-xs text-muted-foreground">• Mês atual</span>
+          <button onClick={onClearWalletFilter} className="ml-auto text-xs text-muted-foreground hover:text-foreground underline">Limpar filtro</button>
+          <button onClick={onNavigateToPatrimonio} className="text-xs text-primary hover:text-primary/80 underline transition-colors">Retornar carteira</button>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="bg-card">
@@ -1748,14 +1758,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         {/* ============ FLUXO DE CAIXA ============ */}
         {viewTab === "previsao" && (
           <>
-            {/* Wallet filter banner */}
-            {walletFilter && (
-              <div className="mb-3 flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-lg px-3 py-2">
-                <span className="text-xs font-medium text-primary">CARTEIRA: {walletFilter.name}</span>
-                <span className="text-xs text-muted-foreground">• Mês atual</span>
-                <button onClick={onClearWalletFilter} className="ml-auto text-xs text-muted-foreground hover:text-foreground underline">Limpar filtro</button>
-              </div>
-            )}
 
             {/* Batch actions */}
             {selectedIds.size > 0 && (
@@ -1897,7 +1899,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[140px]">
                           {categories.find(c => c.id === e.category_id)?.name || "—"}
                         </td>
-                        <td className={cn("py-2.5 px-3 font-medium", e.is_paid && "line-through text-muted-foreground")}>
+                        <td className={cn("py-2.5 px-3 text-muted-foreground font-bold", e.is_paid && "line-through")}>
                           <span className="inline-flex items-center gap-1.5">
                             {highlightMatch(e.title, searchQuery)}
                             {isRecurrent && (
@@ -1918,10 +1920,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
                         </td>
-                        <td className="py-2.5 px-3 text-center text-muted-foreground">
+                        <td className={cn("py-2.5 px-3 text-center",
+                          e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {e.type === "expense" ? "Despesa" : "Receita"}
                         </td>
-                        <td className={cn("py-2.5 px-3 text-center", statusColor)}>
+                        <td className={cn("py-2.5 px-3 text-center font-normal", statusColor)}>
                           {statusText}
                         </td>
                         <td className="py-2.5 px-1 w-14">
