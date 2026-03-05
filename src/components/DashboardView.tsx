@@ -1,13 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart as RechartsPieChart, Pie, Cell, Line, Legend, ComposedChart, AreaChart, Area,
@@ -18,31 +16,13 @@ import {
   TrendingUp, TrendingDown, Wallet, PiggyBank,
   BarChart3, Building2,
   CalendarCheck, CalendarDays, CalendarRange, Scale, PieChart as PieChartIcon,
-  ArrowRightLeft, GripVertical,
+  ArrowRightLeft, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyConversion } from "@/hooks/useCurrencyConversion";
 import type { Tables } from "@/integrations/supabase/types";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  rectSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 
 const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
 
@@ -59,49 +39,6 @@ function getPeriodRange(key: PeriodKey): { start: Date; end: Date } {
   }
 }
 
-type WidgetId = "receita" | "despesa" | "caixa" | "investimentos" | "patrimonio" | "cambio";
-
-const DEFAULT_ORDER: WidgetId[] = ["receita", "despesa", "caixa", "investimentos", "patrimonio", "cambio"];
-const STORAGE_KEY = "dashboard-widget-order";
-
-function getStoredOrder(): WidgetId[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_ORDER;
-    const parsed = JSON.parse(raw) as WidgetId[];
-    // Validate all IDs present
-    if (DEFAULT_ORDER.every(id => parsed.includes(id)) && parsed.length === DEFAULT_ORDER.length) return parsed;
-    return DEFAULT_ORDER;
-  } catch {
-    return DEFAULT_ORDER;
-  }
-}
-
-// Sortable widget wrapper
-function SortableWidget({ id, children }: { id: string; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 10 : undefined,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} className="relative group">
-      <div
-        {...attributes}
-        {...listeners}
-        className="absolute top-1.5 right-1.5 z-10 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-60 transition-opacity duration-200 touch-none"
-        aria-label="Arrastar widget"
-      >
-        <GripVertical className="size-4 text-muted-foreground" />
-      </div>
-      {children}
-    </div>
-  );
-}
-
 export default function DashboardView() {
   const { user } = useAuth();
   const { formatCurrency: brl, currency } = useCurrency();
@@ -115,8 +52,6 @@ export default function DashboardView() {
     try { return localStorage.getItem("dashboard-show-cambio") === "true"; } catch { return false; }
   });
 
-  const [widgetOrder, setWidgetOrder] = useState<WidgetId[]>(getStoredOrder);
-
   const [periodKey, setPeriodKey] = useState<PeriodKey>("year");
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>(getPeriodRange("year"));
   const [customFrom, setCustomFrom] = useState<Date | undefined>(undefined);
@@ -124,12 +59,6 @@ export default function DashboardView() {
   const [intervalOpen, setIntervalOpen] = useState(false);
   const [fromText, setFromText] = useState("");
   const [toText, setToText] = useState("");
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
 
   const period = useMemo(() => {
     if (periodKey === "custom") return customRange;
@@ -260,22 +189,10 @@ export default function DashboardView() {
     return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      setWidgetOrder(prev => {
-        const oldIndex = prev.indexOf(active.id as WidgetId);
-        const newIndex = prev.indexOf(over.id as WidgetId);
-        const newOrder = arrayMove(prev, oldIndex, newIndex);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newOrder));
-        return newOrder;
-      });
-    }
-  }, []);
-
-  const handleToggleConversion = (checked: boolean) => {
-    setShowConversion(checked);
-    localStorage.setItem("dashboard-show-cambio", String(checked));
+  const handleToggleConversion = () => {
+    const next = !showConversion;
+    setShowConversion(next);
+    localStorage.setItem("dashboard-show-cambio", String(next));
   };
 
   const otherCurrencies = (["BRL", "BTC", "EUR", "USD"] as const).filter(c => c !== currency).sort();
@@ -288,105 +205,9 @@ export default function DashboardView() {
     { key: "custom", label: "Intervalo", icon: CalendarRange },
   ];
 
-  // Widget render map
-  const renderWidget = (id: WidgetId) => {
-    switch (id) {
-      case "receita":
-        return (
-          <Card className="bg-card h-full" style={{ width: 221 }}>
-            <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
-              <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <TrendingUp className="size-6 mr-1 text-muted-foreground" /> Receita
-              </p>
-              <p className="text-[1.2rem] font-semibold text-[hsl(var(--success))] mt-2 overflow-hidden truncate">{brl(totalRevenue)}</p>
-            </CardContent>
-          </Card>
-        );
-      case "despesa":
-        return (
-          <Card className="bg-card h-full" style={{ width: 221 }}>
-            <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
-              <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <TrendingDown className="size-6 mr-1 text-muted-foreground" /> Despesa
-              </p>
-              <p className="text-[1.2rem] font-semibold text-destructive mt-2 overflow-hidden truncate">{brl(totalExpense)}</p>
-            </CardContent>
-          </Card>
-        );
-      case "caixa":
-        return (
-          <Card className="bg-card h-full" style={{ width: 221 }}>
-            <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
-              <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <Wallet className="size-6 mr-1 text-muted-foreground" /> Caixa
-              </p>
-              <p className={cn("text-[1.2rem] font-semibold mt-2 overflow-hidden truncate", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
-                {brl(totalCash)}
-              </p>
-            </CardContent>
-          </Card>
-        );
-      case "investimentos":
-        return (
-          <Card className="bg-card h-full" style={{ width: 221 }}>
-            <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
-              <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <PiggyBank className="size-6 mr-1 text-muted-foreground" /> Investimentos
-              </p>
-              <p className="text-[1.2rem] font-semibold text-foreground mt-2 overflow-hidden truncate">{brl(totalInvestments)}</p>
-            </CardContent>
-          </Card>
-        );
-      case "patrimonio":
-        return (
-          <Card className="bg-card h-full" style={{ width: 221 }}>
-            <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
-              <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <Building2 className="size-6 mr-1 text-muted-foreground" strokeWidth={1.5} /> Patrimônio
-              </p>
-              <p className="text-[1.2rem] font-semibold text-foreground mt-2 overflow-hidden truncate">{brl(totalPatrimony)}</p>
-            </CardContent>
-          </Card>
-        );
-      case "cambio":
-        return (
-          <Card className="bg-card/60 h-full border" style={{ width: 221 }}>
-            <CardContent className="p-3 flex flex-col" style={{ minHeight: showConversion ? 240 : 80 }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[1.1rem] font-bold text-foreground">Câmbio</span>
-                <Switch
-                  checked={showConversion}
-                  onCheckedChange={handleToggleConversion}
-                  className="scale-75"
-                />
-              </div>
-              {showConversion && (
-                <div className="space-y-2.5 animate-in fade-in duration-300">
-                  {ratesLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Carregando...</span>}
-                  {otherCurrencies.map(cur => {
-                    const val = cur === "BRL"
-                      ? totalPatrimony
-                      : convert(totalPatrimony, cur as "USD" | "EUR" | "BTC");
-                    const rate = cur === "BRL"
-                      ? 1
-                      : rates[cur as "USD" | "EUR" | "BTC"];
-                    return (
-                      <div key={cur} className="space-y-0.5">
-                        <p className="text-[0.85rem] font-semibold text-foreground">
-                          {fmtOther(val, cur)}
-                        </p>
-                        <p className="text-[0.85rem] text-muted-foreground">
-                          ({cur === "BRL" ? "moeda base" : `1 ${cur} = R$ ${cur === "BTC" ? rate.toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : rate.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`})
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-    }
+  const fmtRate = (cur: string, rate: number) => {
+    if (cur === "BTC") return `1 ${currency} = ${(1 / rate).toFixed(8)} BTC`;
+    return `1 ${currency} = ${(1 / rate).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${cur}`;
   };
 
   return (
@@ -439,7 +260,7 @@ export default function DashboardView() {
                         value={fromText}
                         onChange={(e) => setFromText(e.target.value)}
                         onBlur={handleFromBlur}
-                       placeholder={datePlaceholder}
+                        placeholder={datePlaceholder}
                         className={cn("h-8 text-xs rounded-md border-border", !fromText && "placeholder:text-muted-foreground/40")}
                         style={{ width: 150 }}
                       />
@@ -471,18 +292,98 @@ export default function DashboardView() {
           ))}
         </div>
 
-        {/* Draggable KPI Widgets - 3 columns */}
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={widgetOrder} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {widgetOrder.map(id => (
-                <SortableWidget key={id} id={id}>
-                  {renderWidget(id)}
-                </SortableWidget>
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
+        {/* KPI Cards Grid + Câmbio */}
+        <div className="flex gap-4 flex-wrap lg:flex-nowrap">
+          {/* Main KPI grid */}
+          <div className="flex-1 min-w-0 grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(243px, 1fr))" }}>
+            {/* Receita */}
+            <Card className="bg-card">
+              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <TrendingUp className="size-6 mr-1 text-muted-foreground" /> Receita
+                </p>
+                <p className="text-[1.2rem] font-semibold text-[hsl(var(--success))] mt-2 overflow-hidden truncate">{brl(totalRevenue)}</p>
+              </CardContent>
+            </Card>
+            {/* Despesa */}
+            <Card className="bg-card">
+              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <TrendingDown className="size-6 mr-1 text-muted-foreground" /> Despesa
+                </p>
+                <p className="text-[1.2rem] font-semibold text-destructive mt-2 overflow-hidden truncate">{brl(totalExpense)}</p>
+              </CardContent>
+            </Card>
+            {/* Caixa */}
+            <Card className="bg-card">
+              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Wallet className="size-6 mr-1 text-muted-foreground" /> Caixa
+                </p>
+                <p className={cn("text-[1.2rem] font-semibold mt-2 overflow-hidden truncate", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                  {brl(totalCash)}
+                </p>
+              </CardContent>
+            </Card>
+            {/* Investimentos */}
+            <Card className="bg-card">
+              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <PiggyBank className="size-6 mr-1 text-muted-foreground" /> Investimentos
+                </p>
+                <p className="text-[1.2rem] font-semibold text-foreground mt-2 overflow-hidden truncate">{brl(totalInvestments)}</p>
+              </CardContent>
+            </Card>
+            {/* Patrimônio */}
+            <Card className="bg-card">
+              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Building2 className="size-6 mr-1 text-muted-foreground" strokeWidth={1.5} /> Patrimônio
+                </p>
+                <p className="text-[1.2rem] font-semibold text-foreground mt-2 overflow-hidden truncate">{brl(totalPatrimony)}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Câmbio widget – fixed right */}
+          <Card className="bg-card/60 border shrink-0" style={{ width: 243 }}>
+            <CardContent className="p-3 flex flex-col" style={{ minHeight: showConversion ? 240 : undefined }}>
+              <div className="flex items-center justify-between">
+                <span className="text-[1.1rem] font-bold text-foreground">Câmbio</span>
+                <button
+                  onClick={handleToggleConversion}
+                  className="p-1 rounded-md hover:bg-muted/60 transition-colors text-muted-foreground"
+                  aria-label={showConversion ? "Ocultar câmbio" : "Mostrar câmbio"}
+                >
+                  {showConversion ? <ChevronUp className="size-5" /> : <ChevronDown className="size-5" />}
+                </button>
+              </div>
+              {showConversion && (
+                <div className="space-y-2.5 mt-3 animate-in fade-in duration-300">
+                  {ratesLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Carregando...</span>}
+                  {otherCurrencies.map(cur => {
+                    const val = cur === "BRL"
+                      ? totalPatrimony
+                      : convert(totalPatrimony, cur as "USD" | "EUR" | "BTC");
+                    const rate = cur === "BRL"
+                      ? 1
+                      : rates[cur as "USD" | "EUR" | "BTC"];
+                    return (
+                      <div key={cur} className="space-y-0.5">
+                        <p className="text-[0.85rem] font-semibold text-foreground">
+                          {cur}: ≈ {fmtOther(val, cur)}
+                        </p>
+                        <p className="text-[0.85rem] text-muted-foreground">
+                          ({cur === "BRL" ? "moeda base" : fmtRate(cur, rate)})
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
