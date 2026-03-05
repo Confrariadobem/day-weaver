@@ -22,7 +22,7 @@ import {
   Printer, FileDown, FileUp, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
   CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
-  Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign, Pencil,
+  Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign, Pencil, X,
 } from "lucide-react";
 import {
   format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
@@ -143,7 +143,7 @@ function CounterpartAutocomplete({ value, onChange, entries }: { value: string; 
   );
 }
 
-export default function FinancesView({ onTabChange }: { onTabChange?: (tab: string) => void }) {
+export default function FinancesView({ onTabChange, walletFilter, onClearWalletFilter }: { onTabChange?: (tab: string) => void; walletFilter?: { id: string; name: string } | null; onClearWalletFilter?: () => void }) {
   const { user } = useAuth();
   const { formatCurrency: brl } = useCurrency();
   const fmtCurrency = (v: number, _cur?: CurrencyType) => brl(v);
@@ -546,6 +546,14 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
   const now = new Date();
   const periodYear = new Date(periodStart).getFullYear();
 
+  // Highlight helper for search matches
+  const highlightMatch = (text: string, query: string) => {
+    if (!query) return text;
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return text;
+    return <>{text.slice(0, idx)}<strong className="text-foreground">{text.slice(idx, idx + query.length)}</strong>{text.slice(idx + query.length)}</>;
+  };
+
   // Fluxo de caixa: filter logic - expanded search
   const filtered = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -553,7 +561,8 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
     
     return entries
       .filter((e) => {
-        // Apply custom period filter only if enabled
+        // Wallet filter from Patrimônio
+        if (walletFilter && e.account_id !== walletFilter.id) return false;
         if (customPeriodEnabled) {
           const d = parseEntryDate(e.entry_date);
           const start = parseEntryDate(customStart);
@@ -596,22 +605,16 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         const amt = String(e.amount);
         const pm = e.payment_method || "";
         const desc = e.description || "";
-        // Status search
+        const dateStr = e.entry_date ? format(parseEntryDate(e.entry_date), "dd/MM/yyyy") : "";
         const statusLabel = e.is_paid ? "pago baixado" : "pendente";
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const isOverdue = !e.is_paid && parseEntryDate(e.entry_date) < today;
         const overdueLabel = isOverdue ? "atrasado vencido" : "";
-        return e.title.toLowerCase().includes(query) ||
-          cat.toLowerCase().includes(query) ||
-          cc.toLowerCase().includes(query) ||
-          proj.toLowerCase().includes(query) ||
-          acc.toLowerCase().includes(query) ||
-          cp.toLowerCase().includes(query) ||
-          amt.includes(query) ||
-          pm.toLowerCase().includes(query) ||
-          desc.toLowerCase().includes(query) ||
-          statusLabel.includes(query) ||
-          overdueLabel.includes(query);
+        const haystack = [e.title, cat, cc, proj, acc, cp, amt, pm, desc, dateStr, statusLabel, overdueLabel]
+          .join(" ").toLowerCase();
+        // Simple fuzzy: all query words must appear somewhere
+        const words = query.split(/\s+/).filter(Boolean);
+        return words.every(w => haystack.includes(w));
       })
       .sort((a, b) => {
         let aVal: any, bVal: any;
@@ -637,7 +640,7 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, previsaoFilterDate, colFilterStatus, colFilterCounterpart]);
+  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, previsaoFilterDate, colFilterStatus, colFilterCounterpart, walletFilter]);
 
   // KPI totals based on current filter
   const kpiData = useMemo(() => {
@@ -1381,10 +1384,15 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
 
         {/* Search (previsao, doar, centrocusto) */}
         {isPrevisao && (
-          <div className="relative">
+          <div className="relative flex-1 max-w-[400px]">
             <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-7 pl-8 text-xs w-36 rounded-xl" />
+            <Input placeholder="Buscar título, categoria, contraparte, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-7 pl-8 pr-7 text-xs rounded-xl" />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="absolute right-2 top-2 text-[#9ca3af] hover:text-foreground">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         )}
         {isDoar && (
@@ -1560,6 +1568,15 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
         {/* ============ FLUXO DE CAIXA ============ */}
         {viewTab === "previsao" && (
           <>
+            {/* Wallet filter banner */}
+            {walletFilter && (
+              <div className="mb-3 flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-lg px-3 py-2">
+                <span className="text-xs font-medium text-primary">CARTEIRA: {walletFilter.name}</span>
+                <span className="text-xs text-muted-foreground">• Mês atual</span>
+                <button onClick={onClearWalletFilter} className="ml-auto text-xs text-muted-foreground hover:text-foreground underline">Limpar filtro</button>
+              </div>
+            )}
+
             {/* Quick filters */}
             <div className="mb-3 flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 flex-wrap">
@@ -1654,6 +1671,9 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                     <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("entry_date")}>
                       Vencimento <SortIcon field="entry_date" />
                     </th>
+                    <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("category")}>
+                      Categoria <SortIcon field="category" />
+                    </th>
                     <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("title")}>
                       Título <SortIcon field="title" />
                     </th>
@@ -1705,14 +1725,14 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                         </Popover>
                       </div>
                     </th>
-                    <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("payment_date")}>
-                      Pgto Real <SortIcon field="payment_date" />
+                    <th className="text-center py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("type")}>
+                      Pagar / Receber
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={7} className="text-center text-muted-foreground/40 py-12">
+                    <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">
                       Sem lançamentos no período
                     </td></tr>
                   )}
@@ -1758,9 +1778,12 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                           />
                         </td>
                         <td className="py-2.5 px-3 text-muted-foreground text-xs">{format(entDate, "dd/MM/yy")}</td>
+                        <td className="py-2.5 px-3 text-xs text-muted-foreground truncate max-w-[120px]">
+                          {categories.find(c => c.id === e.category_id)?.name || "—"}
+                        </td>
                         <td className={cn("py-2.5 px-3 font-medium", e.is_paid && "line-through text-muted-foreground")}>
                           <span className="inline-flex items-center gap-1.5">
-                            {e.title}
+                            {highlightMatch(e.title, searchQuery)}
                             {isRecurrent && (
                               <Tooltip delayDuration={200}>
                                 <TooltipTrigger>
@@ -1838,8 +1861,10 @@ export default function FinancesView({ onTabChange }: { onTabChange?: (tab: stri
                             </Tooltip>
                           </div>
                         </td>
-                        <td className="py-2.5 px-3 text-xs text-muted-foreground">
-                          {e.payment_date ? format(parseEntryDate(e.payment_date), "dd/MM/yy") : "—"}
+                        <td className="py-2.5 px-3 text-center">
+                          <span className={cn("text-[1rem] font-bold", e.type === "expense" ? "text-[#ef4444]" : "text-[#10b981]")}>
+                            {e.type === "expense" ? "Pagar" : "Receber"}
+                          </span>
                         </td>
                       </tr>
                     );

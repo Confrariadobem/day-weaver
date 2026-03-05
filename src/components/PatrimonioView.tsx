@@ -15,6 +15,7 @@ import {
   Wallet, TrendingUp, TrendingDown, Landmark, CreditCard, PiggyBank,
   BarChart3, AlertTriangle, Lock, ArrowUpRight, ArrowDownRight,
   Banknote, WalletCards, Bitcoin, Star, Save, Trash2, Eye, EyeOff,
+  ExternalLink,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area,
@@ -48,7 +49,11 @@ const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   crypto: "Criptoativos",
 };
 
-export default function PatrimonioView() {
+interface PatrimonioViewProps {
+  onNavigateToFluxo?: (acc: { id: string; name: string }) => void;
+}
+
+export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProps) {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [entries, setEntries] = useState<any[]>([]);
@@ -368,7 +373,7 @@ export default function PatrimonioView() {
         )}
 
         {/* Main KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <Card className="bg-card">
             <CardContent className="p-3">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Patrimônio Total</p>
@@ -394,13 +399,6 @@ export default function PatrimonioView() {
                 {metrics.invProfitPct >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
                 {metrics.invProfitPct >= 0 ? "+" : ""}{metrics.invProfitPct.toFixed(2)}%
               </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card">
-            <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Projetos (Orçamento)</p>
-              <p className="text-lg font-bold text-foreground">{brl(metrics.totalProjectBudget)}</p>
-              <p className="text-[10px] text-muted-foreground">{projects.length} projeto(s)</p>
             </CardContent>
           </Card>
         </div>
@@ -525,13 +523,21 @@ export default function PatrimonioView() {
                           </p>
                         )}
                       </div>
-                      <div className="mt-2 pt-2 border-t border-border/20">
+                      <div className="mt-2 pt-2 border-t border-border/20 flex items-center gap-2">
                         <button
                           onClick={(e) => { e.stopPropagation(); deactivateAccount(acc.id); }}
                           className="text-[0.9rem] text-[#ef4444] border border-[#ef4444] rounded-lg px-3 py-1 hover:bg-[#fee2e2] transition-colors"
                         >
                           Desativar
                         </button>
+                        {onNavigateToFluxo && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onNavigateToFluxo({ id: acc.id, name: acc.name }); }}
+                            className="text-[0.9rem] text-[#6b7280] border border-[#d1d5db] rounded-lg px-3 py-1 hover:bg-primary hover:text-white hover:border-primary transition-colors ml-auto"
+                          >
+                            Ver Fluxo
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

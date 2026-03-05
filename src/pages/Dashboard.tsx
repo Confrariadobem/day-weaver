@@ -45,6 +45,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [activeModule, setActiveModule] = useState<ModuleKey>("calendar");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [walletFilter, setWalletFilter] = useState<{ id: string; name: string } | null>(null);
 
   // Data for bullet charts in the header
   const [entries, setEntries] = useState<any[]>([]);
@@ -211,10 +212,10 @@ export default function Dashboard() {
           <div className="flex-1 overflow-hidden">
             {activeModule === "dashboard" && <DashboardView />}
             {activeModule === "calendar" && <CalendarView onTabChange={setCalendarTab} />}
-            {activeModule === "finances" && <FinancesView onTabChange={setFinanceTab} />}
+            {activeModule === "finances" && <FinancesView onTabChange={setFinanceTab} walletFilter={walletFilter} onClearWalletFilter={() => setWalletFilter(null)} />}
             {activeModule === "programs" && <ProgramsProjectsView onTabChange={setProjectTab} />}
             {activeModule === "investments" && <InvestmentsView onTabChange={setInvestmentTab} />}
-            {activeModule === "patrimonio" && <PatrimonioView />}
+            {activeModule === "patrimonio" && <PatrimonioView onNavigateToFluxo={(acc) => { setWalletFilter(acc); setActiveModule("finances"); }} />}
             {activeModule === "profile" && <ProfileView />}
             {activeModule === "preferences" && <PreferencesView />}
           </div>
