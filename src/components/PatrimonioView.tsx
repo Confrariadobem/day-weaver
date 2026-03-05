@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
   Wallet, TrendingUp, TrendingDown, Landmark, CreditCard, PiggyBank,
@@ -516,7 +516,7 @@ export default function PatrimonioView() {
                         <p className={cn("text-[0.9rem]", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
                           Movimentos: {movement >= 0 ? "+" : ""}{brl(movement)}
                         </p>
-                        <p className={cn("text-[1.2rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
+                        <p className={cn("text-[0.9rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
                           Saldo Atual: {brl(Number(acc.current_balance))}
                         </p>
                         {creditAvailable !== null && (
@@ -524,14 +524,6 @@ export default function PatrimonioView() {
                             Limite disponível: {brl(creditAvailable)}
                           </p>
                         )}
-                      </div>
-                      <div className="mt-2 pt-2 border-t border-border/20">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deactivateAccount(acc.id); }}
-                          className="text-[0.9rem] text-[#ef4444] border border-[#ef4444] rounded-lg px-3 py-1 hover:bg-[#fee2e2] transition-colors"
-                        >
-                          Desativar
-                        </button>
                       </div>
                     </div>
                   );
@@ -548,7 +540,10 @@ export default function PatrimonioView() {
                   onClick={() => setShowInactive(!showInactive)}
                   className="flex items-center gap-1.5 text-[0.9rem] text-[#9ca3af] opacity-70 hover:underline hover:opacity-100 transition-opacity group/inactive"
                 >
-                  <EyeOff className="h-5 w-5 text-[#9ca3af] group-hover/inactive:text-[#3b82f6] transition-colors" />
+                  {showInactive
+                    ? <Eye className="h-5 w-5 text-[#9ca3af] group-hover/inactive:text-[#3b82f6] transition-colors" />
+                    : <EyeOff className="h-5 w-5 text-[#9ca3af] group-hover/inactive:text-[#3b82f6] transition-colors" />
+                  }
                   Inativas ({inactiveAccounts.length})
                 </button>
 
@@ -571,17 +566,9 @@ export default function PatrimonioView() {
                             <p className={cn("text-[0.9rem]", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
                               Movimentos: {movement >= 0 ? "+" : ""}{brl(movement)}
                             </p>
-                            <p className={cn("text-[1.2rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
+                            <p className={cn("text-[0.9rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
                               Saldo Atual: {brl(Number(acc.current_balance))}
                             </p>
-                          </div>
-                          <div className="mt-2 pt-2 border-t border-border/20">
-                            <button
-                              onClick={() => reactivateAccount(acc.id)}
-                              className="text-[0.9rem] text-[#10b981] border border-[#10b981] rounded-lg px-3 py-1 hover:bg-[#d1fae5] transition-colors"
-                            >
-                              Ativar
-                            </button>
                           </div>
                         </div>
                       );
@@ -645,6 +632,10 @@ export default function PatrimonioView() {
                 </div>
               </>
             )}
+            <div className="flex items-center justify-between pt-1">
+              <Label className="text-sm text-muted-foreground">Ativa</Label>
+              <Switch checked={accIsActive} onCheckedChange={setAccIsActive} />
+            </div>
           </div>
           <div className="flex gap-2 justify-end pt-3 border-t border-border/20">
             <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
