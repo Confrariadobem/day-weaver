@@ -181,7 +181,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   const [deleteEntryConfirm, setDeleteEntryConfirm] = useState<string | null>(null);
-  const [doarShowPaid, setDoarShowPaid] = useState(false); // false=all, true=paid only
+  const [_doarShowPaid, _setDoarShowPaid] = useState(false); // deprecated — now showing both sections
   const [doarHideCarryOver, setDoarHideCarryOver] = useState(false);
   const [ccReportSearch, setCcReportSearch] = useState("");
   const [ccReportFilterIds, setCcReportFilterIds] = useState<Set<string>>(new Set()); // empty = all
@@ -729,94 +729,107 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     });
   }, [entries, periodStart, periodEnd]);
 
-  // DRE / DOAR data
+  // DRE / DOAR data — computes both Previsto (pending) and Realizado (paid)
   const dreData = useMemo(() => {
     const pStart = new Date(periodStart);
     const pEnd = new Date(periodEnd);
     const yr = pStart.getFullYear();
     const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
-    // Include categories that have entries even if is_revenue/is_expense flags aren't set
     const catIdsWithRevEntries = new Set(entries.filter(e => e.type === "revenue" && e.category_id).map(e => e.category_id));
     const catIdsWithExpEntries = new Set(entries.filter(e => e.type === "expense" && e.category_id).map(e => e.category_id));
     const revenueCategories = categories.filter(c => c.is_revenue || catIdsWithRevEntries.has(c.id));
     const expenseCategories = categories.filter(c => c.is_expense || catIdsWithExpEntries.has(c.id));
 
-    const getMonthEntries = (month: Date) => {
-      let src = doarShowPaid ? entries.filter(e => e.is_paid) : entries;
-      return src.filter(e => {
-        const d = new Date(e.entry_date);
-        if (d.getMonth() !== month.getMonth() || d.getFullYear() !== yr) return false;
-        const ed = parseEntryDate(e.entry_date);
-        return ed >= parseEntryDate(periodStart) && ed <= parseEntryDate(periodEnd);
+    const buildSection = (paidFilter: boolean | null) => {
+      const getMonthEntries = (month: Date) => {
+        let src = entries;
+        if (paidFilter !== null) src = src.filter(e => paidFilter ? e.is_paid : !e.is_paid);
+        return src.filter(e => {
+          const d = new Date(e.entry_date);
+          if (d.getMonth() !== month.getMonth() || d.getFullYear() !== yr) return false;
+          const ed = parseEntryDate(e.entry_date);
+          return ed >= parseEntryDate(periodStart) && ed <= parseEntryDate(periodEnd);
+        });
+      };
+
+      const getEntriesForCatMonth = (catId: string, month: Date, type: string) =>
+        getMonthEntries(month).filter(e => e.type === type && e.category_id === catId);
+
+      const prevYearEntries = entries.filter(e => {
+        if (paidFilter !== null) { if (paidFilter ? !e.is_paid : e.is_paid) return false; }
+        return new Date(e.entry_date).getFullYear() < yr;
       });
+      const carryOver = prevYearEntries.reduce((s, e) =>
+        s + (e.type === "revenue" ? Number(e.amount) : -Number(e.amount)), 0);
+
+      const revRows = revenueCategories
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+        .map(cat => ({
+          id: cat.id, name: cat.name, color: cat.color,
+          months: months.map(m => {
+            const mEntries = getMonthEntries(m).filter(e => e.type === "revenue" && e.category_id === cat.id);
+            return mEntries.reduce((s, e) => s + Number(e.amount), 0);
+          }),
+          entries: months.map(m => getEntriesForCatMonth(cat.id, m, "revenue")),
+        }));
+
+      const uncatRev = months.map(m => {
+        const mEntries = getMonthEntries(m).filter(e => e.type === "revenue" && !e.category_id);
+        return mEntries.reduce((s, e) => s + Number(e.amount), 0);
+      });
+      if (uncatRev.some(v => v > 0)) {
+        revRows.push({
+          id: `uncat-rev${paidFilter === true ? "-paid" : paidFilter === false ? "-pending" : ""}`,
+          name: "Outras Receitas", color: "#6b7280", months: uncatRev,
+          entries: months.map(m => getMonthEntries(m).filter(e => e.type === "revenue" && !e.category_id)),
+        });
+      }
+
+      const expRows = expenseCategories
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+        .map(cat => ({
+          id: cat.id, name: cat.name, color: cat.color,
+          months: months.map(m => {
+            const mEntries = getMonthEntries(m).filter(e => e.type === "expense" && e.category_id === cat.id);
+            return mEntries.reduce((s, e) => s + Number(e.amount), 0);
+          }),
+          entries: months.map(m => getEntriesForCatMonth(cat.id, m, "expense")),
+        }));
+
+      const uncatExp = months.map(m => {
+        const mEntries = getMonthEntries(m).filter(e => e.type === "expense" && !e.category_id);
+        return mEntries.reduce((s, e) => s + Number(e.amount), 0);
+      });
+      if (uncatExp.some(v => v > 0)) {
+        expRows.push({
+          id: `uncat-exp${paidFilter === true ? "-paid" : paidFilter === false ? "-pending" : ""}`,
+          name: "Outras Despesas", color: "#6b7280", months: uncatExp,
+          entries: months.map(m => getMonthEntries(m).filter(e => e.type === "expense" && !e.category_id)),
+        });
+      }
+
+      const monthTotalsRev = months.map((_, i) => revRows.reduce((s, r) => s + r.months[i], 0));
+      const monthTotalsExp = months.map((_, i) => expRows.reduce((s, r) => s + r.months[i], 0));
+      const monthBalance = months.map((_, i) => monthTotalsRev[i] - monthTotalsExp[i]);
+
+      let acc = doarHideCarryOver ? 0 : carryOver;
+      const accumulated = monthBalance.map(b => { acc += b; return acc; });
+
+      return { revRows, expRows, monthTotalsRev, monthTotalsExp, monthBalance, accumulated, carryOver };
     };
 
-    const getEntriesForCatMonth = (catId: string, month: Date, type: string) =>
-      getMonthEntries(month).filter(e => e.type === type && e.category_id === catId);
-
-    const prevYearEntries = entries.filter(e => {
-      if (doarShowPaid && !e.is_paid) return false;
-      return new Date(e.entry_date).getFullYear() < yr;
-    });
-    const carryOver = prevYearEntries.reduce((s, e) =>
-      s + (e.type === "revenue" ? Number(e.amount) : -Number(e.amount)), 0);
-
-    const revRows = revenueCategories
-      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
-      .map(cat => ({
-        id: cat.id, name: cat.name, color: cat.color,
-        months: months.map(m => {
-          const mEntries = getMonthEntries(m).filter(e => e.type === "revenue" && e.category_id === cat.id);
-          return mEntries.reduce((s, e) => s + Number(e.amount), 0);
-        }),
-        entries: months.map(m => getEntriesForCatMonth(cat.id, m, "revenue")),
-      }));
-
-    const uncatRev = months.map(m => {
-      const mEntries = getMonthEntries(m).filter(e => e.type === "revenue" && !e.category_id);
-      return mEntries.reduce((s, e) => s + Number(e.amount), 0);
-    });
-    if (uncatRev.some(v => v > 0)) {
-      revRows.push({
-        id: "uncat-rev", name: "Outras Receitas", color: "#6b7280", months: uncatRev,
-        entries: months.map(m => getMonthEntries(m).filter(e => e.type === "revenue" && !e.category_id)),
-      });
-    }
-
-    const expRows = expenseCategories
-      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
-      .map(cat => ({
-        id: cat.id, name: cat.name, color: cat.color,
-        months: months.map(m => {
-          const mEntries = getMonthEntries(m).filter(e => e.type === "expense" && e.category_id === cat.id);
-          return mEntries.reduce((s, e) => s + Number(e.amount), 0);
-        }),
-        entries: months.map(m => getEntriesForCatMonth(cat.id, m, "expense")),
-      }));
-
-    const uncatExp = months.map(m => {
-      const mEntries = getMonthEntries(m).filter(e => e.type === "expense" && !e.category_id);
-      return mEntries.reduce((s, e) => s + Number(e.amount), 0);
-    });
-    if (uncatExp.some(v => v > 0)) {
-      expRows.push({
-        id: "uncat-exp", name: "Outras Despesas", color: "#6b7280", months: uncatExp,
-        entries: months.map(m => getMonthEntries(m).filter(e => e.type === "expense" && !e.category_id)),
-      });
-    }
-
-    const monthTotalsRev = months.map((_, i) => revRows.reduce((s, r) => s + r.months[i], 0));
-    const monthTotalsExp = months.map((_, i) => expRows.reduce((s, r) => s + r.months[i], 0));
-    const monthBalance = months.map((_, i) => monthTotalsRev[i] - monthTotalsExp[i]);
-
-    let acc = doarHideCarryOver ? 0 : carryOver;
-    const accumulated = monthBalance.map(b => { acc += b; return acc; });
+    // null = all (legacy), false = pending (previsto), true = paid (realizado)
+    const all = buildSection(null);
+    const previsto = buildSection(false);
+    const realizado = buildSection(true);
 
     return {
       months: months.map(m => format(m, "MMM", { locale: ptBR }).toUpperCase()),
-      revRows, expRows, monthTotalsRev, monthTotalsExp, monthBalance, accumulated, carryOver,
+      ...all,
+      previsto,
+      realizado,
     };
-  }, [entries, categories, periodStart, periodEnd, doarShowPaid, doarHideCarryOver]);
+  }, [entries, categories, periodStart, periodEnd, doarHideCarryOver]);
 
   // Indicator chart data
   const reportChartData = useMemo(() => {
@@ -1073,17 +1086,16 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     const nextLevel = doarExpandLevel >= 3 ? 1 : doarExpandLevel + 1;
     setDoarExpandLevel(nextLevel);
     if (nextLevel === 1) {
-      setRevenueCollapsed(true);
-      setExpenseCollapsed(true);
       setExpandedCats(new Set());
     } else if (nextLevel === 2) {
-      setRevenueCollapsed(false);
-      setExpenseCollapsed(false);
       setExpandedCats(new Set());
     } else {
-      setRevenueCollapsed(false);
-      setExpenseCollapsed(false);
-      const allIds = [...dreData.revRows, ...dreData.expRows].map(r => r.id);
+      const allIds = [
+        ...dreData.previsto.revRows.map(r => `prev-${r.id}`),
+        ...dreData.previsto.expRows.map(r => `prev-${r.id}`),
+        ...dreData.realizado.revRows.map(r => `real-${r.id}`),
+        ...dreData.realizado.expRows.map(r => `real-${r.id}`),
+      ];
       setExpandedCats(new Set(allIds));
     }
   };
@@ -1896,9 +1908,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     };
                     const statusText = getStatusText();
                     const statusColor = statusText === "Atrasado" ? "text-[#E74C3C] font-semibold"
-                      : (statusText === "Pago" || statusText === "Recebido" || statusText === "Baixado")
-                        ? (e.type === "revenue" ? "text-[#27AE60]" : "text-[#E74C3C]")
-                      : "text-foreground";
+                      : "text-muted-foreground";
 
                     return (
                       <tr key={e.id}
@@ -2000,18 +2010,13 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
         {/* ============ DOAR ============ */}
         {viewTab === "doar" && (() => {
-          const totalRevYear = dreData.monthTotalsRev.reduce((s, v) => s + v, 0);
-          const totalExpYear = dreData.monthTotalsExp.reduce((s, v) => s + v, 0);
-
           const dQuery = doarSearchQuery.toLowerCase().trim();
           const filterDoarRow = (row: { name: string; months: number[] }) => {
             return !dQuery || row.name.toLowerCase().includes(dQuery);
           };
-          const filteredRevRows = dreData.revRows.filter(filterDoarRow);
-          const filteredExpRows = dreData.expRows.filter(filterDoarRow);
 
-          const renderCategoryEntries = (row: typeof dreData.revRows[0]) => {
-            if (!expandedCats.has(row.id)) return null;
+          const renderCategoryEntries = (row: typeof dreData.revRows[0], keyPrefix: string) => {
+            if (!expandedCats.has(`${keyPrefix}-${row.id}`)) return null;
             const allEntries = row.entries.flat();
             if (allEntries.length === 0) return null;
             const grouped = new Map<string, { title: string; monthAmounts: number[] }>();
@@ -2024,14 +2029,13 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               grouped.get(key)!.monthAmounts[mi] += Number(e.amount);
             });
             const rowTotal = row.months.reduce((s, v) => s + v, 0);
-            // Sort alphabetically
             return Array.from(grouped.values())
               .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"))
               .map(g => {
                 const entryTotal = g.monthAmounts.reduce((s, v) => s + v, 0);
                 const pctOfCat = rowTotal > 0 ? ((entryTotal / rowTotal) * 100).toFixed(1) : "0.0";
                 return (
-                  <tr key={g.title} className="entry-row bg-muted/10 text-xs">
+                  <tr key={`${keyPrefix}-${g.title}`} className="entry-row bg-muted/10 text-xs">
                     <td className="p-1.5 border-b border-border/50 pl-10 text-muted-foreground">{g.title}</td>
                     <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground/60">{pctOfCat}%</td>
                     {g.monthAmounts.map((v, mi) => (
@@ -2047,214 +2051,216 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               });
           };
 
-          return (
-          <div className="space-y-4">
-            {/* DOAR quick filters only - toolbar moved to shared bar */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1 flex-wrap">
-                <Button size="sm"
-                  variant={doarShowPaid ? "default" : "ghost"}
-                  className={cn("h-7 text-xs px-2.5 gap-1 rounded-full", !doarShowPaid && "text-muted-foreground hover:text-foreground")}
-                  onClick={() => setDoarShowPaid(!doarShowPaid)}
-                >
-                  {doarShowPaid ? "Real (Baixados)" : "Previsto (Todos)"}
-                </Button>
-                <div className="flex items-center gap-1.5">
-                  <Checkbox checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} id="carry-over" className="h-3.5 w-3.5" />
-                  <Label htmlFor="carry-over" className="text-xs text-muted-foreground whitespace-nowrap">Saldo anterior</Label>
-                </div>
-              </div>
-            </div>
+          const toggleCatExpandPrefixed = (prefix: string, id: string) => {
+            const key = `${prefix}-${id}`;
+            setExpandedCats(prev => {
+              const next = new Set(prev);
+              if (next.has(key)) next.delete(key); else next.add(key);
+              return next;
+            });
+          };
 
-            <div id="doar-print-area" className="rounded-lg border border-border overflow-auto">
-              <table className="w-full text-xs border-collapse">
-                <thead className="sticky top-0 z-10 bg-background">
-                  <tr className="bg-primary/10">
-                    <th colSpan={15} className="text-center p-3 border-b border-border">
-                      <h1 className="uppercase font-bold text-sm text-primary tracking-wide">
-                        DOAR — DEMONSTRATIVO DE ORIGEM E APLICAÇÃO DE RECURSOS
-                      </h1>
-                      <p className="text-[0.9em] text-muted-foreground mt-0.5 font-normal">
-                        (Período: {format(new Date(periodStart), "dd/MM/yyyy")} a {format(new Date(periodEnd), "dd/MM/yyyy")})
-                      </p>
-                    </th>
-                  </tr>
-                  <tr className="bg-muted">
-                    <th className="text-left p-2 border-b border-border font-bold min-w-[140px]">Descrição</th>
-                    <th className="text-right p-2 border-b border-border font-bold min-w-[50px]">%</th>
-                    {dreData.months.map(m => (
-                      <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px]">{m}</th>
-                    ))}
-                    <th className="text-right p-2 border-b border-border font-bold min-w-[90px] bg-muted">TOTAL</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Carry-over */}
-                  {!doarHideCarryOver && dreData.carryOver !== 0 && (
-                    <tr className="carry-row bg-primary/5">
-                      <td className="p-2 border-b border-border font-bold text-primary">📦 Saldo Anterior</td>
-                      <td className="text-right p-2 border-b border-border text-muted-foreground">—</td>
-                      {dreData.months.map((m, i) => (
-                        <td key={m} className="text-right p-2 border-b border-border">
-                          {i === 0 ? <span className={dreData.carryOver >= 0 ? "text-success" : "text-destructive"}>{brl(dreData.carryOver)}</span> : ""}
-                        </td>
-                      ))}
-                      <td className={cn("text-right p-2 border-b border-border font-bold", dreData.carryOver >= 0 ? "text-success" : "text-destructive")}>
-                        {brl(dreData.carryOver)}
-                      </td>
+          const renderDoarTable = (
+            sectionData: typeof dreData.previsto,
+            sectionLabel: string,
+            sectionDesc: string,
+            keyPrefix: string,
+          ) => {
+            const totalRevYear = sectionData.monthTotalsRev.reduce((s, v) => s + v, 0);
+            const totalExpYear = sectionData.monthTotalsExp.reduce((s, v) => s + v, 0);
+            const filteredRevRows = sectionData.revRows.filter(filterDoarRow);
+            const filteredExpRows = sectionData.expRows.filter(filterDoarRow);
+
+            return (
+              <div className="rounded-lg border border-border overflow-auto">
+                <table className="w-full text-xs border-collapse">
+                  <thead className="sticky top-0 z-10 bg-background">
+                    <tr className="bg-primary/10">
+                      <th colSpan={15} className="text-center p-3 border-b border-border">
+                        <h1 className="uppercase font-bold text-sm text-primary tracking-wide">
+                          DOAR — {sectionLabel}
+                        </h1>
+                        <p className="text-[0.9em] text-muted-foreground mt-0.5 font-normal">
+                          {sectionDesc} — (Período: {format(new Date(periodStart), "dd/MM/yyyy")} a {format(new Date(periodEnd), "dd/MM/yyyy")})
+                        </p>
+                      </th>
                     </tr>
-                  )}
-
-                  {/* Revenue header */}
-                  <tr className="section-header section-header-rev bg-success/10 cursor-pointer select-none" onClick={() => setRevenueCollapsed(!revenueCollapsed)}>
-                    <td colSpan={2} className="p-2 border-b border-border font-bold text-success">
-                      <span className="inline-flex items-center gap-1">
-                        <span className="expand-icon">
-                          {revenueCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-                        </span>
-                        RECEITAS
-                      </span>
-                    </td>
-                    {dreData.monthTotalsRev.map((v, i) => (
-                      <td key={i} className="text-right p-2 border-b border-border font-bold text-success">{revenueCollapsed ? brl(v) : ""}</td>
-                    ))}
-                    {revenueCollapsed && <td className="text-right p-2 border-b border-border font-bold text-success">{brl(totalRevYear)}</td>}
-                    {!revenueCollapsed && <td className="p-2 border-b border-border" />}
-                  </tr>
-                  {!revenueCollapsed && filteredRevRows.map(row => {
-                    const rowTotal = row.months.reduce((s, v) => s + v, 0);
-                    const pct = totalRevYear > 0 ? ((rowTotal / totalRevYear) * 100).toFixed(1) : "0.0";
-                    const isExpanded = expandedCats.has(row.id);
-                    return (
-                      <React.Fragment key={row.id}>
-                        <tr className="cat-row hover:bg-muted/30 cursor-pointer" onClick={() => toggleCatExpand(row.id)}>
-                          <td className="p-2 border-b border-border pl-6">
-                            <span className="inline-flex items-center gap-1">
-                              <span className="expand-icon">
-                                {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
-                              </span>
-                              {row.name}
-                            </span>
+                    <tr className="bg-muted">
+                      <th className="text-left p-2 border-b border-border font-bold min-w-[140px]">Descrição</th>
+                      <th className="text-right p-2 border-b border-border font-bold min-w-[50px]">%</th>
+                      {dreData.months.map(m => (
+                        <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px]">{m}</th>
+                      ))}
+                      <th className="text-right p-2 border-b border-border font-bold min-w-[90px] bg-muted">TOTAL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Carry-over */}
+                    {!doarHideCarryOver && sectionData.carryOver !== 0 && (
+                      <tr className="carry-row bg-primary/5">
+                        <td className="p-2 border-b border-border font-bold text-primary">📦 Saldo Anterior</td>
+                        <td className="text-right p-2 border-b border-border text-muted-foreground">—</td>
+                        {dreData.months.map((m, i) => (
+                          <td key={m} className="text-right p-2 border-b border-border">
+                            {i === 0 ? <span className={sectionData.carryOver >= 0 ? "text-success" : "text-destructive"}>{brl(sectionData.carryOver)}</span> : ""}
                           </td>
-                          <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
-                          {row.months.map((v, i) => (
-                            <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-success" : "text-muted-foreground")}>
-                              {v > 0 ? brl(v) : "—"}
+                        ))}
+                        <td className={cn("text-right p-2 border-b border-border font-bold", sectionData.carryOver >= 0 ? "text-success" : "text-destructive")}>
+                          {brl(sectionData.carryOver)}
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Revenue */}
+                    <tr className="section-header bg-success/10">
+                      <td colSpan={2} className="p-2 border-b border-border font-bold text-success">RECEITAS</td>
+                      {sectionData.monthTotalsRev.map((v, i) => (
+                        <td key={i} className="text-right p-2 border-b border-border font-bold text-success">{brl(v)}</td>
+                      ))}
+                      <td className="text-right p-2 border-b border-border font-bold text-success">{brl(totalRevYear)}</td>
+                    </tr>
+                    {filteredRevRows.map(row => {
+                      const rowTotal = row.months.reduce((s, v) => s + v, 0);
+                      if (rowTotal === 0 && !row.months.some(v => v > 0)) return null;
+                      const pct = totalRevYear > 0 ? ((rowTotal / totalRevYear) * 100).toFixed(1) : "0.0";
+                      const isExpanded = expandedCats.has(`${keyPrefix}-${row.id}`);
+                      return (
+                        <React.Fragment key={row.id}>
+                          <tr className="cat-row hover:bg-muted/30 cursor-pointer" onClick={() => toggleCatExpandPrefixed(keyPrefix, row.id)}>
+                            <td className="p-2 border-b border-border pl-6">
+                              <span className="inline-flex items-center gap-1">
+                                <span className="expand-icon">
+                                  {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                                </span>
+                                {row.name}
+                              </span>
                             </td>
-                          ))}
-                          <td className="text-right p-2 border-b border-border font-medium text-success">{brl(rowTotal)}</td>
-                        </tr>
-                        {renderCategoryEntries(row)}
-                      </React.Fragment>
-                    );
-                  })}
-                  {!revenueCollapsed && (
-                    <tr className="total-row total-row-rev bg-success/5 font-bold">
+                            <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
+                            {row.months.map((v, i) => (
+                              <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-success" : "text-muted-foreground")}>
+                                {v > 0 ? brl(v) : "—"}
+                              </td>
+                            ))}
+                            <td className="text-right p-2 border-b border-border font-medium text-success">{brl(rowTotal)}</td>
+                          </tr>
+                          {renderCategoryEntries(row, keyPrefix)}
+                        </React.Fragment>
+                      );
+                    })}
+                    <tr className="total-row bg-success/5 font-bold">
                       <td className="p-2 border-b-2 border-border text-success">TOTAL RECEITAS</td>
                       <td className="text-right p-2 border-b-2 border-border text-success">100%</td>
-                      {dreData.monthTotalsRev.map((v, i) => (
+                      {sectionData.monthTotalsRev.map((v, i) => (
                         <td key={i} className="text-right p-2 border-b-2 border-border text-success">{brl(v)}</td>
                       ))}
                       <td className="text-right p-2 border-b-2 border-border text-success">{brl(totalRevYear)}</td>
                     </tr>
-                  )}
 
-                  {/* Expense header */}
-                  <tr className="section-header section-header-exp bg-destructive/10 cursor-pointer select-none" onClick={() => setExpenseCollapsed(!expenseCollapsed)}>
-                    <td colSpan={2} className="p-2 border-b border-border font-bold text-destructive">
-                      <span className="inline-flex items-center gap-1">
-                        <span className="expand-icon">
-                          {expenseCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-                        </span>
-                        DESPESAS
-                      </span>
-                    </td>
-                    {dreData.monthTotalsExp.map((v, i) => (
-                      <td key={i} className="text-right p-2 border-b border-border font-bold text-destructive">{expenseCollapsed ? brl(v) : ""}</td>
-                    ))}
-                    {expenseCollapsed && <td className="text-right p-2 border-b border-border font-bold text-destructive">{brl(totalExpYear)}</td>}
-                    {!expenseCollapsed && <td className="p-2 border-b border-border" />}
-                  </tr>
-                  {!expenseCollapsed && filteredExpRows.map(row => {
-                    const rowTotal = row.months.reduce((s, v) => s + v, 0);
-                    const pct = totalExpYear > 0 ? ((rowTotal / totalExpYear) * 100).toFixed(1) : "0.0";
-                    const isExpanded = expandedCats.has(row.id);
-                    return (
-                      <React.Fragment key={row.id}>
-                        <tr className="cat-row hover:bg-muted/30 cursor-pointer" onClick={() => toggleCatExpand(row.id)}>
-                          <td className="p-2 border-b border-border pl-6">
-                            <span className="inline-flex items-center gap-1">
-                              <span className="expand-icon">
-                                {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                    {/* Expenses */}
+                    <tr className="section-header bg-destructive/10">
+                      <td colSpan={2} className="p-2 border-b border-border font-bold text-destructive">DESPESAS</td>
+                      {sectionData.monthTotalsExp.map((v, i) => (
+                        <td key={i} className="text-right p-2 border-b border-border font-bold text-destructive">{brl(v)}</td>
+                      ))}
+                      <td className="text-right p-2 border-b border-border font-bold text-destructive">{brl(totalExpYear)}</td>
+                    </tr>
+                    {filteredExpRows.map(row => {
+                      const rowTotal = row.months.reduce((s, v) => s + v, 0);
+                      if (rowTotal === 0 && !row.months.some(v => v > 0)) return null;
+                      const pct = totalExpYear > 0 ? ((rowTotal / totalExpYear) * 100).toFixed(1) : "0.0";
+                      const isExpanded = expandedCats.has(`${keyPrefix}-${row.id}`);
+                      return (
+                        <React.Fragment key={row.id}>
+                          <tr className="cat-row hover:bg-muted/30 cursor-pointer" onClick={() => toggleCatExpandPrefixed(keyPrefix, row.id)}>
+                            <td className="p-2 border-b border-border pl-6">
+                              <span className="inline-flex items-center gap-1">
+                                <span className="expand-icon">
+                                  {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                                </span>
+                                {row.name}
                               </span>
-                              {row.name}
-                            </span>
-                          </td>
-                          <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
-                          {row.months.map((v, i) => (
-                            <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-destructive" : "text-muted-foreground")}>
-                              {v > 0 ? brl(v) : "—"}
                             </td>
-                          ))}
-                          <td className="text-right p-2 border-b border-border font-medium text-destructive">{brl(rowTotal)}</td>
-                        </tr>
-                        {renderCategoryEntries(row)}
-                      </React.Fragment>
-                    );
-                  })}
-                  {!expenseCollapsed && (
-                    <tr className="total-row total-row-exp bg-destructive/5 font-bold">
+                            <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
+                            {row.months.map((v, i) => (
+                              <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-destructive" : "text-muted-foreground")}>
+                                {v > 0 ? brl(v) : "—"}
+                              </td>
+                            ))}
+                            <td className="text-right p-2 border-b border-border font-medium text-destructive">{brl(rowTotal)}</td>
+                          </tr>
+                          {renderCategoryEntries(row, keyPrefix)}
+                        </React.Fragment>
+                      );
+                    })}
+                    <tr className="total-row bg-destructive/5 font-bold">
                       <td className="p-2 border-b-2 border-border text-destructive">TOTAL DESPESAS</td>
                       <td className="text-right p-2 border-b-2 border-border text-destructive">100%</td>
-                      {dreData.monthTotalsExp.map((v, i) => (
+                      {sectionData.monthTotalsExp.map((v, i) => (
                         <td key={i} className="text-right p-2 border-b-2 border-border text-destructive">{brl(v)}</td>
                       ))}
                       <td className="text-right p-2 border-b-2 border-border text-destructive">{brl(totalExpYear)}</td>
                     </tr>
-                  )}
 
-                  {/* Balance per month */}
-                  {(() => {
-                    const totalResult = dreData.monthBalance.reduce((s, v) => s + v, 0);
-                    const resultPctRev = totalRevYear > 0 ? ((totalResult / totalRevYear) * 100).toFixed(1) : "0.0";
-                    return (
-                      <tr className="result-row bg-primary/5 font-bold">
-                        <td className="p-2 border-b border-border text-primary">RESULTADO DO MÊS</td>
-                        <td className="text-right p-2 border-b border-border text-primary">{resultPctRev}%</td>
-                        {dreData.monthBalance.map((v, i) => (
-                          <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
-                            {brl(v)}
-                          </td>
-                        ))}
-                        <td className={cn("text-right p-2 border-b border-border font-bold",
-                          totalResult >= 0 ? "text-success" : "text-destructive"
-                        )}>{brl(totalResult)}</td>
-                      </tr>
-                    );
-                  })()}
+                    {/* Balance */}
+                    {(() => {
+                      const totalResult = sectionData.monthBalance.reduce((s, v) => s + v, 0);
+                      const resultPctRev = totalRevYear > 0 ? ((totalResult / totalRevYear) * 100).toFixed(1) : "0.0";
+                      return (
+                        <tr className="result-row bg-primary/5 font-bold">
+                          <td className="p-2 border-b border-border text-primary">RESULTADO</td>
+                          <td className="text-right p-2 border-b border-border text-primary">{resultPctRev}%</td>
+                          {sectionData.monthBalance.map((v, i) => (
+                            <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
+                              {brl(v)}
+                            </td>
+                          ))}
+                          <td className={cn("text-right p-2 border-b border-border font-bold",
+                            totalResult >= 0 ? "text-success" : "text-destructive"
+                          )}>{brl(totalResult)}</td>
+                        </tr>
+                      );
+                    })()}
 
-                  {/* Accumulated */}
-                  {(() => {
-                    const lastAcc = dreData.accumulated[11] || 0;
-                    const accPctRev = totalRevYear > 0 ? ((lastAcc / totalRevYear) * 100).toFixed(1) : "0.0";
-                    return (
-                      <tr className="accum-row bg-muted font-bold">
-                        <td className="p-2 border-b border-border">SALDO ACUMULADO</td>
-                        <td className="text-right p-2 border-b border-border text-muted-foreground">{accPctRev}%</td>
-                        {dreData.accumulated.map((v, i) => (
-                          <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
-                            {brl(v)}
-                          </td>
-                        ))}
-                        <td className={cn("text-right p-2 border-b border-border font-bold",
-                          lastAcc >= 0 ? "text-success" : "text-destructive"
-                        )}>{brl(lastAcc)}</td>
-                      </tr>
-                    );
-                  })()}
-                </tbody>
-              </table>
+                    {/* Accumulated */}
+                    {(() => {
+                      const lastAcc = sectionData.accumulated[11] || 0;
+                      const accPctRev = totalRevYear > 0 ? ((lastAcc / totalRevYear) * 100).toFixed(1) : "0.0";
+                      return (
+                        <tr className="accum-row bg-muted font-bold">
+                          <td className="p-2 border-b border-border">SALDO ACUMULADO</td>
+                          <td className="text-right p-2 border-b border-border text-muted-foreground">{accPctRev}%</td>
+                          {sectionData.accumulated.map((v, i) => (
+                            <td key={i} className={cn("text-right p-2 border-b border-border font-bold", v >= 0 ? "text-success" : "text-destructive")}>
+                              {brl(v)}
+                            </td>
+                          ))}
+                          <td className={cn("text-right p-2 border-b border-border font-bold",
+                            lastAcc >= 0 ? "text-success" : "text-destructive"
+                          )}>{brl(lastAcc)}</td>
+                        </tr>
+                      );
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            );
+          };
+
+          return (
+          <div className="space-y-4" id="doar-print-area">
+            {/* DOAR quick filters */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <Checkbox checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} id="carry-over" className="h-3.5 w-3.5" />
+                <Label htmlFor="carry-over" className="text-xs text-muted-foreground whitespace-nowrap">Saldo anterior</Label>
+              </div>
             </div>
+
+            {/* PREVISTO — Contas a Pagar/Receber */}
+            {renderDoarTable(dreData.previsto, "PREVISTO", "Contas a Pagar / Receber", "prev")}
+
+            {/* REALIZADO — Contas Pagas/Recebidas */}
+            {renderDoarTable(dreData.realizado, "REALIZADO", "Contas Pagas / Recebidas", "real")}
           </div>
           );
         })()}
