@@ -212,7 +212,7 @@ export default function Dashboard() {
           <div className="flex-1 overflow-hidden">
             {activeModule === "dashboard" && <DashboardView />}
             {activeModule === "calendar" && <CalendarView onTabChange={setCalendarTab} />}
-            {activeModule === "finances" && <FinancesView onTabChange={setFinanceTab} walletFilter={walletFilter} onClearWalletFilter={() => setWalletFilter(null)} />}
+            {activeModule === "finances" && <FinancesView onTabChange={setFinanceTab} walletFilter={walletFilter} onClearWalletFilter={() => setWalletFilter(null)} onNavigateToPatrimonio={() => { setWalletFilter(null); setActiveModule("patrimonio"); }} />}
             {activeModule === "programs" && <ProgramsProjectsView onTabChange={setProjectTab} />}
             {activeModule === "investments" && <InvestmentsView onTabChange={setInvestmentTab} />}
             {activeModule === "patrimonio" && <PatrimonioView onNavigateToFluxo={(acc) => { setWalletFilter(acc); setActiveModule("finances"); }} />}
