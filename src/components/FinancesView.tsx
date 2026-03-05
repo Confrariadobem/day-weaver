@@ -1432,6 +1432,36 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     setFluxoIntervalOpen(false);
   };
 
+  // Shared Intervalo state for DOAR / Centro de Custo (updates periodStart/periodEnd)
+  const [sharedIntervalOpen, setSharedIntervalOpen] = useState(false);
+  const [sharedCustomFrom, setSharedCustomFrom] = useState<Date | undefined>(undefined);
+  const [sharedCustomTo, setSharedCustomTo] = useState<Date | undefined>(undefined);
+  const [sharedDateFrom, setSharedDateFrom] = useState("");
+  const [sharedDateTo, setSharedDateTo] = useState("");
+
+  const handleSharedIntervalSelect = (range: any) => {
+    if (range?.from) {
+      setSharedCustomFrom(range.from);
+      setSharedDateFrom(format(range.from, "dd/MM/yyyy"));
+      setPeriodStart(format(range.from, "yyyy-MM-dd"));
+    }
+    if (range?.to) {
+      setSharedCustomTo(range.to);
+      setSharedDateTo(format(range.to, "dd/MM/yyyy"));
+      setPeriodEnd(format(range.to, "yyyy-MM-dd"));
+    }
+  };
+
+  const handleClearSharedInterval = () => {
+    setSharedCustomFrom(undefined);
+    setSharedCustomTo(undefined);
+    setSharedDateFrom("");
+    setSharedDateTo("");
+    setPeriodStart(format(startOfYear(new Date()), "yyyy-MM-dd"));
+    setPeriodEnd(format(endOfYear(new Date()), "yyyy-MM-dd"));
+    setSharedIntervalOpen(false);
+  };
+
   // Toolbar renderer (context-sensitive, right of tabs)
   const renderToolbar = () => {
     const isPrevisao = viewTab === "previsao";
@@ -1439,9 +1469,56 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     const isIndicadores = viewTab === "indicadores";
     const isCentro = viewTab === "centrocusto";
 
+    // Shared Intervalo popover renderer (for DOAR / Centro de Custo)
+    const renderSharedInterval = () => (
+      <Popover open={sharedIntervalOpen} onOpenChange={setSharedIntervalOpen}>
+        <PopoverTrigger asChild>
+          <button
+            onClick={() => setSharedIntervalOpen(true)}
+            className={cn(
+              "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+              (sharedDateFrom || sharedDateTo)
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border hover:border-primary/80 hover:bg-primary/5"
+            )}
+          >
+            <CalendarRange className="size-4" />
+            <span className="text-xs font-medium">Intervalo</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-3" align="start">
+          <Calendar mode="range" locale={ptBR} showOutsideDays={false}
+            selected={{ from: sharedCustomFrom, to: sharedCustomTo }}
+            onSelect={handleSharedIntervalSelect}
+            className="pointer-events-auto" />
+          <div className="space-y-2 border-t border-border/30 pt-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold w-8 shrink-0">De:</span>
+              <Input value={sharedDateFrom}
+                onChange={(e) => setSharedDateFrom(normalizeDateInput(e.target.value))}
+                onBlur={() => { const d = parseDMY(sharedDateFrom); if (d) { setSharedCustomFrom(d); setSharedDateFrom(format(d, "dd/MM/yyyy")); setPeriodStart(format(d, "yyyy-MM-dd")); } }}
+                placeholder="DD/MM/AAAA" className="h-8 text-xs rounded-md border-border" style={{ width: 150 }} maxLength={10} />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold w-8 shrink-0">Até:</span>
+              <Input value={sharedDateTo}
+                onChange={(e) => setSharedDateTo(normalizeDateInput(e.target.value))}
+                onBlur={() => { const d = parseDMY(sharedDateTo); if (d) { setSharedCustomTo(d); setSharedDateTo(format(d, "dd/MM/yyyy")); setPeriodEnd(format(d, "yyyy-MM-dd")); } }}
+                placeholder="DD/MM/AAAA" className="h-8 text-xs rounded-md border-border" style={{ width: 150 }} maxLength={10} />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button onClick={handleClearSharedInterval}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
+              style={{ minWidth: 80, height: 32 }}>Limpar</button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+
     return (
       <div className="flex items-center gap-3">
-        {!isPrevisao && renderPeriodFilter()}
+        {isIndicadores && renderPeriodFilter()}
 
         {isPrevisao && (
           <>
@@ -1543,68 +1620,61 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           </>
         )}
 
-        {isDoar && (
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input placeholder="Pesquisar..." value={doarSearchQuery} onChange={(e) => setDoarSearchQuery(e.target.value)}
-              className="h-7 pl-8 text-xs w-36 rounded-xl" />
-          </div>
+        {(isDoar || isCentro) && (
+          <>
+            <div className="relative" style={{ width: 300 }}>
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input placeholder={isDoar ? "Pesquisar categorias..." : "Pesquisar centros..."} 
+                value={isDoar ? doarSearchQuery : ccReportSearch} 
+                onChange={(e) => isDoar ? setDoarSearchQuery(e.target.value) : setCcReportSearch(e.target.value)}
+                className="h-7 pl-8 pr-7 text-xs rounded-lg" />
+              {(isDoar ? doarSearchQuery : ccReportSearch) && (
+                <button onClick={() => isDoar ? setDoarSearchQuery("") : setCcReportSearch("")} className="absolute right-2 top-2 text-[#9ca3af] hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {renderSharedInterval()}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={isDoar ? handlePrintDOAR : handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                  <Printer className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Imprimir</TooltipContent>
+            </Tooltip>
+            {isDoar && (
+              <Tooltip delayDuration={200}>
+                <TooltipTrigger asChild>
+                  <button onClick={cycleDoarExpand} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                    <ChevronsUpDown className="h-5 w-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Expandir/Recolher (Nível {doarExpandLevel}/3)</TooltipContent>
+              </Tooltip>
+            )}
+          </>
         )}
-        {isCentro && (
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input placeholder="Pesquisar centros..." value={ccReportSearch} onChange={(e) => setCcReportSearch(e.target.value)}
-              className="h-7 pl-8 text-xs w-36 rounded-xl" />
-          </div>
-        )}
+
         {isIndicadores && (
-          <Tooltip delayDuration={200}>
-            <TooltipTrigger asChild>
-              <button onClick={handleExportCSV} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
-                <FileUp className="h-5 w-5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Exportar CSV</TooltipContent>
-          </Tooltip>
-        )}
-        {!isPrevisao && (
-          <Tooltip delayDuration={200}>
-            <TooltipTrigger asChild>
-              <button onClick={isDoar ? handlePrintDOAR : handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
-                <Printer className="h-5 w-5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Imprimir</TooltipContent>
-          </Tooltip>
-        )}
-        {isDoar && (
-          <Tooltip delayDuration={200}>
-            <TooltipTrigger asChild>
-              <button onClick={cycleDoarExpand} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
-                <ChevronsUpDown className="h-5 w-5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Expandir/Recolher (Nível {doarExpandLevel}/3)</TooltipContent>
-          </Tooltip>
-        )}
-        {isCentro && (
-          <Select value={ccReportFilterIds.size === 0 ? "all" : Array.from(ccReportFilterIds)[0] || "all"} onValueChange={(v) => {
-            if (v === "all") setCcReportFilterIds(new Set());
-            else setCcReportFilterIds(new Set([v]));
-          }}>
-            <SelectTrigger className="h-7 w-40 text-xs rounded-xl"><SelectValue placeholder="Centro de Custo" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Centros</SelectItem>
-              {costCenters.map((cc: any) => (
-                <SelectItem key={cc.id} value={cc.id}>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color || "#6b7280" }} />
-                    {cc.name}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={handleExportCSV} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                  <FileUp className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Exportar CSV</TooltipContent>
+            </Tooltip>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                  <Printer className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Imprimir</TooltipContent>
+            </Tooltip>
+          </>
         )}
       </div>
     );
@@ -1963,7 +2033,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 <thead className="sticky top-0 z-10 bg-background">
                   <tr className="bg-primary/10">
                     <th colSpan={15} className="text-center p-3 border-b border-border font-bold text-sm text-primary tracking-wide">
-                      DOAR – {doarShowPaid ? "REALIZADO" : "PREVISTO"} — {periodYear}
+                      DOAR – {doarShowPaid ? "REALIZADO" : "PREVISTO"} — {format(new Date(periodStart), "dd/MM/yyyy")} a {format(new Date(periodEnd), "dd/MM/yyyy")}
                     </th>
                   </tr>
                   <tr className="bg-muted">
