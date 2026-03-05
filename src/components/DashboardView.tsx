@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart as RechartsPieChart, Pie, Cell, Line, Legend, ComposedChart, AreaChart, Area,
@@ -16,7 +17,7 @@ import {
   TrendingUp, TrendingDown, Wallet, PiggyBank,
   BarChart3, Building2,
   CalendarCheck, CalendarDays, CalendarRange, Scale, PieChart as PieChartIcon,
-  ArrowRightLeft, ChevronDown, ChevronUp,
+  ArrowRightLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
@@ -350,16 +351,14 @@ export default function DashboardView() {
             <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
               <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                 <ArrowRightLeft className="size-6 mr-1 text-muted-foreground" /> Câmbio
-                <button
-                  onClick={handleToggleConversion}
-                  className="ml-auto p-1 rounded-md hover:bg-muted/60 transition-colors text-muted-foreground"
-                  aria-label={showConversion ? "Ocultar câmbio" : "Mostrar câmbio"}
-                >
-                  {showConversion ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-                </button>
+                <Switch
+                  checked={showConversion}
+                  onCheckedChange={handleToggleConversion}
+                  className="ml-auto"
+                />
               </p>
               {showConversion && (
-                <div className="space-y-1.5 mt-2 animate-in fade-in duration-300">
+                <div className="space-y-3 mt-3 animate-in fade-in duration-300">
                   {ratesLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Carregando...</span>}
                   {otherCurrencies.map(cur => {
                     const val = cur === "BRL"
