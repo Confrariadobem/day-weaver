@@ -346,20 +346,20 @@ export default function DashboardView() {
           </div>
 
           {/* Câmbio widget – fixed right */}
-          <Card className="bg-card/60 border shrink-0" style={{ width: 243 }}>
-            <CardContent className="p-3 flex flex-col" style={{ minHeight: showConversion ? 240 : undefined }}>
-              <div className="flex items-center justify-between">
-                <span className="text-[1.1rem] font-bold text-foreground">Câmbio</span>
+          <Card className="bg-card shrink-0" style={{ width: 243 }}>
+            <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+              <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <ArrowRightLeft className="size-6 mr-1 text-muted-foreground" /> Câmbio
                 <button
                   onClick={handleToggleConversion}
-                  className="p-1 rounded-md hover:bg-muted/60 transition-colors text-muted-foreground"
+                  className="ml-auto p-1 rounded-md hover:bg-muted/60 transition-colors text-muted-foreground"
                   aria-label={showConversion ? "Ocultar câmbio" : "Mostrar câmbio"}
                 >
-                  {showConversion ? <ChevronUp className="size-5" /> : <ChevronDown className="size-5" />}
+                  {showConversion ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
                 </button>
-              </div>
+              </p>
               {showConversion && (
-                <div className="space-y-2.5 mt-3 animate-in fade-in duration-300">
+                <div className="space-y-1.5 mt-2 animate-in fade-in duration-300">
                   {ratesLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Carregando...</span>}
                   {otherCurrencies.map(cur => {
                     const val = cur === "BRL"
@@ -369,11 +369,11 @@ export default function DashboardView() {
                       ? 1
                       : rates[cur as "USD" | "EUR" | "BTC"];
                     return (
-                      <div key={cur} className="space-y-0.5">
-                        <p className="text-[0.85rem] font-semibold text-foreground">
+                      <div key={cur} className="space-y-0">
+                        <p className="text-[0.75rem] text-foreground">
                           {cur}: ≈ {fmtOther(val, cur)}
                         </p>
-                        <p className="text-[0.85rem] text-muted-foreground">
+                        <p className="text-[0.65rem] text-muted-foreground">
                           ({cur === "BRL" ? "moeda base" : fmtRate(cur, rate)})
                         </p>
                       </div>
