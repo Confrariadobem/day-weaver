@@ -516,7 +516,7 @@ export default function PatrimonioView() {
                         <p className={cn("text-[0.9rem]", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
                           Movimentos: {movement >= 0 ? "+" : ""}{brl(movement)}
                         </p>
-                        <p className={cn("text-[0.9rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
+                        <p className={cn("text-[1.2rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
                           Saldo Atual: {brl(Number(acc.current_balance))}
                         </p>
                         {creditAvailable !== null && (
@@ -524,6 +524,14 @@ export default function PatrimonioView() {
                             Limite disponível: {brl(creditAvailable)}
                           </p>
                         )}
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-border/20">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deactivateAccount(acc.id); }}
+                          className="text-[0.9rem] text-[#ef4444] border border-[#ef4444] rounded-lg px-3 py-1 hover:bg-[#fee2e2] transition-colors"
+                        >
+                          Desativar
+                        </button>
                       </div>
                     </div>
                   );
@@ -566,9 +574,17 @@ export default function PatrimonioView() {
                             <p className={cn("text-[0.9rem]", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
                               Movimentos: {movement >= 0 ? "+" : ""}{brl(movement)}
                             </p>
-                            <p className={cn("text-[0.9rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
+                            <p className={cn("text-[1.2rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
                               Saldo Atual: {brl(Number(acc.current_balance))}
                             </p>
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-border/20">
+                            <button
+                              onClick={() => reactivateAccount(acc.id)}
+                              className="text-[0.9rem] text-[#10b981] border border-[#10b981] rounded-lg px-3 py-1 hover:bg-[#d1fae5] transition-colors"
+                            >
+                              Ativar
+                            </button>
                           </div>
                         </div>
                       );
