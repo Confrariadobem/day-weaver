@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
+import { DateFormatProvider } from "@/contexts/DateFormatContext";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
@@ -31,6 +32,7 @@ const App = () => (
     <ThemeProvider>
       <AuthProvider>
         <CurrencyProvider>
+          <DateFormatProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -42,6 +44,7 @@ const App = () => (
               </Routes>
             </BrowserRouter>
           </TooltipProvider>
+          </DateFormatProvider>
         </CurrencyProvider>
       </AuthProvider>
     </ThemeProvider>
