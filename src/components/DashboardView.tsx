@@ -369,10 +369,10 @@ export default function DashboardView() {
                       : rates[cur as "USD" | "EUR" | "BTC"];
                     return (
                       <div key={cur} className="space-y-0">
-                        <p className="text-[0.75rem] text-foreground">
+                        <p className="text-[0.8rem] text-foreground">
                           {cur}: ≈ {fmtOther(val, cur)}
                         </p>
-                        <p className="text-[0.65rem] text-muted-foreground">
+                        <p className="text-[0.7rem] text-muted-foreground">
                           ({cur === "BRL" ? "moeda base" : fmtRate(cur, rate)})
                         </p>
                       </div>
