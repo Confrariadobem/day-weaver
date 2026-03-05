@@ -1975,7 +1975,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td className="py-2.5 px-1 w-14 no-print">
                           <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
                             <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }}
-                              className="rounded p-0.5 text-white bg-[#4A90E2] hover:bg-[#357ABD] transition-colors">
+                              className="rounded p-0.5 text-foreground hover:text-foreground/80 transition-colors">
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
                             <button onClick={async (ev) => {
@@ -1990,11 +1990,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 description: e.description || null, currency: e.currency || "BRL",
                               });
                               fetchData();
-                            }} className="rounded p-0.5 text-white bg-[#2ECC71] hover:bg-[#27AE60] transition-colors">
+                            }} className="rounded p-0.5 text-muted-foreground hover:text-muted-foreground/80 transition-colors">
                               <Copy className="h-3.5 w-3.5" />
                             </button>
                             <button onClick={(ev) => { ev.stopPropagation(); setDeleteEntryConfirm(e.id); }}
-                              className="rounded p-0.5 text-white bg-[#E74C3C] hover:bg-[#C0392B] transition-colors">
+                              className="rounded p-0.5 text-destructive hover:text-destructive/80 transition-colors">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
