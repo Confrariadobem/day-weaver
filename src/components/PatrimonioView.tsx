@@ -505,7 +505,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
                         <div className="flex h-8 w-8 items-center justify-center text-[#6b7280]">
                           {ACCOUNT_ICONS[acc.type] || <Wallet className="h-5 w-5" />}
                         </div>
-                        <p className="text-[0.9rem] text-[#374151] truncate pr-6">{acc.name}</p>
+                        <p className="text-sm font-semibold text-foreground truncate pr-6">{acc.name}</p>
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-[0.9rem] text-[#6b7280]">
@@ -514,7 +514,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
                         <p className={cn("text-[0.9rem]", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
                           Movimentos: {movement >= 0 ? "+" : ""}{brl(movement)}
                         </p>
-                        <p className={cn("text-[1.2rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
+                        <p className={cn("text-[0.9rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
                           Saldo Atual: {brl(Number(acc.current_balance))}
                         </p>
                         {creditAvailable !== null && (
@@ -523,22 +523,16 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
                           </p>
                         )}
                       </div>
-                      <div className="mt-2 pt-2 border-t border-border/20 flex items-center gap-2">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deactivateAccount(acc.id); }}
-                          className="text-[0.9rem] text-[#ef4444] border border-[#ef4444] rounded-lg px-3 py-1 hover:bg-[#fee2e2] transition-colors"
-                        >
-                          Desativar
-                        </button>
-                        {onNavigateToFluxo && (
+                      {onNavigateToFluxo && (
+                        <div className="mt-2 pt-2 border-t border-border/20 flex items-center">
                           <button
                             onClick={(e) => { e.stopPropagation(); onNavigateToFluxo({ id: acc.id, name: acc.name }); }}
-                            className="text-[0.9rem] text-[#6b7280] border border-[#d1d5db] rounded-lg px-3 py-1 hover:bg-primary hover:text-white hover:border-primary transition-colors ml-auto"
+                            className="text-[0.9rem] text-[#6b7280] border border-[#d1d5db] rounded-md px-3 py-1 hover:text-primary hover:border-primary transition-colors ml-auto"
                           >
                             Ver Fluxo
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -555,8 +549,8 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
                   className="flex items-center gap-1.5 text-[0.9rem] text-[#9ca3af] opacity-70 hover:underline hover:opacity-100 transition-opacity group/inactive"
                 >
                   {showInactive
-                    ? <Eye className="h-5 w-5 text-[#9ca3af] group-hover/inactive:text-[#3b82f6] transition-colors" />
-                    : <EyeOff className="h-5 w-5 text-[#9ca3af] group-hover/inactive:text-[#3b82f6] transition-colors" />
+                    ? <EyeOff className="h-5 w-5 text-[#9ca3af] group-hover/inactive:text-[#3b82f6] transition-colors" />
+                    : <Eye className="h-5 w-5 text-[#9ca3af] group-hover/inactive:text-[#3b82f6] transition-colors" />
                   }
                   Inativas ({inactiveAccounts.length})
                 </button>
@@ -566,12 +560,13 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
                     {sortedInactive.map(acc => {
                       const movement = monthlyMovements[acc.id] || 0;
                       return (
-                        <div key={acc.id} className="relative rounded-lg border border-border/30 p-3 bg-[#f3f4f6] dark:bg-muted/10">
+                        <div key={acc.id} className="relative rounded-lg border border-border/30 p-3 bg-[#f3f4f6] dark:bg-muted/10 cursor-pointer hover:bg-muted/20 transition-colors"
+                          onClick={() => { openAccountEdit(acc); }}>
                           <div className="flex items-center gap-2 mb-2">
                             <div className="flex h-8 w-8 items-center justify-center text-[#6b7280] opacity-60">
                               {ACCOUNT_ICONS[acc.type] || <Wallet className="h-5 w-5" />}
                             </div>
-                            <p className="text-[0.9rem] text-[#374151] truncate flex-1 opacity-60">{acc.name}</p>
+                            <p className="text-sm font-semibold text-foreground truncate flex-1 opacity-60">{acc.name}</p>
                           </div>
                           <div className="space-y-0.5 opacity-60">
                             <p className="text-[0.9rem] text-[#6b7280]">
@@ -580,17 +575,9 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
                             <p className={cn("text-[0.9rem]", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
                               Movimentos: {movement >= 0 ? "+" : ""}{brl(movement)}
                             </p>
-                            <p className={cn("text-[1.2rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
+                            <p className={cn("text-[0.9rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
                               Saldo Atual: {brl(Number(acc.current_balance))}
                             </p>
-                          </div>
-                          <div className="mt-2 pt-2 border-t border-border/20">
-                            <button
-                              onClick={() => reactivateAccount(acc.id)}
-                              className="text-[0.9rem] text-[#10b981] border border-[#10b981] rounded-lg px-3 py-1 hover:bg-[#d1fae5] transition-colors"
-                            >
-                              Ativar
-                            </button>
                           </div>
                         </div>
                       );
