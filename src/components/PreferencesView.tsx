@@ -61,8 +61,8 @@ const DECIMAL_OPTIONS = [
 ];
 
 const DATE_FORMAT_OPTIONS = [
-  { value: "DD/MM/YYYY", label: "Dia/Mês/Ano (DD/MM/YYYY)" },
-  { value: "YYYY/MM/DD", label: "Ano/Mês/Dia (YYYY/MM/DD)" },
+  { value: "DD/MM/YYYY", label: "DD / MM / YYYY" },
+  { value: "YYYY/MM/DD", label: "YYYY / MM / DD" },
 ];
 
 const WEEK_STARTS = [
@@ -492,7 +492,7 @@ export default function PreferencesView() {
 
                   {/* Date format */}
                   <div className="max-w-xs">
-                    <Label className="text-xs">Formato de data preferido</Label>
+                    <Label className="text-xs">Formato de data</Label>
                     <Select value={dateFormat} onValueChange={(v) => setGlobalDateFormat(v as DateFormatType)}>
                       <SelectTrigger className="mt-1 h-9 text-sm rounded-lg"><SelectValue /></SelectTrigger>
                       <SelectContent>{DATE_FORMAT_OPTIONS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>

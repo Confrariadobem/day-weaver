@@ -112,7 +112,7 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
     [dateFormat]
   );
 
-  const placeholder = dateFormat === "YYYY/MM/DD" ? "____/__/__" : "__/__/____";
+  const placeholder = dateFormat === "YYYY/MM/DD" ? "YYYY / MM / DD" : "DD / MM / YYYY";
   const mask = dateFormat;
 
   return (
