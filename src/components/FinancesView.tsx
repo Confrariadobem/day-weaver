@@ -954,6 +954,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   }, [periodFilteredEntries, costCenters, categories, periodYear, ccReportFilterIds, ccReportSearch]);
 
   const handlePrint = () => {
+    const now = new Date();
+    const dateStr = format(now, "dd/MM/yyyy");
+    const timeStr = format(now, "HH:mm");
+    const totalPages = Math.ceil(filtered.length / 40) || 1;
+    
     const style = document.createElement("style");
     style.id = "fluxo-print-style";
     style.textContent = `
@@ -961,15 +966,45 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         @page { size: landscape; margin: 1cm; }
         body * { visibility: hidden !important; }
         .print-fluxo-area, .print-fluxo-area * { visibility: visible !important; }
-        .print-fluxo-area { position: absolute; left: 0; top: 0; width: 100%; }
-        .print-fluxo-area nav, .print-fluxo-area button, .print-fluxo-area .no-print { display: none !important; }
-        .print-fluxo-area table thead { background: #f3f4f6 !important; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+        .print-fluxo-area { position: absolute; left: 0; top: 0; width: 100%; overflow: hidden !important; }
+        .print-fluxo-area nav, .print-fluxo-area button, .print-fluxo-area .no-print,
+        .print-fluxo-area [class*="ScrollArea"], .print-fluxo-area input, .print-fluxo-area select { display: none !important; }
         .print-fluxo-area table { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        .print-fluxo-area table thead { background: #f3f4f6 !important; }
+        .print-fluxo-area table tbody tr { background: transparent !important; }
+        .print-fluxo-area .print-header { display: block !important; visibility: visible !important; }
+        .print-fluxo-area .print-footer { display: flex !important; visibility: visible !important; }
+        * { overflow: hidden !important; }
       }
     `;
-    document.head.appendChild(style);
-    window.print();
-    setTimeout(() => document.getElementById("fluxo-print-style")?.remove(), 500);
+    
+    // Add print header/footer elements
+    const printArea = document.querySelector(".print-fluxo-area");
+    if (printArea) {
+      const header = document.createElement("div");
+      header.className = "print-header";
+      header.style.display = "none";
+      header.innerHTML = `<h1 style="font-size:16px;font-weight:bold;text-align:center;margin-bottom:8px;">Fluxo de Caixa — ${format(new Date(periodStart), "dd/MM/yyyy")} a ${format(new Date(periodEnd), "dd/MM/yyyy")}</h1>`;
+      printArea.insertBefore(header, printArea.firstChild);
+      
+      const footer = document.createElement("div");
+      footer.className = "print-footer";
+      footer.style.cssText = "display:none;justify-content:space-between;align-items:center;margin-top:12px;font-size:10px;color:#666;";
+      footer.innerHTML = `<span>Página 1 de ${totalPages}</span><span>Data: ${dateStr} às ${timeStr}</span>`;
+      printArea.appendChild(footer);
+      
+      document.head.appendChild(style);
+      window.print();
+      setTimeout(() => {
+        document.getElementById("fluxo-print-style")?.remove();
+        header.remove();
+        footer.remove();
+      }, 500);
+    } else {
+      document.head.appendChild(style);
+      window.print();
+      setTimeout(() => document.getElementById("fluxo-print-style")?.remove(), 500);
+    }
   };
 
   const handleExportCSV = () => {
@@ -1860,10 +1895,10 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       return "Pendente";
                     };
                     const statusText = getStatusText();
-                    const statusColor = statusText === "Pago" || statusText === "Recebido" || statusText === "Baixado"
-                      ? "text-[hsl(var(--success))]"
-                      : statusText === "Atrasado" ? "text-destructive"
-                      : "text-amber-500";
+                    const statusColor = statusText === "Atrasado" ? "text-[#E74C3C] font-semibold"
+                      : (statusText === "Pago" || statusText === "Recebido" || statusText === "Baixado")
+                        ? (e.type === "revenue" ? "text-[#27AE60]" : "text-[#E74C3C]")
+                      : "text-foreground";
 
                     return (
                       <tr key={e.id}
@@ -1899,7 +1934,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[140px]">
                           {categories.find(c => c.id === e.category_id)?.name || "—"}
                         </td>
-                        <td className={cn("py-2.5 px-3 text-muted-foreground font-bold", e.is_paid && "line-through")}>
+                        <td className={cn("py-2.5 px-3 text-[#F8F9FA] font-bold", e.is_paid && "line-through")}>
                           <span className="inline-flex items-center gap-1.5">
                             {highlightMatch(e.title, searchQuery)}
                             {isRecurrent && (
@@ -1927,11 +1962,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td className={cn("py-2.5 px-3 text-center font-normal", statusColor)}>
                           {statusText}
                         </td>
-                        <td className="py-2.5 px-1 w-14">
+                        <td className="py-2.5 px-1 w-14 no-print">
                           <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
                             <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }}
-                              className="text-[hsl(var(--success))] hover:text-primary transition-colors">
-                              <Pencil className="h-4 w-4" />
+                              className="rounded p-0.5 text-white bg-[#4A90E2] hover:bg-[#357ABD] transition-colors">
+                              <Pencil className="h-3.5 w-3.5" />
                             </button>
                             <button onClick={async (ev) => {
                               ev.stopPropagation();
@@ -1945,12 +1980,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 description: e.description || null, currency: e.currency || "BRL",
                               });
                               fetchData();
-                            }} className="text-primary hover:text-primary/80 transition-colors">
-                              <Copy className="h-4 w-4" />
+                            }} className="rounded p-0.5 text-white bg-[#2ECC71] hover:bg-[#27AE60] transition-colors">
+                              <Copy className="h-3.5 w-3.5" />
                             </button>
                             <button onClick={(ev) => { ev.stopPropagation(); setDeleteEntryConfirm(e.id); }}
-                              className="text-destructive hover:text-destructive/80 transition-colors">
-                              <X className="h-4 w-4" />
+                              className="rounded p-0.5 text-white bg-[#E74C3C] hover:bg-[#C0392B] transition-colors">
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         </td>
@@ -2035,8 +2070,13 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <table className="w-full text-xs border-collapse">
                 <thead className="sticky top-0 z-10 bg-background">
                   <tr className="bg-primary/10">
-                    <th colSpan={15} className="text-center p-3 border-b border-border font-bold text-sm text-primary tracking-wide">
-                      DOAR – {doarShowPaid ? "REALIZADO" : "PREVISTO"} — {format(new Date(periodStart), "dd/MM/yyyy")} a {format(new Date(periodEnd), "dd/MM/yyyy")}
+                    <th colSpan={15} className="text-center p-3 border-b border-border">
+                      <h1 className="uppercase font-bold text-sm text-primary tracking-wide">
+                        DOAR — DEMONSTRATIVO DE ORIGEM E APLICAÇÃO DE RECURSOS
+                      </h1>
+                      <p className="text-[0.9em] text-muted-foreground mt-0.5 font-normal">
+                        (Período: {format(new Date(periodStart), "dd/MM/yyyy")} a {format(new Date(periodEnd), "dd/MM/yyyy")})
+                      </p>
                     </th>
                   </tr>
                   <tr className="bg-muted">
