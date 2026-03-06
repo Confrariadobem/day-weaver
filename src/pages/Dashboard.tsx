@@ -47,6 +47,8 @@ function BulletChart({ value, marker, maxVal, balance, label }: { value: number;
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeModule, setActiveModule] = useState<ModuleKey>("calendar");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [walletFilter, setWalletFilter] = useState<{ id: string; name: string } | null>(null);
