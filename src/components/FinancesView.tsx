@@ -771,7 +771,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             return mEntries.reduce((s, e) => s + Number(e.amount), 0);
           }),
           entries: months.map(m => getEntriesForCatMonth(cat.id, m, "revenue")),
-        }));
+        }))
+        .filter(row => row.months.some(v => v > 0));
 
       const uncatRev = months.map(m => {
         const mEntries = getMonthEntries(m).filter(e => e.type === "revenue" && !e.category_id);
@@ -794,7 +795,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             return mEntries.reduce((s, e) => s + Number(e.amount), 0);
           }),
           entries: months.map(m => getEntriesForCatMonth(cat.id, m, "expense")),
-        }));
+        }))
+        .filter(row => row.months.some(v => v > 0));
 
       const uncatExp = months.map(m => {
         const mEntries = getMonthEntries(m).filter(e => e.type === "expense" && !e.category_id);
@@ -1086,11 +1088,17 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     const nextLevel = doarExpandLevel >= 3 ? 1 : doarExpandLevel + 1;
     setDoarExpandLevel(nextLevel);
     if (nextLevel === 1) {
+      // Collapse everything
       setExpandedCats(new Set());
     } else if (nextLevel === 2) {
-      setExpandedCats(new Set());
+      // Show groups (RECEITAS/DESPESAS) expanded, categories collapsed
+      setExpandedCats(new Set([
+        "prev-receitas", "prev-despesas", "real-receitas", "real-despesas",
+      ]));
     } else {
+      // Expand all: groups + categories
       const allIds = [
+        "prev-receitas", "prev-despesas", "real-receitas", "real-despesas",
         ...dreData.previsto.revRows.map(r => `prev-${r.id}`),
         ...dreData.previsto.expRows.map(r => `prev-${r.id}`),
         ...dreData.realizado.revRows.map(r => `real-${r.id}`),
@@ -2036,7 +2044,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 const pctOfCat = rowTotal > 0 ? ((entryTotal / rowTotal) * 100).toFixed(1) : "0.0";
                 return (
                   <tr key={`${keyPrefix}-${g.title}`} className="entry-row bg-muted/10 text-xs">
-                    <td className="p-1.5 border-b border-border/50 pl-10 text-muted-foreground">{g.title}</td>
+                    <td className="p-1.5 border-b border-border/50 pl-14 text-muted-foreground">{g.title}</td>
                     <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground/60">{pctOfCat}%</td>
                     {g.monthAmounts.map((v, mi) => (
                       <td key={mi} className="text-right p-1.5 border-b border-border/50 text-muted-foreground">
@@ -2070,6 +2078,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             const totalExpYear = sectionData.monthTotalsExp.reduce((s, v) => s + v, 0);
             const filteredRevRows = sectionData.revRows.filter(filterDoarRow);
             const filteredExpRows = sectionData.expRows.filter(filterDoarRow);
+            const revGroupExpanded = expandedCats.has(`${keyPrefix}-receitas`);
+            const expGroupExpanded = expandedCats.has(`${keyPrefix}-despesas`);
 
             return (
               <div className="rounded-lg border border-border overflow-auto">
@@ -2086,7 +2096,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       </th>
                     </tr>
                     <tr className="bg-muted">
-                      <th className="text-left p-2 border-b border-border font-bold min-w-[140px]">Descrição</th>
+                      <th className="text-left p-2 border-b border-border font-bold min-w-[180px]">Descrição</th>
                       <th className="text-right p-2 border-b border-border font-bold min-w-[50px]">%</th>
                       {dreData.months.map(m => (
                         <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px]">{m}</th>
@@ -2111,26 +2121,31 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       </tr>
                     )}
 
-                    {/* Revenue */}
-                    <tr className="section-header bg-success/10">
-                      <td colSpan={2} className="p-2 border-b border-border font-bold text-success">RECEITAS</td>
+                    {/* ===== RECEITAS GROUP ===== */}
+                    <tr className="section-header bg-success/10 cursor-pointer select-none" onClick={() => toggleCatExpandPrefixed(keyPrefix, "receitas")}>
+                      <td className="p-2 border-b border-border font-bold text-success">
+                        <span className="inline-flex items-center gap-1.5">
+                          {revGroupExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5 rotate-90" />}
+                          RECEITAS
+                        </span>
+                      </td>
+                      <td className="text-right p-2 border-b border-border font-bold text-success">—</td>
                       {sectionData.monthTotalsRev.map((v, i) => (
-                        <td key={i} className="text-right p-2 border-b border-border font-bold text-success">{brl(v)}</td>
+                        <td key={i} className="text-right p-2 border-b border-border font-bold text-success">{v > 0 ? brl(v) : "—"}</td>
                       ))}
                       <td className="text-right p-2 border-b border-border font-bold text-success">{brl(totalRevYear)}</td>
                     </tr>
-                    {filteredRevRows.map(row => {
+                    {revGroupExpanded && filteredRevRows.map(row => {
                       const rowTotal = row.months.reduce((s, v) => s + v, 0);
-                      if (rowTotal === 0 && !row.months.some(v => v > 0)) return null;
                       const pct = totalRevYear > 0 ? ((rowTotal / totalRevYear) * 100).toFixed(1) : "0.0";
                       const isExpanded = expandedCats.has(`${keyPrefix}-${row.id}`);
                       return (
                         <React.Fragment key={row.id}>
                           <tr className="cat-row hover:bg-muted/30 cursor-pointer" onClick={() => toggleCatExpandPrefixed(keyPrefix, row.id)}>
-                            <td className="p-2 border-b border-border pl-6">
+                            <td className="p-2 border-b border-border pl-8">
                               <span className="inline-flex items-center gap-1">
                                 <span className="expand-icon">
-                                  {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                                  {isExpanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground rotate-90" />}
                                 </span>
                                 {row.name}
                               </span>
@@ -2156,26 +2171,31 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       <td className="text-right p-2 border-b-2 border-border text-success">{brl(totalRevYear)}</td>
                     </tr>
 
-                    {/* Expenses */}
-                    <tr className="section-header bg-destructive/10">
-                      <td colSpan={2} className="p-2 border-b border-border font-bold text-destructive">DESPESAS</td>
+                    {/* ===== DESPESAS GROUP ===== */}
+                    <tr className="section-header bg-destructive/10 cursor-pointer select-none" onClick={() => toggleCatExpandPrefixed(keyPrefix, "despesas")}>
+                      <td className="p-2 border-b border-border font-bold text-destructive">
+                        <span className="inline-flex items-center gap-1.5">
+                          {expGroupExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5 rotate-90" />}
+                          DESPESAS
+                        </span>
+                      </td>
+                      <td className="text-right p-2 border-b border-border font-bold text-destructive">—</td>
                       {sectionData.monthTotalsExp.map((v, i) => (
-                        <td key={i} className="text-right p-2 border-b border-border font-bold text-destructive">{brl(v)}</td>
+                        <td key={i} className="text-right p-2 border-b border-border font-bold text-destructive">{v > 0 ? brl(v) : "—"}</td>
                       ))}
                       <td className="text-right p-2 border-b border-border font-bold text-destructive">{brl(totalExpYear)}</td>
                     </tr>
-                    {filteredExpRows.map(row => {
+                    {expGroupExpanded && filteredExpRows.map(row => {
                       const rowTotal = row.months.reduce((s, v) => s + v, 0);
-                      if (rowTotal === 0 && !row.months.some(v => v > 0)) return null;
                       const pct = totalExpYear > 0 ? ((rowTotal / totalExpYear) * 100).toFixed(1) : "0.0";
                       const isExpanded = expandedCats.has(`${keyPrefix}-${row.id}`);
                       return (
                         <React.Fragment key={row.id}>
                           <tr className="cat-row hover:bg-muted/30 cursor-pointer" onClick={() => toggleCatExpandPrefixed(keyPrefix, row.id)}>
-                            <td className="p-2 border-b border-border pl-6">
+                            <td className="p-2 border-b border-border pl-8">
                               <span className="inline-flex items-center gap-1">
                                 <span className="expand-icon">
-                                  {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                                  {isExpanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground rotate-90" />}
                                 </span>
                                 {row.name}
                               </span>
