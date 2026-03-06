@@ -11,9 +11,12 @@ import InvestmentsView from "@/components/InvestmentsView";
 import PatrimonioView from "@/components/PatrimonioView";
 import ProjectsDesejosView from "@/components/ProjectsDesejosView";
 import FloatingActionButton from "@/components/FloatingActionButton";
+import MobileNavDrawer from "@/components/MobileNavDrawer";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { Menu } from "lucide-react";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
