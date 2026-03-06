@@ -733,7 +733,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const dreData = useMemo(() => {
     const pStart = new Date(periodStart);
     const pEnd = new Date(periodEnd);
-    const yr = pStart.getFullYear();
+    const yr = pEnd.getFullYear();
     const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
     const catIdsWithRevEntries = new Set(entries.filter(e => e.type === "revenue" && e.category_id).map(e => e.category_id));
     const catIdsWithExpEntries = new Set(entries.filter(e => e.type === "expense" && e.category_id).map(e => e.category_id));
