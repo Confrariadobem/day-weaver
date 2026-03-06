@@ -1084,6 +1084,20 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
   const [doarExpandLevel, setDoarExpandLevel] = useState(2);
 
+  // Auto-expand RECEITAS/DESPESAS groups when entering DOAR tab
+  useEffect(() => {
+    if (viewTab === "doar") {
+      setExpandedCats(prev => {
+        const next = new Set(prev);
+        next.add("prev-receitas");
+        next.add("prev-despesas");
+        next.add("real-receitas");
+        next.add("real-despesas");
+        return next;
+      });
+    }
+  }, [viewTab]);
+
   const cycleDoarExpand = () => {
     const nextLevel = doarExpandLevel >= 3 ? 1 : doarExpandLevel + 1;
     setDoarExpandLevel(nextLevel);
