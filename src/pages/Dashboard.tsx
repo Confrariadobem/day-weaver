@@ -11,9 +11,12 @@ import InvestmentsView from "@/components/InvestmentsView";
 import PatrimonioView from "@/components/PatrimonioView";
 import ProjectsDesejosView from "@/components/ProjectsDesejosView";
 import FloatingActionButton from "@/components/FloatingActionButton";
+import MobileNavDrawer from "@/components/MobileNavDrawer";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { Menu } from "lucide-react";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
@@ -44,6 +47,8 @@ function BulletChart({ value, marker, maxVal, balance, label }: { value: number;
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeModule, setActiveModule] = useState<ModuleKey>("calendar");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [walletFilter, setWalletFilter] = useState<{ id: string; name: string } | null>(null);
@@ -190,10 +195,32 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      <NavSidebar activeModule={activeModule} onModuleChange={setActiveModule} />
+      {/* Desktop sidebar */}
+      {!isMobile && (
+        <NavSidebar activeModule={activeModule} onModuleChange={setActiveModule} />
+      )}
+
+      {/* Mobile drawer */}
+      {isMobile && (
+        <MobileNavDrawer
+          open={mobileNavOpen}
+          onOpenChange={setMobileNavOpen}
+          activeModule={activeModule}
+          onModuleChange={setActiveModule}
+        />
+      )}
 
       <main className="flex flex-1 flex-col overflow-hidden">
         <header className="flex items-center gap-3 border-b border-border/30 bg-card px-4 py-2.5">
+          {/* Mobile hamburger */}
+          {isMobile && (
+            <button
+              onClick={() => setMobileNavOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground hover:bg-accent transition-colors"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          )}
           <h1 className="text-sm font-bold text-foreground">
             {activeModule === "calendar" && "Calendário"}
             {activeModule === "finances" && "Finanças"}
@@ -223,7 +250,7 @@ export default function Dashboard() {
             {activeModule === "preferences" && <PreferencesView />}
           </div>
 
-          {showUnifiedSidebar && (
+          {showUnifiedSidebar && !isMobile && (
             <UnifiedSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
           )}
         </div>
