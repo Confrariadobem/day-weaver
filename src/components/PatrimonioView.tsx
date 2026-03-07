@@ -351,7 +351,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
         )}
 
         {/* Main KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-card">
             <CardContent className="p-3">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Patrimônio Total</p>
