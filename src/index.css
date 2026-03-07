@@ -170,6 +170,14 @@
   * {
     @apply border-border;
   }
+  html {
+    font-size: 14px;
+  }
+  @media (min-width: 768px) {
+    html {
+      font-size: 16px;
+    }
+  }
   body {
     @apply bg-background text-foreground;
     transition: background-color 0.5s ease, color 0.5s ease;

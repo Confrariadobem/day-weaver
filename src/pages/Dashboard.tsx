@@ -194,6 +194,18 @@ export default function Dashboard() {
     }
   };
 
+  const moduleTitle: Record<ModuleKey, string> = {
+    calendar: "Calendário",
+    finances: "Finanças",
+    dashboard: "Dashboard",
+    profile: "Perfil",
+    preferences: "Preferências",
+    programs: "Projetos",
+    investments: "Investimentos",
+    patrimonio: "Patrimônio",
+    desejos: "Projetos & Desejos",
+  };
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Desktop sidebar */}
@@ -212,34 +224,29 @@ export default function Dashboard() {
       )}
 
       <main className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex items-center gap-3 border-b border-border/30 bg-card px-4 py-2.5">
-          {/* Mobile hamburger */}
-          {isMobile && (
-            <button
-              onClick={() => setMobileNavOpen(true)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground hover:bg-accent transition-colors"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-          )}
-          <h1 className="text-sm font-bold text-foreground">
-            {activeModule === "calendar" && "Calendário"}
-            {activeModule === "finances" && "Finanças"}
-            {activeModule === "dashboard" && "Dashboard"}
-            {activeModule === "profile" && "Perfil"}
-            {activeModule === "preferences" && "Preferências"}
-            {activeModule === "programs" && "Projetos"}
-            {activeModule === "investments" && "Investimentos"}
-            {activeModule === "patrimonio" && "Patrimônio"}
-            {activeModule === "desejos" && "Projetos & Desejos"}
-          </h1>
-          <div className="ml-auto">
-            {renderBulletChart()}
+        {/* Sticky header — line 1 */}
+        <header className="sticky top-0 z-30 flex-shrink-0 border-b border-border bg-card">
+          <div className="flex h-14 items-center gap-3 px-4">
+            {/* Mobile hamburger */}
+            {isMobile && (
+              <button
+                onClick={() => setMobileNavOpen(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground hover:bg-accent transition-colors"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            )}
+            <h1 className="text-sm md:text-base font-bold text-foreground">
+              {moduleTitle[activeModule]}
+            </h1>
+            <div className="ml-auto flex items-center gap-2">
+              {renderBulletChart()}
+            </div>
           </div>
         </header>
 
         <div className="flex flex-1 overflow-hidden">
-          <div className="flex-1 overflow-hidden">
+          <div className={cn("flex-1 overflow-hidden", isMobile && "pb-14")}>
             {activeModule === "dashboard" && <DashboardView />}
             {activeModule === "calendar" && <CalendarView onTabChange={setCalendarTab} />}
             {activeModule === "finances" && <FinancesView onTabChange={setFinanceTab} walletFilter={walletFilter} onClearWalletFilter={() => setWalletFilter(null)} onNavigateToPatrimonio={() => { setWalletFilter(null); setActiveModule("patrimonio"); }} />}
@@ -256,15 +263,22 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Selo do Propósito */}
-        <footer className="flex-shrink-0 border-t border-border/20 px-4 py-1.5 text-center">
-          <p className="text-[11px] text-muted-foreground/60 leading-tight">
-            Organize sua vida financeira — do que você tem hoje ao que você quer amanhã. <span className="font-medium">(Confraria do Bem)</span>
-          </p>
-        </footer>
+        {/* Footer — hidden on mobile to not interfere with bottom nav */}
+        {!isMobile && (
+          <footer className="flex-shrink-0 border-t border-border/20 px-4 py-1.5 text-center">
+            <p className="text-[11px] text-muted-foreground/60 leading-tight">
+              Organize sua vida financeira — do que você tem hoje ao que você quer amanhã. <span className="font-medium">(Confraria do Bem)</span>
+            </p>
+          </footer>
+        )}
       </main>
 
-      {/* Global FAB */}
+      {/* Mobile bottom nav */}
+      {isMobile && (
+        <MobileBottomNav activeModule={activeModule} onModuleChange={setActiveModule} />
+      )}
+
+      {/* Global FAB — adjust position on mobile to not overlap bottom nav */}
       <FloatingActionButton activeModule={activeModule} />
     </div>
   );
