@@ -298,14 +298,14 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-4">
-        {/* Profile filter + Bullet Chart */}
-        <div className="flex items-center gap-2">
+      <div className="p-4 max-w-full overflow-hidden space-y-4">
+        {/* Profile filter (balance indicator moved to sticky header in Dashboard) */}
+        <div className="flex items-center gap-2 overflow-x-auto">
           <Button
             variant={profileFilter === "pessoal" ? "default" : "ghost"}
             size="sm"
             onClick={() => setProfileFilter("pessoal")}
-            className={cn("h-7 text-xs px-3 rounded-full", profileFilter !== "pessoal" && "text-muted-foreground")}
+            className={cn("h-7 text-xs px-3 rounded-full shrink-0", profileFilter !== "pessoal" && "text-muted-foreground")}
           >
             Pessoal
           </Button>
@@ -316,7 +316,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
               if (!hasUpgrade) return;
               setProfileFilter("profissional");
             }}
-            className={cn("h-7 text-xs px-3 rounded-full gap-1.5", profileFilter !== "profissional" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
+            className={cn("h-7 text-xs px-3 rounded-full gap-1.5 shrink-0", profileFilter !== "profissional" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
             disabled={!hasUpgrade}
           >
             <Lock className="h-3 w-3" /> Profissional
@@ -328,33 +328,11 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
               if (!hasUpgrade) return;
               setProfileFilter("tudo");
             }}
-            className={cn("h-7 text-xs px-3 rounded-full gap-1.5", profileFilter !== "tudo" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
+            className={cn("h-7 text-xs px-3 rounded-full gap-1.5 shrink-0", profileFilter !== "tudo" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
             disabled={!hasUpgrade}
           >
             <Lock className="h-3 w-3" /> Tudo
           </Button>
-
-          {/* Bullet Chart - weekly cash flow */}
-          <div className="ml-auto flex items-center gap-3" style={{ width: 180, height: 40 }}>
-            <div className="flex-1 relative h-full flex flex-col justify-center gap-0.5">
-              <div className="relative h-3 rounded-full bg-muted/30 overflow-hidden">
-                <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-[hsl(var(--success))]"
-                  style={{ width: `${Math.min(100, (weeklyBullet.rev / weeklyBullet.maxVal) * 100)}%` }}
-                />
-                <div
-                  className="absolute top-0 h-full w-[2px] bg-destructive"
-                  style={{ left: `${Math.min(100, (weeklyBullet.exp / weeklyBullet.maxVal) * 100)}%` }}
-                />
-              </div>
-              <span className={cn(
-                "text-[11px] font-bold tabular-nums",
-                weeklyBullet.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive"
-              )}>
-                {brl(weeklyBullet.balance)}
-              </span>
-            </div>
-          </div>
         </div>
 
         {!hasUpgrade && (
@@ -373,7 +351,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
         )}
 
         {/* Main KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-card">
             <CardContent className="p-3">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Patrimônio Total</p>
@@ -404,7 +382,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
         </div>
 
         {/* Charts row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Patrimony evolution */}
           <Card className="bg-card">
             <CardContent className="p-3">
@@ -485,7 +463,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
               <Landmark className="h-3.5 w-3.5 text-primary" /> Carteiras e Saldos
             </p>
             {sortedAccounts.length > 0 ? (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                 {sortedAccounts.map(acc => {
                   const movement = monthlyMovements[acc.id] || 0;
                   const creditAvailable = acc.type === "credit_card" && acc.credit_limit
@@ -556,7 +534,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
                 </button>
 
                 {showInactive && (
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 mt-2 animate-in slide-in-from-top-2 duration-200">
+                  <div className="grid gap-4 grid-cols-1 md:grid-cols-3 mt-2 animate-in slide-in-from-top-2 duration-200">
                     {sortedInactive.map(acc => {
                       const movement = monthlyMovements[acc.id] || 0;
                       return (

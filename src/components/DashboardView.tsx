@@ -213,7 +213,7 @@ export default function DashboardView() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 pt-3 space-y-4">
+      <div className="p-4 pt-3 max-w-full overflow-hidden space-y-4">
         {/* Period filter buttons */}
         <div className="flex flex-row gap-2 overflow-x-auto pb-1">
           {periodButtons.map(({ key, label, icon: Icon }) => (
@@ -254,7 +254,7 @@ export default function DashboardView() {
                     className="pointer-events-auto"
                   />
                   {/* Manual date inputs */}
-                  <div className="space-y-2 border-t border-border/30 pt-3">
+                  <div className="space-y-2 border-t border-border/30 pt-3 pr-3">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold w-8 shrink-0">De:</span>
                       <Input
@@ -262,8 +262,8 @@ export default function DashboardView() {
                         onChange={(e) => setFromText(e.target.value)}
                         onBlur={handleFromBlur}
                         placeholder={datePlaceholder}
-                        className={cn("h-8 text-xs rounded-md border-border", !fromText && "placeholder:text-muted-foreground/40")}
-                        style={{ width: 150 }}
+                        className={cn("h-10 text-sm rounded-md border-border", !fromText && "placeholder:text-muted-foreground/40")}
+                        style={{ width: 130 }}
                       />
                     </div>
                     <div className="flex items-center gap-2">
@@ -273,8 +273,8 @@ export default function DashboardView() {
                         onChange={(e) => setToText(e.target.value)}
                         onBlur={handleToBlur}
                         placeholder={datePlaceholder}
-                        className={cn("h-8 text-xs rounded-md border-border", !toText && "placeholder:text-muted-foreground/40")}
-                        style={{ width: 150 }}
+                        className={cn("h-10 text-sm rounded-md border-border", !toText && "placeholder:text-muted-foreground/40")}
+                        style={{ width: 130 }}
                       />
                     </div>
                   </div>
