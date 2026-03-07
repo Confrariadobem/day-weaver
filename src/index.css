@@ -246,6 +246,21 @@
       padding: 1.5rem;
     }
   }
+
+  /* Hide scrollbar but keep scroll */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Capitalize month names in calendar */
+.rdp-caption_label,
+.rdp-head_cell {
+  text-transform: capitalize;
 }
 
 /* Thin border consistency for cards */
