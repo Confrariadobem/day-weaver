@@ -534,7 +534,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
                 </button>
 
                 {showInactive && (
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 mt-2 animate-in slide-in-from-top-2 duration-200">
+                  <div className="grid gap-4 grid-cols-1 md:grid-cols-3 mt-2 animate-in slide-in-from-top-2 duration-200">
                     {sortedInactive.map(acc => {
                       const movement = monthlyMovements[acc.id] || 0;
                       return (

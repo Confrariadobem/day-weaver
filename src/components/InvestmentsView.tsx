@@ -329,7 +329,7 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
           {/* Investment Cards Grid - all types when dashboard, filtered when specific tab */}
           {activeTab !== "dashboard" && (
             <>
-              <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                 {tabFilteredInvestments.map(inv => {
                   const totalInvested = (Number(inv.purchase_price) || 0) * (Number(inv.quantity) || 0);
                   const totalCurrent = (Number(inv.current_price) || 0) * (Number(inv.quantity) || 0);
