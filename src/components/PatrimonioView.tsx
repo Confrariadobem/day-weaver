@@ -463,7 +463,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
               <Landmark className="h-3.5 w-3.5 text-primary" /> Carteiras e Saldos
             </p>
             {sortedAccounts.length > 0 ? (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                 {sortedAccounts.map(acc => {
                   const movement = monthlyMovements[acc.id] || 0;
                   const creditAvailable = acc.type === "credit_card" && acc.credit_limit
