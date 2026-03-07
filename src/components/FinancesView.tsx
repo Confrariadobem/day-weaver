@@ -1560,20 +1560,20 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             selected={{ from: sharedCustomFrom, to: sharedCustomTo }}
             onSelect={handleSharedIntervalSelect}
             className="pointer-events-auto" />
-          <div className="space-y-2 border-t border-border/30 pt-3">
+          <div className="space-y-2 border-t border-border/30 pt-3 pr-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold w-8 shrink-0">De:</span>
               <Input value={sharedDateFrom}
                 onChange={(e) => setSharedDateFrom(normalizeDateInput(e.target.value))}
                 onBlur={() => { const d = parseDMY(sharedDateFrom); if (d) { setSharedCustomFrom(d); setSharedDateFrom(format(d, "dd/MM/yyyy")); setPeriodStart(format(d, "yyyy-MM-dd")); } }}
-                placeholder="DD/MM/AAAA" className="h-8 text-xs rounded-md border-border" style={{ width: 150 }} maxLength={10} />
+                placeholder="DD/MM/AAAA" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold w-8 shrink-0">Até:</span>
               <Input value={sharedDateTo}
                 onChange={(e) => setSharedDateTo(normalizeDateInput(e.target.value))}
                 onBlur={() => { const d = parseDMY(sharedDateTo); if (d) { setSharedCustomTo(d); setSharedDateTo(format(d, "dd/MM/yyyy")); setPeriodEnd(format(d, "yyyy-MM-dd")); } }}
-                placeholder="DD/MM/AAAA" className="h-8 text-xs rounded-md border-border" style={{ width: 150 }} maxLength={10} />
+                placeholder="DD/MM/AAAA" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
             </div>
           </div>
           <div className="flex justify-end">
