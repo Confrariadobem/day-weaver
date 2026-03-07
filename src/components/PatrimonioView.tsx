@@ -382,7 +382,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
         </div>
 
         {/* Charts row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Patrimony evolution */}
           <Card className="bg-card">
             <CardContent className="p-3">

@@ -213,7 +213,7 @@ export default function DashboardView() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 pt-3 space-y-4">
+      <div className="p-4 pt-3 max-w-full overflow-hidden space-y-4">
         {/* Period filter buttons */}
         <div className="flex flex-row gap-2 overflow-x-auto pb-1">
           {periodButtons.map(({ key, label, icon: Icon }) => (
