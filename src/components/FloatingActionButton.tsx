@@ -38,7 +38,8 @@ export default function FloatingActionButton({ activeModule }: FloatingActionBut
       <button
         onClick={() => setEventOpen(true)}
         className={cn(
-          "fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full",
+          "fixed z-50 flex h-14 w-14 items-center justify-center rounded-full",
+          "bottom-20 right-4 md:bottom-6 md:right-6",
           "bg-primary text-primary-foreground shadow-lg",
           "transition-all duration-200 hover:scale-110 hover:shadow-xl",
           "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",

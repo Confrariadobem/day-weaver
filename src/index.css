@@ -170,6 +170,14 @@
   * {
     @apply border-border;
   }
+  html {
+    font-size: 14px;
+  }
+  @media (min-width: 768px) {
+    html {
+      font-size: 16px;
+    }
+  }
   body {
     @apply bg-background text-foreground;
     transition: background-color 0.5s ease, color 0.5s ease;
@@ -214,5 +222,37 @@
   }
   .icon-interactive:hover {
     @apply opacity-100;
+  }
+
+  /* Responsive grid: 1-col mobile, 3-col desktop */
+  .grid-responsive {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  @media (min-width: 768px) {
+    .grid-responsive {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+  }
+
+  /* Responsive spacing */
+  .p-responsive {
+    padding: 1rem;
+  }
+  @media (min-width: 768px) {
+    .p-responsive {
+      padding: 1.5rem;
+    }
+  }
+}
+
+/* Thin border consistency for cards */
+@layer components {
+  .card-thin {
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    box-shadow: none;
   }
 }
