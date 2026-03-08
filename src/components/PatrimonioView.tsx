@@ -624,6 +624,6 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
           </div>
         </DialogContent>
       </Dialog>
-    </ScrollArea>
+    </>
   );
 }
