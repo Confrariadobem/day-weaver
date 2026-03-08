@@ -297,8 +297,8 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
   const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
 
   return (
-    <ScrollArea className="h-full">
-      <div className="p-4 max-w-full overflow-hidden space-y-4">
+    <>
+    <div className="p-4 max-w-full overflow-hidden space-y-4">
         {/* Profile filter (balance indicator moved to sticky header in Dashboard) */}
         <div className="flex items-center gap-2 overflow-x-auto">
           <Button
@@ -456,126 +456,111 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
           </Card>
         </div>
 
-        {/* Accounts overview */}
-        <Card className="bg-card">
-          <CardContent className="p-3">
-            <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
-              <Landmark className="h-3.5 w-3.5 text-primary" /> Carteiras e Saldos
-            </p>
-            {sortedAccounts.length > 0 ? (
-              <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-                {sortedAccounts.map(acc => {
-                  const movement = monthlyMovements[acc.id] || 0;
-                  const creditAvailable = acc.type === "credit_card" && acc.credit_limit
-                    ? Number(acc.credit_limit) + Number(acc.current_balance)
-                    : null;
-                  return (
-                    <div key={acc.id} className="relative rounded-lg border border-border/30 p-3 cursor-pointer hover:bg-muted/20 transition-colors"
-                      onClick={() => handleAccountClick(acc)}>
+        {/* Accounts overview — flat list */}
+        <div>
+          <p className="text-xs font-semibold mb-2 flex items-center gap-1.5 px-1">
+            <Landmark className="h-3.5 w-3.5 text-primary" /> Carteiras e Saldos
+          </p>
+          {sortedAccounts.length > 0 ? (
+            <div className="space-y-1">
+              {sortedAccounts.map(acc => {
+                const movement = monthlyMovements[acc.id] || 0;
+                return (
+                  <div
+                    key={acc.id}
+                    className="flex items-center gap-3 h-16 px-4 rounded-lg border border-border/30 cursor-pointer hover:bg-muted/20 transition-colors"
+                    onClick={() => handleAccountClick(acc)}
+                  >
+                    {/* Icon */}
+                    <div className="flex h-8 w-8 items-center justify-center shrink-0 text-muted-foreground">
+                      {ACCOUNT_ICONS[acc.type] || <Wallet className="h-5 w-5" />}
+                    </div>
+                    {/* Name + type */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{acc.name}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{ACCOUNT_TYPE_LABELS[acc.type as AccountType] || acc.type}</p>
+                    </div>
+                    {/* Balance */}
+                    <div className="text-right shrink-0">
+                      <p className={cn("text-sm font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
+                        {brl(Number(acc.current_balance))}
+                      </p>
+                      <p className={cn("text-[10px]", movement >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                        {movement >= 0 ? "+" : ""}{brl(movement)}
+                      </p>
+                    </div>
+                    {/* Star */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleDefault(acc); }}
+                      className="p-0.5 shrink-0"
+                    >
+                      <Star className={cn("h-4 w-4", acc.is_default ? "fill-warning text-warning" : "text-muted-foreground/40")} />
+                    </button>
+                    {/* Ver Fluxo */}
+                    {onNavigateToFluxo && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); toggleDefault(acc); }}
-                        className="absolute top-2 right-2 p-0.5 rounded transition-colors group/star"
-                        title="Favoritar como padrão"
+                        onClick={(e) => { e.stopPropagation(); onNavigateToFluxo({ id: acc.id, name: acc.name }); }}
+                        className="text-xs text-muted-foreground hover:text-primary shrink-0"
                       >
-                        <Star className={cn("h-5 w-5 transition-colors", acc.is_default ? "fill-warning text-warning" : "text-[#6b7280] group-hover/star:text-[#3b82f6]")} />
+                        <ExternalLink className="h-4 w-4" />
                       </button>
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="flex h-8 w-8 items-center justify-center text-[#6b7280]">
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center py-4">Nenhuma carteira cadastrada.</p>
+          )}
+
+          {/* Inactive accounts */}
+          {inactiveAccounts.length > 0 && (
+            <div className="mt-2">
+              <button
+                onClick={() => setShowInactive(!showInactive)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors px-1"
+              >
+                {showInactive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                Inativas ({inactiveAccounts.length})
+              </button>
+              {showInactive && (
+                <div className="space-y-1 mt-1 animate-in slide-in-from-top-2 duration-200">
+                  {sortedInactive.map(acc => {
+                    const movement = monthlyMovements[acc.id] || 0;
+                    return (
+                      <div
+                        key={acc.id}
+                        className="flex items-center gap-3 h-16 px-4 rounded-lg border border-border/30 opacity-50 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => openAccountEdit(acc)}
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center shrink-0 text-muted-foreground">
                           {ACCOUNT_ICONS[acc.type] || <Wallet className="h-5 w-5" />}
                         </div>
-                        <p className="text-sm font-semibold text-foreground truncate pr-6">{acc.name}</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-[0.9rem] text-[#6b7280]">
-                          Saldo Inicial: {brl(Number(acc.initial_balance))}
-                        </p>
-                        <p className={cn("text-[0.9rem]", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
-                          Movimentos: {movement >= 0 ? "+" : ""}{brl(movement)}
-                        </p>
-                        <p className={cn("text-[0.9rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
-                          Saldo Atual: {brl(Number(acc.current_balance))}
-                        </p>
-                        {creditAvailable !== null && (
-                          <p className={cn("text-[0.9rem]", creditAvailable >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
-                            Limite disponível: {brl(creditAvailable)}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">{acc.name}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{ACCOUNT_TYPE_LABELS[acc.type as AccountType] || acc.type}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className={cn("text-sm font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
+                            {brl(Number(acc.current_balance))}
                           </p>
-                        )}
-                      </div>
-                      {onNavigateToFluxo && (
-                        <div className="mt-2 pt-2 border-t border-border/20 flex items-center">
+                        </div>
+                        {onNavigateToFluxo && (
                           <button
                             onClick={(e) => { e.stopPropagation(); onNavigateToFluxo({ id: acc.id, name: acc.name }); }}
-                            className="text-[0.9rem] text-[#6b7280] border border-[#d1d5db] rounded-md px-3 py-1 hover:text-primary hover:border-primary transition-colors ml-auto"
+                            className="text-xs text-muted-foreground hover:text-primary shrink-0"
                           >
-                            Ver Fluxo
+                            <ExternalLink className="h-4 w-4" />
                           </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground text-center py-4">Nenhuma carteira cadastrada. Adicione carteiras na Central de Lançamentos.</p>
-            )}
-
-            {/* Link para carteiras inativas */}
-            {inactiveAccounts.length > 0 && (
-              <div className="mt-3">
-                <button
-                  onClick={() => setShowInactive(!showInactive)}
-                  className="flex items-center gap-1.5 text-[0.9rem] text-[#9ca3af] opacity-70 hover:underline hover:opacity-100 transition-opacity group/inactive"
-                >
-                  {showInactive
-                    ? <EyeOff className="h-5 w-5 text-[#9ca3af] group-hover/inactive:text-[#3b82f6] transition-colors" />
-                    : <Eye className="h-5 w-5 text-[#9ca3af] group-hover/inactive:text-[#3b82f6] transition-colors" />
-                  }
-                  Inativas ({inactiveAccounts.length})
-                </button>
-
-                {showInactive && (
-                  <div className="grid gap-4 grid-cols-1 md:grid-cols-3 mt-2 animate-in slide-in-from-top-2 duration-200">
-                    {sortedInactive.map(acc => {
-                      const movement = monthlyMovements[acc.id] || 0;
-                      return (
-                        <div key={acc.id} className="relative rounded-lg border border-border/30 p-3 bg-[#f3f4f6] dark:bg-muted/10 cursor-pointer hover:bg-muted/20 transition-colors"
-                          onClick={() => { openAccountEdit(acc); }}>
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="flex h-8 w-8 items-center justify-center text-[#6b7280] opacity-60">
-                              {ACCOUNT_ICONS[acc.type] || <Wallet className="h-5 w-5" />}
-                            </div>
-                            <p className="text-sm font-semibold text-foreground truncate flex-1 opacity-60">{acc.name}</p>
-                          </div>
-                          <div className="space-y-0.5 opacity-60">
-                            <p className="text-[0.9rem] text-[#6b7280]">
-                              Saldo Inicial: {brl(Number(acc.initial_balance))}
-                            </p>
-                            <p className={cn("text-[0.9rem]", movement >= 0 ? "text-[#10b981]" : "text-[#ef4444]")}>
-                              Movimentos: {movement >= 0 ? "+" : ""}{brl(movement)}
-                            </p>
-                            <p className={cn("text-[0.9rem] font-bold", Number(acc.current_balance) >= 0 ? "text-foreground" : "text-destructive")}>
-                              Saldo Atual: {brl(Number(acc.current_balance))}
-                            </p>
-                          </div>
-                          {onNavigateToFluxo && (
-                            <div className="flex items-center mt-2 opacity-60">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); onNavigateToFluxo({ id: acc.id, name: acc.name }); }}
-                                className="text-[0.9rem] text-[#6b7280] border border-[#d1d5db] rounded-md px-3 py-1 hover:text-primary hover:border-primary transition-colors ml-auto"
-                              >
-                                Ver Fluxo
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Alerts */}
         {metrics.alerts.length > 0 && (
@@ -640,6 +625,6 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
           </div>
         </DialogContent>
       </Dialog>
-    </ScrollArea>
+    </>
   );
 }
