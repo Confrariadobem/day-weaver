@@ -297,6 +297,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
   const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
 
   return (
+    <>
     <div className="p-4 max-w-full overflow-hidden space-y-4">
         {/* Profile filter (balance indicator moved to sticky header in Dashboard) */}
         <div className="flex items-center gap-2 overflow-x-auto">
