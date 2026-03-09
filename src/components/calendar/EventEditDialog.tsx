@@ -924,7 +924,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 <SelectTrigger>
                   <SelectValue>
                     <span className="flex items-center gap-2">
-                      {EVENT_TYPE_ICONS[eventType]}
+                      <span style={{ color: EVENT_TYPES.find(t => t.value === eventType)?.color }}>{EVENT_TYPE_ICONS[eventType]}</span>
                       {EVENT_TYPES.find(t => t.value === eventType)?.label}
                     </span>
                   </SelectValue>

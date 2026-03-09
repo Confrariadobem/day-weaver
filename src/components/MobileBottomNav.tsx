@@ -1,14 +1,12 @@
-import { useState, useRef, useCallback } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import {
-  BarChart3,
+  LayoutDashboard,
   CircleDollarSign,
   Building2,
-  Heart,
-  LayoutDashboard,
-  CalendarDays,
   TrendingUp,
   FolderKanban,
+  Settings,
 } from "lucide-react";
 import type { ModuleKey } from "@/components/NavSidebar";
 
@@ -21,9 +19,16 @@ interface BottomNavItem {
 const bottomNavItems: BottomNavItem[] = [
   { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-6 w-6" /> },
   { key: "finances", label: "Fluxo de Caixa", icon: <CircleDollarSign className="h-6 w-6" /> },
-  { key: "patrimonio", label: "Patrimônio", icon: <Building2 className="h-6 w-6" /> },
   { key: "investments", label: "Investimentos", icon: <TrendingUp className="h-6 w-6" /> },
+  { key: "patrimonio", label: "Patrimônio", icon: <Building2 className="h-6 w-6" /> },
+  { key: "programs", label: "Projetos", icon: <FolderKanban className="h-6 w-6" /> },
+  { key: "preferences", label: "Preferências", icon: <Settings className="h-6 w-6" /> },
 ];
+
+// Tripled for infinite loop illusion
+const LOOP_ITEMS = [...bottomNavItems, ...bottomNavItems, ...bottomNavItems];
+const ITEM_WIDTH = 72; // 48px icon + 16px*2 gap ~ 72px per item
+const SET_COUNT = bottomNavItems.length;
 
 interface MobileBottomNavProps {
   activeModule: ModuleKey;
@@ -31,53 +36,69 @@ interface MobileBottomNavProps {
 }
 
 export default function MobileBottomNav({ activeModule, onModuleChange }: MobileBottomNavProps) {
-  const [tooltip, setTooltip] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isScrolling = useRef(false);
 
-  const handleTouchStart = useCallback((label: string) => {
-    timerRef.current = setTimeout(() => {
-      setTooltip(label);
-    }, 300);
+  // Center the middle set on mount
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const middleOffset = SET_COUNT * ITEM_WIDTH;
+    el.scrollLeft = middleOffset;
   }, []);
 
-  const handleTouchEnd = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setTooltip(null);
+  // Infinite loop: when scrolling past boundaries, silently jump to middle set
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || isScrolling.current) return;
+
+    const totalWidth = SET_COUNT * ITEM_WIDTH;
+    const maxScroll = totalWidth * 3 - el.clientWidth;
+
+    if (el.scrollLeft < totalWidth * 0.3) {
+      isScrolling.current = true;
+      el.scrollLeft += totalWidth;
+      requestAnimationFrame(() => { isScrolling.current = false; });
+    } else if (el.scrollLeft > totalWidth * 2.2) {
+      isScrolling.current = true;
+      el.scrollLeft -= totalWidth;
+      requestAnimationFrame(() => { isScrolling.current = false; });
+    }
   }, []);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-14 items-center justify-around border-t border-border bg-card md:hidden">
-      {bottomNavItems.map((item) => {
-        const isActive = activeModule === item.key;
-        return (
-          <button
-            key={item.key}
-            onClick={() => onModuleChange(item.key)}
-            onTouchStart={() => handleTouchStart(item.label)}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchEnd}
-            className={cn(
-              "relative flex h-12 w-12 flex-col items-center justify-center rounded-xl transition-colors",
-              isActive
-                ? "text-primary"
-                : "text-muted-foreground"
-            )}
-          >
-            {/* Active indicator line */}
-            {isActive && (
-              <div className="absolute top-0 left-2 right-2 h-0.5 rounded-full bg-primary" />
-            )}
-            {item.icon}
-            {/* Tooltip bubble on long press */}
-            {tooltip === item.label && (
-              <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-foreground px-3 py-1.5 text-xs font-medium text-background shadow-lg animate-in fade-in zoom-in-95 duration-150">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card md:hidden"
+      style={{ height: 56 }}>
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex items-center h-full overflow-x-auto scrollbar-hide snap-x snap-mandatory"
+        style={{ scrollBehavior: "auto", WebkitOverflowScrolling: "touch", paddingLeft: 16, paddingRight: 16 }}
+      >
+        {LOOP_ITEMS.map((item, i) => {
+          const isActive = activeModule === item.key;
+          return (
+            <button
+              key={`${item.key}-${i}`}
+              onClick={() => onModuleChange(item.key)}
+              className={cn(
+                "relative flex flex-col items-center justify-center shrink-0 snap-center transition-colors",
+                "px-2 py-1",
+                isActive ? "text-primary" : "text-muted-foreground"
+              )}
+              style={{ width: ITEM_WIDTH, height: 48 }}
+            >
+              {isActive && (
+                <div className="absolute top-0 left-3 right-3 h-0.5 rounded-full bg-primary" />
+              )}
+              {item.icon}
+              <span className="text-[9px] mt-0.5 leading-tight truncate w-full text-center">
                 {item.label}
-                <div className="absolute left-1/2 -bottom-1 -translate-x-1/2 h-2 w-2 rotate-45 bg-foreground" />
-              </div>
-            )}
-          </button>
-        );
-      })}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </nav>
   );
 }

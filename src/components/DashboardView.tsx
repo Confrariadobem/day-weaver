@@ -25,7 +25,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyConversion } from "@/hooks/useCurrencyConversion";
 import type { Tables } from "@/integrations/supabase/types";
 
-const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
+const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" };
 
 type PeriodKey = "today" | "3days" | "month" | "year" | "custom";
 
