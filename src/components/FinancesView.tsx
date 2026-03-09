@@ -1873,7 +1873,56 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <th className="text-center py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("is_paid")}>
                       Status <SortIcon field="is_paid" />
                     </th>
-                    <th className="w-14 py-2.5 px-1"></th>
+                    <th className="w-14 py-2.5 px-1">
+                      {selectedIds.size > 0 ? (
+                        <div className="flex items-center justify-center gap-0.5">
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="rounded p-1 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] transition-colors"
+                                onClick={async () => {
+                                  const ids = Array.from(selectedIds);
+                                  await supabase.from("financial_entries").update({
+                                    is_paid: true, payment_date: format(new Date(), "yyyy-MM-dd"),
+                                  }).in("id", ids);
+                                  setSelectedIds(new Set());
+                                  fetchData();
+                                }}
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="text-xs">Baixar selecionados</TooltipContent>
+                          </Tooltip>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="rounded p-1 text-muted-foreground hover:bg-accent transition-colors">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="min-w-[140px]">
+                              <DropdownMenuItem
+                                className="gap-2 text-xs cursor-pointer"
+                                onClick={handleBatchCopy}
+                              >
+                                <Copy className="h-3.5 w-3.5 text-muted-foreground" /> Duplicar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="gap-2 text-xs cursor-pointer text-destructive focus:text-destructive"
+                                onClick={async () => {
+                                  const ids = Array.from(selectedIds);
+                                  await supabase.from("financial_entries").delete().in("id", ids);
+                                  setSelectedIds(new Set());
+                                  fetchData();
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ) : null}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
