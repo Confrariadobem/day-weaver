@@ -149,7 +149,7 @@ function CounterpartAutocomplete({ value, onChange, entries }: { value: string; 
 export default function FinancesView({ onTabChange, walletFilter, onClearWalletFilter, onNavigateToPatrimonio }: { onTabChange?: (tab: string) => void; walletFilter?: { id: string; name: string } | null; onClearWalletFilter?: () => void; onNavigateToPatrimonio?: () => void }) {
   const { user } = useAuth();
   const { formatCurrency: brl } = useCurrency();
-  const { formatDate: fmtDate } = useDateFormat();
+  const { formatDate: fmtDate, dateFormat } = useDateFormat();
   const fmtCurrency = (v: number, _cur?: CurrencyType) => brl(v);
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<DBTables<"projects">[]>([]);
@@ -1567,7 +1567,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             selected={{ from: sharedCustomFrom, to: sharedCustomTo }}
             onSelect={handleSharedIntervalSelect}
             className="pointer-events-auto"
-            formatters={{ formatCaption: (date) => { const m = format(date, "LLLL yyyy", { locale: ptBR }); return m.charAt(0).toUpperCase() + m.slice(1); } }} />
+            formatters={{ formatCaption: (date) => { const m = format(date, "LLLL", { locale: ptBR }); const cap = m.charAt(0).toUpperCase() + m.slice(1); const y = format(date, "yyyy"); return dateFormat === "YYYY/MM/DD" ? `${y} ${cap}` : `${cap} ${y}`; } }} />
           <div className="space-y-2 border-t border-border/30 pt-3 pr-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold w-8 shrink-0">De:</span>
@@ -1648,7 +1648,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   selected={{ from: fluxoCustomFrom, to: fluxoCustomTo }}
                   onSelect={handleFluxoIntervalSelect}
                   className="pointer-events-auto"
-                  formatters={{ formatCaption: (date) => { const m = format(date, "LLLL yyyy", { locale: ptBR }); return m.charAt(0).toUpperCase() + m.slice(1); } }} />
+                  formatters={{ formatCaption: (date) => { const m = format(date, "LLLL", { locale: ptBR }); const cap = m.charAt(0).toUpperCase() + m.slice(1); const y = format(date, "yyyy"); return dateFormat === "YYYY/MM/DD" ? `${y} ${cap}` : `${cap} ${y}`; } }} />
                 <div className="space-y-2 border-t border-border/30 pt-3 pr-3">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold w-8 shrink-0">De:</span>
@@ -2205,9 +2205,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       <th className="text-left p-2 border-b border-border font-bold min-w-[180px] uppercase">Descrição</th>
                       <th className="text-right p-2 border-b border-border font-bold min-w-[50px]">%</th>
                       {dreData.months.map(m => (
-                        <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px]">{m}</th>
+                        <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px] uppercase">{m}</th>
                       ))}
-                      <th className="text-right p-2 border-b border-border font-bold min-w-[90px] bg-muted">TOTAL</th>
+                      <th className="text-right p-2 border-b border-border font-bold min-w-[90px] bg-muted uppercase">TOTAL</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2419,9 +2419,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <th className="text-left p-2 border-b border-border font-bold min-w-[140px] uppercase">Descrição</th>
                         <th className="text-right p-2 border-b border-border font-bold min-w-[50px]">%</th>
                         {months.map(m => (
-                          <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px]">{m}</th>
+                          <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px] uppercase">{m}</th>
                         ))}
-                        <th className="text-right p-2 border-b border-border font-bold min-w-[90px]">TOTAL</th>
+                        <th className="text-right p-2 border-b border-border font-bold min-w-[90px] uppercase">TOTAL</th>
                       </tr>
                     </thead>
                     <tbody>
