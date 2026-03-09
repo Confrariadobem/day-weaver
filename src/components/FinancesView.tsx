@@ -2021,7 +2021,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           />
                         </td>
                         <td className="py-2.5 px-3 text-xs text-muted-foreground">{fmtDate(entDate)}</td>
-                        <td className={cn("py-2.5 px-3 text-xs font-bold text-foreground", e.is_paid && "line-through")}>
+                        <td className={cn("py-2.5 px-3 text-xs font-bold text-muted-foreground", e.is_paid && "line-through")}>
                           <span className="inline-flex items-center gap-1.5">
                             {highlightMatch(e.title, searchQuery)}
                             {isRecurrent && (
