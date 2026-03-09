@@ -300,40 +300,55 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
   return (
     <>
     <div className="p-4 max-w-full overflow-hidden space-y-4">
-        {/* Profile filter (balance indicator moved to sticky header in Dashboard) */}
-        <div className="flex items-center gap-2 overflow-x-auto">
-          <Button
-            variant={profileFilter === "pessoal" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setProfileFilter("pessoal")}
-            className={cn("h-7 text-xs px-3 rounded-full shrink-0", profileFilter !== "pessoal" && "text-muted-foreground")}
-          >
-            Pessoal
-          </Button>
-          <Button
-            variant={profileFilter === "profissional" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => {
-              if (!hasUpgrade) return;
-              setProfileFilter("profissional");
-            }}
-            className={cn("h-7 text-xs px-3 rounded-full gap-1.5 shrink-0", profileFilter !== "profissional" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
-            disabled={!hasUpgrade}
-          >
-            <Lock className="h-3 w-3" /> Profissional
-          </Button>
-          <Button
-            variant={profileFilter === "tudo" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => {
-              if (!hasUpgrade) return;
-              setProfileFilter("tudo");
-            }}
-            className={cn("h-7 text-xs px-3 rounded-full gap-1.5 shrink-0", profileFilter !== "tudo" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
-            disabled={!hasUpgrade}
-          >
-            <Lock className="h-3 w-3" /> Tudo
-          </Button>
+        {/* Sticky tab bar */}
+        <div className="sticky top-0 z-10 bg-card border-b border-border py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              size="sm"
+              variant={activeTab === "indicadores" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== "indicadores" && "text-muted-foreground")}
+              onClick={() => setActiveTab("indicadores")}
+            >
+              <PieChartIcon className="h-3 w-3" /> Indicadores
+            </Button>
+            <Button
+              size="sm"
+              variant={activeTab === "carteiras" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== "carteiras" && "text-muted-foreground")}
+              onClick={() => setActiveTab("carteiras")}
+            >
+              <Landmark className="h-3 w-3" /> Carteiras
+            </Button>
+          </div>
+          {/* Profile filter pills */}
+          <div className="ml-auto flex items-center gap-1.5">
+            <Button
+              variant={profileFilter === "pessoal" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setProfileFilter("pessoal")}
+              className={cn("h-7 text-xs px-3 rounded-full shrink-0", profileFilter !== "pessoal" && "text-muted-foreground")}
+            >
+              Pessoal
+            </Button>
+            <Button
+              variant={profileFilter === "profissional" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => { if (hasUpgrade) setProfileFilter("profissional"); }}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5 shrink-0", profileFilter !== "profissional" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
+              disabled={!hasUpgrade}
+            >
+              <Lock className="h-3 w-3" /> Profissional
+            </Button>
+            <Button
+              variant={profileFilter === "tudo" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => { if (hasUpgrade) setProfileFilter("tudo"); }}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5 shrink-0", profileFilter !== "tudo" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
+              disabled={!hasUpgrade}
+            >
+              <Lock className="h-3 w-3" /> Tudo
+            </Button>
+          </div>
         </div>
 
         {!hasUpgrade && (
