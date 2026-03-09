@@ -1002,6 +1002,59 @@ export default function ProjectsView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* EAP Modal */}
+      <Dialog open={eapOpen} onOpenChange={setEapOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Layers className="h-5 w-5 text-primary" /> Estrutura Analítica do Projeto (EAP)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1">
+            {hierarchy.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">Nenhum projeto cadastrado. Crie um projeto primeiro.</p>
+            )}
+            {hierarchy.map(parent => {
+              const children = parent.children || [];
+              const progress = getProgress(children);
+              const effStatus = getEffectiveStatus(parent);
+              return (
+                <div key={parent.id} className="space-y-0.5">
+                  <div className="flex items-center gap-2 rounded-lg px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform shrink-0", children.length > 0 && "text-primary")} />
+                    <FolderKanban className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-sm font-semibold flex-1 truncate">{parent.name}</span>
+                    <span className={cn("text-[10px] font-medium shrink-0", STATUS_LABELS[effStatus].className)}>{STATUS_LABELS[effStatus].label}</span>
+                    {children.length > 0 && (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Progress value={progress} className="h-1.5 w-16" />
+                        <span className="text-[10px] text-muted-foreground tabular-nums">{progress}%</span>
+                      </div>
+                    )}
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs gap-1 shrink-0"
+                      onClick={() => { setFormParentId(parent.id); setEapOpen(false); resetForm(); setFormParentId(parent.id); setDialogOpen(true); }}>
+                      <Plus className="h-3 w-3" /> Filho
+                    </Button>
+                  </div>
+                  {children.map(child => (
+                    <div key={child.id} className="flex items-center gap-2 rounded-lg px-3 py-1.5 ml-8 bg-muted/10 hover:bg-muted/20 transition-colors">
+                      <span className="text-xs text-muted-foreground">└</span>
+                      <span className="text-xs font-medium flex-1 truncate">{child.name}</span>
+                      <span className={cn("text-[10px]", STATUS_LABELS[child.status].className)}>{STATUS_LABELS[child.status].label}</span>
+                      <span className={cn("text-[10px]", PRIORITY_LABELS[child.priority].className)}>{PRIORITY_LABELS[child.priority].label}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-between items-center pt-3 border-t border-border/20">
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setEapOpen(false); resetForm(); setDialogOpen(true); }}>
+              <Plus className="h-3.5 w-3.5" /> Novo Projeto Raiz
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setEapOpen(false)}>Fechar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </ScrollArea>
   );
 }

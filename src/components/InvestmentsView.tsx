@@ -66,6 +66,53 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(INVESTMENT_TYPES.map(t => t.value)));
   const { visibleTabs } = useModulePreferences("investments");
+  const { formatDate: fmtDate, dateFormat } = useDateFormat();
+
+  // Interval filter
+  const [intervalOpen, setIntervalOpen] = useState(false);
+  const [customFrom, setCustomFrom] = useState<Date | undefined>(undefined);
+  const [customTo, setCustomTo] = useState<Date | undefined>(undefined);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const normalizeDateInput = (val: string) => {
+    const digits = val.replace(/\D/g, "");
+    let out = "";
+    for (let i = 0; i < digits.length && i < 8; i++) {
+      if (i === 2 || i === 4) out += "/";
+      out += digits[i];
+    }
+    return out;
+  };
+  const parseDMY = (val: string): Date | null => {
+    const parts = val.split("/");
+    if (parts.length !== 3) return null;
+    const d = parseInt(parts[0]), m = parseInt(parts[1]) - 1, y = parseInt(parts[2]);
+    if (isNaN(d) || isNaN(m) || isNaN(y) || y < 1900) return null;
+    return new Date(y, m, d);
+  };
+  const handleIntervalSelect = (range: any) => {
+    if (range?.from) { setCustomFrom(range.from); setDateFrom(format(range.from, "dd/MM/yyyy")); }
+    if (range?.to) { setCustomTo(range.to); setDateTo(format(range.to, "dd/MM/yyyy")); }
+  };
+  const handleClearInterval = () => {
+    setCustomFrom(undefined); setCustomTo(undefined);
+    setDateFrom(""); setDateTo(""); setIntervalOpen(false);
+  };
+
+  const handleExportCSV = () => {
+    const rows = [["Nome", "Tipo", "Ticker", "Qtd", "Preço Compra", "Preço Atual", "Data Compra"]];
+    tabFilteredInvestments.forEach(inv => {
+      rows.push([inv.name, getTypeLabel(inv.type), inv.ticker || "", String(inv.quantity || 0), String(inv.purchase_price || 0), String(inv.current_price || 0), inv.purchase_date || ""]);
+    });
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `investimentos-${format(new Date(), "yyyy-MM-dd")}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+  const handlePrint = () => window.print();
 
   useEffect(() => { onTabChange?.(activeTab); }, [activeTab, onTabChange]);
 
