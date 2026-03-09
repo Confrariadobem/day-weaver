@@ -18,7 +18,12 @@ import {
   Plus, TrendingUp, TrendingDown, ArrowLeft, Trash2, Save, Search,
   PieChart as PieChartIcon, Wallet, Calendar, BarChart3, AlertTriangle,
   Edit, PiggyBank, Building2, Bitcoin, Coins, Eye, EyeOff, BadgeDollarSign,
+  FileUp, Printer, CalendarRange, CalendarDays, X,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -61,6 +66,53 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(INVESTMENT_TYPES.map(t => t.value)));
   const { visibleTabs } = useModulePreferences("investments");
+  const { formatDate: fmtDate, dateFormat } = useDateFormat();
+
+  // Interval filter
+  const [intervalOpen, setIntervalOpen] = useState(false);
+  const [customFrom, setCustomFrom] = useState<Date | undefined>(undefined);
+  const [customTo, setCustomTo] = useState<Date | undefined>(undefined);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const normalizeDateInput = (val: string) => {
+    const digits = val.replace(/\D/g, "");
+    let out = "";
+    for (let i = 0; i < digits.length && i < 8; i++) {
+      if (i === 2 || i === 4) out += "/";
+      out += digits[i];
+    }
+    return out;
+  };
+  const parseDMY = (val: string): Date | null => {
+    const parts = val.split("/");
+    if (parts.length !== 3) return null;
+    const d = parseInt(parts[0]), m = parseInt(parts[1]) - 1, y = parseInt(parts[2]);
+    if (isNaN(d) || isNaN(m) || isNaN(y) || y < 1900) return null;
+    return new Date(y, m, d);
+  };
+  const handleIntervalSelect = (range: any) => {
+    if (range?.from) { setCustomFrom(range.from); setDateFrom(format(range.from, "dd/MM/yyyy")); }
+    if (range?.to) { setCustomTo(range.to); setDateTo(format(range.to, "dd/MM/yyyy")); }
+  };
+  const handleClearInterval = () => {
+    setCustomFrom(undefined); setCustomTo(undefined);
+    setDateFrom(""); setDateTo(""); setIntervalOpen(false);
+  };
+
+  const handleExportCSV = () => {
+    const rows = [["Nome", "Tipo", "Ticker", "Qtd", "Preço Compra", "Preço Atual", "Data Compra"]];
+    tabFilteredInvestments.forEach(inv => {
+      rows.push([inv.name, getTypeLabel(inv.type), inv.ticker || "", String(inv.quantity || 0), String(inv.purchase_price || 0), String(inv.current_price || 0), inv.purchase_date || ""]);
+    });
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `investimentos-${format(new Date(), "yyyy-MM-dd")}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+  const handlePrint = () => window.print();
 
   useEffect(() => { onTabChange?.(activeTab); }, [activeTab, onTabChange]);
 
@@ -285,12 +337,97 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
             {t.icon} {t.label}
           </Button>
         ))}
-        <div className="ml-auto">
-          <div className="relative">
+        <div className="ml-auto flex items-center gap-3">
+          <div className="relative" style={{ width: 200 }}>
             <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input placeholder="Buscar ativo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-7 pl-8 text-xs w-40" />
+              className="h-7 pl-8 pr-7 text-xs rounded-lg" />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1.5 text-muted-foreground hover:text-foreground">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
+
+          {/* Intervalo */}
+          <Popover open={intervalOpen} onOpenChange={setIntervalOpen}>
+            <PopoverTrigger asChild>
+              <button className={cn(
+                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                (dateFrom || dateTo) ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/80 hover:bg-primary/5"
+              )}>
+                <CalendarRange className="size-4" />
+                <span className="text-xs font-medium">Intervalo</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-3" align="start">
+              <CalendarComponent mode="range" locale={ptBR} showOutsideDays={false}
+                selected={{ from: customFrom, to: customTo }}
+                onSelect={handleIntervalSelect}
+                className="pointer-events-auto"
+                formatters={{ formatCaption: (date) => { const m = format(date, "LLLL", { locale: ptBR }); const cap = m.charAt(0).toUpperCase() + m.slice(1); const y = format(date, "yyyy"); return dateFormat === "YYYY/MM/DD" ? `${y} ${cap}` : `${cap} ${y}`; } }} />
+              <div className="space-y-2 border-t border-border/30 pt-3 pr-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold w-8 shrink-0">De:</span>
+                  <Input value={dateFrom} onChange={(e) => setDateFrom(normalizeDateInput(e.target.value))}
+                    onBlur={() => { const d = parseDMY(dateFrom); if (d) { setCustomFrom(d); setDateFrom(format(d, "dd/MM/yyyy")); } }}
+                    placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold w-8 shrink-0">Até:</span>
+                  <Input value={dateTo} onChange={(e) => setDateTo(normalizeDateInput(e.target.value))}
+                    onBlur={() => { const d = parseDMY(dateTo); if (d) { setCustomTo(d); setDateTo(format(d, "dd/MM/yyyy")); } }}
+                    placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button onClick={handleClearInterval}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
+                  style={{ minWidth: 80, height: 32 }}>Limpar</button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Hoje */}
+          <button
+            onClick={() => {
+              const today = new Date();
+              const todayStr = format(today, "dd/MM/yyyy");
+              if (dateFrom === todayStr && dateTo === todayStr) {
+                handleClearInterval();
+              } else {
+                setCustomFrom(today); setCustomTo(today);
+                setDateFrom(todayStr); setDateTo(todayStr);
+              }
+            }}
+            className={cn(
+              "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+              dateFrom === format(new Date(), "dd/MM/yyyy") && dateTo === format(new Date(), "dd/MM/yyyy")
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border hover:border-primary/80 hover:bg-primary/5"
+            )}
+          >
+            <CalendarDays className="size-4" />
+            <span className="text-xs font-medium">Hoje</span>
+          </button>
+
+          {/* Export/Print */}
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <button onClick={handleExportCSV} className="text-muted-foreground hover:text-primary transition-colors">
+                <FileUp className="h-5 w-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Exportar CSV</TooltipContent>
+          </Tooltip>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors">
+                <Printer className="h-5 w-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Imprimir</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
