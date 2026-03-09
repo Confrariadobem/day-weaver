@@ -613,6 +613,11 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
           )}
         </div>
         </>)}
+
+        {/* ═══ ASSET TABS (Imóveis, Veículos, Joias/Outros) ═══ */}
+        {(activeTab === "imovel" || activeTab === "veiculo" || activeTab === "joia_outro") && (
+          <AssetsTable assetType={activeTab as AssetType} totalValue={0} onTotalChange={fetchData} />
+        )}
       </div>
 
       {/* Account Edit Dialog */}
