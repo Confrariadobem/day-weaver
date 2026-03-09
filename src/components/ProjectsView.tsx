@@ -655,76 +655,112 @@ export default function ProjectsView() {
     );
   };
 
-  // Mobile card renderer
-  const renderCard = (item: ProjectItem, isChild: boolean) => {
+  // ─── Show completed toggle ─────────────────────────────────────────
+  const [showCompleted, setShowCompleted] = useState(false);
+
+  const completedItems = useMemo(() => {
+    return hierarchy.filter(p => getEffectiveStatus(p) === "feito");
+  }, [hierarchy]);
+
+  // ─── Card renderer (unified for desktop & mobile) ─────────────────
+  const renderProjectCard = (item: ProjectItem, isChild: boolean) => {
     const hasChildren = !isChild && (hierarchy.find(h => h.id === item.id)?.children.length || 0) > 0;
     const isExpanded = expandedIds.has(item.id);
     const children = hierarchy.find(h => h.id === item.id)?.children || [];
     const progress = getProgress(children);
+    const isOverdue = item.target_date && item.status !== "feito" && new Date(item.target_date) < new Date();
 
     return (
-      <div key={item.id} className={cn("rounded-lg border border-border/30 p-3 space-y-2", isChild && "ml-4 border-l-2 border-l-primary/20")}>
-        <div className="flex items-start gap-2">
-          <Checkbox
-            checked={selectedIds.has(item.id)}
-            onCheckedChange={(c) => {
-              setSelectedIds(prev => {
-                const next = new Set(prev);
-                if (c) next.add(item.id); else next.delete(item.id);
-                return next;
-              });
-            }}
-            className="h-3.5 w-3.5 mt-0.5"
-          />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              {hasChildren && (
-                <button onClick={() => toggleExpand(item.id)} className="p-0.5">
-                  <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", isExpanded && "rotate-90")} />
-                </button>
+      <div key={item.id} className={cn("space-y-0", isChild && "ml-5")}>
+        <div
+          className={cn(
+            "group relative rounded-xl border bg-card transition-all duration-200 hover:shadow-md hover:border-primary/30",
+            isChild ? "border-border/20" : "border-border/40",
+            item.status === "feito" && "opacity-50",
+          )}
+          style={{ minHeight: isChild ? 72 : 100 }}
+        >
+          <div className="flex items-center gap-3 p-4">
+            {/* Checkbox to complete */}
+            <button
+              onClick={() => item.status !== "feito" ? markComplete(item) : undefined}
+              className={cn(
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                item.status === "feito"
+                  ? "bg-[hsl(var(--success))] border-[hsl(var(--success))] text-primary-foreground"
+                  : "border-muted-foreground/30 hover:border-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)]"
               )}
-              <span className="text-sm font-bold text-foreground truncate">{item.name}</span>
-              <StarPriority item={item} />
-            </div>
-            {hasChildren && (
-              <div className="flex items-center gap-1.5 mt-1">
-                <Progress value={progress} className="h-1.5 flex-1" />
-                <span className="text-[10px] text-muted-foreground">{progress}%</span>
+            >
+              {item.status === "feito" && <CheckCircle2 className="h-3.5 w-3.5" />}
+            </button>
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className={cn("text-sm font-semibold text-foreground truncate", item.status === "feito" && "line-through text-muted-foreground")}>
+                  {highlightMatch(item.name, searchQuery)}
+                </span>
+                <StarPriority item={item} />
               </div>
+              {item.observation && (
+                <p className="text-xs text-muted-foreground truncate mt-0.5 max-w-[400px]">{item.observation}</p>
+              )}
+              {/* Meta row */}
+              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                {item.responsible && (
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold shrink-0">
+                      {item.responsible.charAt(0).toUpperCase()}
+                    </div>
+                    {item.responsible}
+                  </span>
+                )}
+                {item.target_date && (
+                  <span className={cn("flex items-center gap-1 text-xs", isOverdue ? "text-destructive font-medium" : "text-muted-foreground")}>
+                    <CalendarDays className="h-3 w-3" />
+                    {formatDateDisplay(item.target_date)}
+                  </span>
+                )}
+                <span className={cn("text-[10px] font-medium uppercase tracking-wide", PRIORITY_LABELS[item.priority].className)}>
+                  {PRIORITY_LABELS[item.priority].label}
+                </span>
+                {hasChildren && (
+                  <div className="flex items-center gap-1.5">
+                    <Progress value={progress} className="h-1.5 w-16" />
+                    <span className="text-[10px] text-muted-foreground tabular-nums">{progress}%</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Expand button for children */}
+            {hasChildren && (
+              <button onClick={() => toggleExpand(item.id)} className="p-1 rounded-lg hover:bg-muted/50 transition-colors shrink-0">
+                <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200", isExpanded && "rotate-180")} />
+              </button>
             )}
+
+            {/* Hover actions */}
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <button onClick={() => openDialog(item)} className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button onClick={() => setDeleteId(item.id)} className="rounded-lg p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 text-xs flex-wrap">
-          <span className={cn("font-medium", STATUS_LABELS[item.status].className)}>{STATUS_LABELS[item.status].label}</span>
-          <span className={cn("font-medium", PRIORITY_LABELS[item.priority].className)}>{PRIORITY_LABELS[item.priority].label}</span>
-          <span className="text-muted-foreground tabular-nums">{formatDateDisplay(item.target_date)}</span>
-          {item.responsible && (
-            <span className="text-muted-foreground flex items-center gap-1">
-              <Users className="h-3 w-3" /> {item.responsible}
-            </span>
-          )}
-        </div>
-        {item.observation && <p className="text-xs text-muted-foreground truncate">{item.observation}</p>}
-        <div className="flex items-center gap-1 justify-end">
-          {item.status !== "feito" && (
-            <button onClick={() => markComplete(item)} className="rounded p-1 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)]">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <button onClick={() => openDialog(item)} className="rounded p-1 text-foreground hover:text-foreground/80">
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={() => setDeleteId(item.id)} className="rounded p-1 text-destructive hover:text-destructive/80">
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        {hasChildren && isExpanded && children.map(c => renderCard(c, true))}
+
+        {/* Children (subtasks) */}
+        {hasChildren && isExpanded && (
+          <div className="space-y-1.5 mt-1.5 pl-2 border-l-2 border-primary/15 ml-3">
+            {children.map(c => renderProjectCard(c, true))}
+          </div>
+        )}
       </div>
     );
   };
-
-  // ─── Indicadores View ─────────────────────────────────────────────────────
-  const renderIndicadores = () => {
     const { total, done, inProgress, pending, overdue, progressPct, responsibleData, statusData, priorityData } = indicadoresData;
 
     const summaryCards = [
