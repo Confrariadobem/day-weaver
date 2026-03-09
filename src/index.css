@@ -255,6 +255,22 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Anti-clipping for mobile — force GPU compositing */
+  .module-container {
+    max-width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  @media (max-width: 768px) {
+    .module-container {
+      padding-left: 8px;
+      padding-right: 8px;
+      margin: 0;
+      overflow-x: hidden;
+      transform: translateZ(0);
+    }
+  }
 }
 
 /* Capitalize month names in calendar */
@@ -269,5 +285,16 @@
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
     box-shadow: none;
+  }
+
+  /* Prevent card/chart clipping in grids */
+  .module-container .grid > * {
+    min-width: 0;
+    flex-shrink: 0;
+    box-sizing: border-box;
+  }
+  .module-container .recharts-responsive-container {
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 }
