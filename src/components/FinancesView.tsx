@@ -1830,36 +1830,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         {viewTab === "previsao" && (
           <>
 
-            {/* Batch actions */}
-            {selectedIds.size > 0 && (
-              <div className="mb-3 flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">{selectedIds.size} selecionados</span>
-                <Button size="sm" variant="ghost"
-                  className="h-7 px-2.5 text-xs gap-1 text-[hsl(var(--success))] hover:text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] rounded-full"
-                  onClick={async () => {
-                    const ids = Array.from(selectedIds);
-                    await supabase.from("financial_entries").update({
-                      is_paid: true, payment_date: format(new Date(), "yyyy-MM-dd"),
-                    }).in("id", ids);
-                    setSelectedIds(new Set());
-                    fetchData();
-                  }}
-                ><Check className="h-3 w-3" /> Baixar</Button>
-                <Button size="sm" variant="ghost"
-                  className="h-7 px-2.5 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10 rounded-full"
-                  onClick={handleBatchCopy}
-                ><Copy className="h-3 w-3" /> Duplicar</Button>
-                <Button size="sm" variant="ghost"
-                  className="h-7 px-2.5 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
-                  onClick={async () => {
-                    const ids = Array.from(selectedIds);
-                    await supabase.from("financial_entries").delete().in("id", ids);
-                    setSelectedIds(new Set());
-                    fetchData();
-                  }}
-                ><Trash2 className="h-3 w-3" /> Excluir</Button>
-              </div>
-            )}
+            {/* Batch actions bar removed — icons now in table header */}
 
             {/* Entry edit dialog */}
             <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
