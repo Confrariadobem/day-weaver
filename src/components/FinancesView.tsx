@@ -2578,7 +2578,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm">Receita × Despesa Mensal — {periodYear}</CardTitle></CardHeader>
               <CardContent>
-                <div className="h-[280px]">
+                <div className="w-full min-w-0" style={{ height: 280 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={reportChartData} barGap={0}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
