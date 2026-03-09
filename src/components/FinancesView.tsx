@@ -2002,8 +2002,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             className="h-3.5 w-3.5"
                           />
                         </td>
-                        <td className="py-2.5 px-3 font-bold text-xs">{fmtDate(entDate)}</td>
-                        <td className={cn("py-2.5 px-3 font-bold", e.is_paid && "line-through")}>
+                        <td className="py-2.5 px-3 text-xs text-muted-foreground">{fmtDate(entDate)}</td>
+                        <td className={cn("py-2.5 px-3 text-xs font-bold text-foreground", e.is_paid && "line-through")}>
                           <span className="inline-flex items-center gap-1.5">
                             {highlightMatch(e.title, searchQuery)}
                             {isRecurrent && (
@@ -2019,16 +2019,16 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             )}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 font-bold truncate max-w-[140px]">{e.counterpart || "—"}</td>
-                        <td className={cn("py-2.5 px-3 text-right font-bold tabular-nums",
+                        <td className="py-2.5 px-3 text-xs text-muted-foreground truncate max-w-[140px]">{e.counterpart || "—"}</td>
+                        <td className={cn("py-2.5 px-3 text-right text-xs font-bold tabular-nums",
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
                         </td>
-                        <td className={cn("py-2.5 px-3 text-center font-bold",
+                        <td className={cn("py-2.5 px-3 text-center text-xs",
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {e.type === "expense" ? "Despesa" : "Receita"}
                         </td>
-                        <td className={cn("py-2.5 px-3 text-center font-bold", statusColor)}>
+                        <td className={cn("py-2.5 px-3 text-center text-xs", statusColor)}>
                           {statusText}
                         </td>
                         <td className="py-2.5 px-1 w-24 no-print">
