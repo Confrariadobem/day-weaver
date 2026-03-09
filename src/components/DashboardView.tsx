@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,8 +7,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart as RechartsPieChart, Pie, Cell, Line, Legend, ComposedChart, AreaChart, Area,
@@ -16,16 +14,15 @@ import {
 import { format, startOfYear, endOfYear, eachMonthOfInterval, startOfMonth, endOfMonth, addDays, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  TrendingUp, TrendingDown, Wallet, Clock,
+  TrendingUp, TrendingDown, Wallet, PiggyBank,
   BarChart3, Building2,
   CalendarCheck, CalendarDays, CalendarRange, Scale, PieChart as PieChartIcon,
-  ArrowRightLeft, RefreshCw, Target, FileDown, Trash2,
+  ArrowRightLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyConversion } from "@/hooks/useCurrencyConversion";
-import { toast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
 const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
@@ -41,27 +38,6 @@ function getPeriodRange(key: PeriodKey): { start: Date; end: Date } {
     case "year": return { start: startOfYear(now), end: endOfYear(now) };
     default: return { start: startOfYear(now), end: endOfYear(now) };
   }
-}
-
-// --- Câmbio history helpers ---
-interface CambioHistoryEntry {
-  date: string;
-  from: string;
-  amount: number;
-  to: string;
-  result: number;
-}
-
-function getCambioHistory(): CambioHistoryEntry[] {
-  try {
-    return JSON.parse(localStorage.getItem("cambioHistory") || "[]");
-  } catch { return []; }
-}
-function saveCambioHistory(h: CambioHistoryEntry[]) {
-  localStorage.setItem("cambioHistory", JSON.stringify(h.slice(0, 20)));
-}
-function getCambioMeta(): number {
-  try { return Number(localStorage.getItem("cambioMeta")) || 0; } catch { return 0; }
 }
 
 export default function DashboardView() {
@@ -85,17 +61,6 @@ export default function DashboardView() {
   const [fromText, setFromText] = useState("");
   const [toText, setToText] = useState("");
 
-  // Câmbio state
-  const [cambioFrom, setCambioFrom] = useState("");
-  const [cambioTo, setCambioTo] = useState("");
-  const [cambioAmount, setCambioAmount] = useState("");
-  const [cambioResult, setCambioResult] = useState<number | null>(null);
-  const [cambioHistory, setCambioHistory] = useState<CambioHistoryEntry[]>(getCambioHistory);
-  const [cambioMeta, setCambioMeta] = useState(getCambioMeta);
-  const [cambioMetaInput, setCambioMetaInput] = useState(String(getCambioMeta() || ""));
-
-  const consolidatedRef = useRef<HTMLDivElement>(null);
-
   const period = useMemo(() => {
     if (periodKey === "custom") return customRange;
     return getPeriodRange(periodKey);
@@ -108,16 +73,24 @@ export default function DashboardView() {
 
   const handleCustomFrom = (d: Date | undefined) => {
     setCustomFrom(d);
-    if (d) { setCustomRange(prev => ({ ...prev, start: d })); setFromText(formatDate(d)); }
+    if (d) {
+      setCustomRange(prev => ({ ...prev, start: d }));
+      setFromText(formatDate(d));
+    }
   };
   const handleCustomTo = (d: Date | undefined) => {
     setCustomTo(d);
-    if (d) { setCustomRange(prev => ({ ...prev, end: d })); setToText(formatDate(d)); }
+    if (d) {
+      setCustomRange(prev => ({ ...prev, end: d }));
+      setToText(formatDate(d));
+    }
   };
 
   const handleClearInterval = () => {
-    setCustomFrom(undefined); setCustomTo(undefined);
-    setFromText(""); setToText("");
+    setCustomFrom(undefined);
+    setCustomTo(undefined);
+    setFromText("");
+    setToText("");
     handlePeriodChange("year");
     setIntervalOpen(false);
   };
@@ -176,35 +149,6 @@ export default function DashboardView() {
     });
   }, [entries, period]);
 
-  // --- Grupo 1: Saldo Consolidado calculations ---
-  const consolidated = useMemo(() => {
-    const totalCash = accounts.reduce((s: number, a: any) => s + Number(a.current_balance || 0), 0);
-    const totalInvestments = investments.reduce((s: number, i: any) => s + (Number(i.current_price) || 0) * (Number(i.quantity) || 0), 0);
-    const saldoAtual = totalCash + totalInvestments;
-
-    const now = new Date();
-    const aReceber = entries
-      .filter(e => e.type === "revenue" && !e.is_paid && new Date(e.entry_date) >= now)
-      .reduce((s, e) => s + Number(e.amount), 0);
-    const aPagar = entries
-      .filter(e => e.type === "expense" && !e.is_paid && new Date(e.entry_date) >= now)
-      .reduce((s, e) => s + Number(e.amount), 0);
-    const projetado = saldoAtual + aReceber - aPagar;
-
-    return { saldoAtual, aReceber, aPagar, projetado, totalCash, totalInvestments };
-  }, [entries, accounts, investments]);
-
-  // Toast alert when projetado < 0
-  useEffect(() => {
-    if (consolidated.projetado < 0) {
-      toast({
-        title: "⚠️ Cuidado!",
-        description: `Seu saldo projetado está negativo: ${brl(consolidated.projetado)}`,
-        variant: "destructive",
-      });
-    }
-  }, [consolidated.projetado]);
-
   const monthlyData = useMemo(() => {
     const months = eachMonthOfInterval({ start: period.start, end: period.end });
     let accumulated = 0;
@@ -235,47 +179,15 @@ export default function DashboardView() {
 
   const totalRevenue = filteredEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
   const totalExpense = filteredEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
+  const totalCash = accounts.reduce((s: number, a: any) => s + Number(a.current_balance || 0), 0);
+  const totalInvestments = investments.reduce((s: number, i: any) => s + (Number(i.current_price) || 0) * (Number(i.quantity) || 0), 0);
+  const totalPatrimony = totalCash + totalInvestments;
 
-  // --- Câmbio handlers ---
-  const handleCambioUpdate = useCallback(() => {
-    const amt = Number(cambioAmount);
-    if (!amt || !cambioFrom || !cambioTo || cambioFrom === cambioTo) return;
-    
-    // Simple conversion using rates
-    let result = amt;
-    if (cambioFrom !== currency) {
-      // Convert to base currency first
-      const fromRate = rates[cambioFrom as "USD" | "EUR" | "BTC"];
-      if (fromRate) result = amt * fromRate;
-    }
-    if (cambioTo !== currency) {
-      const toRate = rates[cambioTo as "USD" | "EUR" | "BTC"];
-      if (toRate) result = result / toRate;
-    }
-
-    setCambioResult(result);
-    const entry: CambioHistoryEntry = {
-      date: format(new Date(), "dd/MM/yyyy HH:mm"),
-      from: cambioFrom,
-      amount: amt,
-      to: cambioTo,
-      result,
-    };
-    const newHistory = [entry, ...cambioHistory].slice(0, 20);
-    setCambioHistory(newHistory);
-    saveCambioHistory(newHistory);
-  }, [cambioAmount, cambioFrom, cambioTo, rates, currency, cambioHistory]);
-
-  const handleSaveMeta = () => {
-    const val = Number(cambioMetaInput);
-    setCambioMeta(val);
-    localStorage.setItem("cambioMeta", String(val));
-    toast({ title: "Meta salva!", description: `Meta de câmbio: ${val}` });
-  };
-
-  const handleClearHistory = () => {
-    setCambioHistory([]);
-    localStorage.removeItem("cambioHistory");
+  const fmtOther = (v: number, cur: string) => {
+    if (cur === "BTC") return `₿ ${v.toFixed(8)}`;
+    if (cur === "USD") return `US$ ${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (cur === "EUR") return `€ ${v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const handleToggleConversion = () => {
@@ -285,41 +197,6 @@ export default function DashboardView() {
   };
 
   const otherCurrencies = (["BRL", "BTC", "EUR", "USD"] as const).filter(c => c !== currency).sort();
-  const allCurrencies = ["BRL", "USD", "EUR", "BTC"];
-
-  const fmtOther = (v: number, cur: string) => {
-    if (cur === "BTC") return `₿ ${v.toFixed(8)}`;
-    if (cur === "USD") return `US$ ${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    if (cur === "EUR") return `€ ${v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
-  const fmtRate = (cur: string, rate: number) => {
-    if (cur === "BTC") return `1 ${currency} = ${(1 / rate).toFixed(8)} BTC`;
-    return `1 ${currency} = ${(1 / rate).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${cur}`;
-  };
-
-  // --- Grupo 4: PDF Export ---
-  const handleExportPDF = async () => {
-    const { default: jsPDF } = await import("jspdf");
-    const { default: html2canvas } = await import("html2canvas");
-    const el = consolidatedRef.current;
-    if (!el) return;
-    try {
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: null });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "landscape", unit: "mm" });
-      const pdfW = pdf.internal.pageSize.getWidth() - 20;
-      const pdfH = (canvas.height * pdfW) / canvas.width;
-      pdf.addImage(imgData, "PNG", 10, 10, pdfW, pdfH);
-      pdf.setFontSize(8);
-      pdf.text(`Gerado em ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 10, pdf.internal.pageSize.getHeight() - 5);
-      pdf.save(`dashboard-${format(new Date(), "yyyy-MM-dd")}.pdf`);
-      toast({ title: "PDF exportado!", description: "Arquivo salvo com sucesso." });
-    } catch {
-      toast({ title: "Erro", description: "Falha ao gerar PDF.", variant: "destructive" });
-    }
-  };
 
   const periodButtons: { key: PeriodKey; label: string; icon: typeof CalendarCheck }[] = [
     { key: "today", label: "Hoje", icon: CalendarCheck },
@@ -329,14 +206,16 @@ export default function DashboardView() {
     { key: "custom", label: "Intervalo", icon: CalendarRange },
   ];
 
-  // Meta progress
-  const metaProgress = cambioMeta > 0 ? Math.min(100, (consolidated.saldoAtual / cambioMeta) * 100) : 0;
+  const fmtRate = (cur: string, rate: number) => {
+    if (cur === "BTC") return `1 ${currency} = ${(1 / rate).toFixed(8)} BTC`;
+    return `1 ${currency} = ${(1 / rate).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${cur}`;
+  };
 
   return (
     <ScrollArea className="h-full">
-      <div ref={consolidatedRef} className="p-4 pt-3 max-w-full overflow-hidden space-y-4">
-        {/* Period filter buttons + Export PDF */}
-        <div className="flex flex-row gap-2 overflow-x-auto pb-1 items-center">
+      <div className="p-4 pt-3 max-w-full overflow-hidden space-y-4">
+        {/* Period filter buttons */}
+        <div className="flex flex-row gap-2 overflow-x-auto pb-1">
           {periodButtons.map(({ key, label, icon: Icon }) => (
             <Popover key={key} open={key === "custom" ? intervalOpen : undefined} onOpenChange={key === "custom" ? setIntervalOpen : undefined}>
               <PopoverTrigger asChild>
@@ -374,6 +253,7 @@ export default function DashboardView() {
                     }}
                     className="pointer-events-auto"
                   />
+                  {/* Manual date inputs */}
                   <div className="space-y-2 border-t border-border/30 pt-3 pr-3">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold w-8 shrink-0">De:</span>
@@ -411,103 +291,82 @@ export default function DashboardView() {
               )}
             </Popover>
           ))}
-
-          {/* Export PDF button */}
-          <button
-            onClick={handleExportPDF}
-            className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-sm font-medium text-muted-foreground hover:border-primary hover:text-primary transition-all duration-200 shrink-0 ml-auto"
-          >
-            <FileDown className="size-4" />
-            <span className="hidden sm:inline">Exportar PDF</span>
-          </button>
         </div>
 
-        {/* GRUPO 1: Saldo Consolidado – unified card */}
-        <Card className={cn(
-          "bg-card transition-all duration-300",
-          consolidated.projetado < 0 && "border-destructive/50 bg-destructive/5"
-        )}>
-          <CardContent className="p-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Saldo Atual */}
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-primary/10 p-2 shrink-0">
-                  <Wallet className="size-5 text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Saldo Atual</p>
-                  <p className={cn("text-lg font-bold truncate mt-0.5", consolidated.saldoAtual >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
-                    {brl(consolidated.saldoAtual)}
-                  </p>
-                </div>
-              </div>
+        {/* KPI Cards Grid + Câmbio */}
+        <div className="flex gap-4 flex-wrap lg:flex-nowrap">
+          {/* Main KPI grid */}
+          <div className="flex-1 min-w-0 grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(243px, 1fr))" }}>
+            {/* Receita */}
+            <Card className="bg-card">
+              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <TrendingUp className="size-6 mr-1 text-muted-foreground" /> Receita
+                </p>
+                <p className="text-[1.2rem] font-semibold text-[hsl(var(--success))] mt-2 overflow-hidden truncate">{brl(totalRevenue)}</p>
+              </CardContent>
+            </Card>
+            {/* Despesa */}
+            <Card className="bg-card">
+              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <TrendingDown className="size-6 mr-1 text-muted-foreground" /> Despesa
+                </p>
+                <p className="text-[1.2rem] font-semibold text-destructive mt-2 overflow-hidden truncate">{brl(totalExpense)}</p>
+              </CardContent>
+            </Card>
+            {/* Caixa */}
+            <Card className="bg-card">
+              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Wallet className="size-6 mr-1 text-muted-foreground" /> Caixa
+                </p>
+                <p className={cn("text-[1.2rem] font-semibold mt-2 overflow-hidden truncate", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                  {brl(totalCash)}
+                </p>
+              </CardContent>
+            </Card>
+            {/* Investimentos */}
+            <Card className="bg-card">
+              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <PiggyBank className="size-6 mr-1 text-muted-foreground" /> Investimentos
+                </p>
+                <p className="text-[1.2rem] font-semibold text-foreground mt-2 overflow-hidden truncate">{brl(totalInvestments)}</p>
+              </CardContent>
+            </Card>
+            {/* Patrimônio */}
+            <Card className="bg-card">
+              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Building2 className="size-6 mr-1 text-muted-foreground" strokeWidth={1.5} /> Patrimônio
+                </p>
+                <p className="text-[1.2rem] font-semibold text-foreground mt-2 overflow-hidden truncate">{brl(totalPatrimony)}</p>
+              </CardContent>
+            </Card>
+          </div>
 
-              {/* A Receber */}
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-[hsl(var(--success))]/10 p-2 shrink-0">
-                  <TrendingUp className="size-5 text-[hsl(var(--success))]" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">A Receber</p>
-                  <p className="text-lg font-bold text-[hsl(var(--success))] truncate mt-0.5">
-                    {brl(consolidated.aReceber)}
-                  </p>
-                </div>
-              </div>
-
-              {/* A Pagar */}
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-destructive/10 p-2 shrink-0">
-                  <TrendingDown className="size-5 text-destructive" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">A Pagar</p>
-                  <p className="text-lg font-bold text-destructive truncate mt-0.5">
-                    {brl(consolidated.aPagar)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Projetado */}
-              <div className="flex items-start gap-3">
-                <div className={cn("rounded-lg p-2 shrink-0", consolidated.projetado >= 0 ? "bg-primary/10" : "bg-destructive/10")}>
-                  <Clock className={cn("size-5", consolidated.projetado >= 0 ? "text-primary" : "text-destructive")} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Projetado</p>
-                  <p className={cn("text-lg font-bold truncate mt-0.5", consolidated.projetado >= 0 ? "text-foreground" : "text-destructive")}>
-                    {brl(consolidated.projetado)}
-                  </p>
-                  {consolidated.projetado < 0 && (
-                    <span className="text-[10px] font-semibold text-destructive animate-pulse">Cuidado!</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* GRUPO 2: Câmbio card – enhanced */}
-        <Card className="bg-card">
-          <CardContent className="p-4 space-y-3">
-            <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <ArrowRightLeft className="size-5 mr-1 text-muted-foreground" /> Câmbio
-              <Switch
-                checked={showConversion}
-                onCheckedChange={handleToggleConversion}
-                className="ml-auto"
-              />
-            </p>
-
-            {showConversion && (
-              <div className="space-y-4 animate-in fade-in duration-300">
-                {/* Quick patrimony conversion */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Câmbio widget – fixed right */}
+          <Card className="bg-card shrink-0 transition-all duration-300" style={{ width: 243 }}>
+            <CardContent className={cn("p-3 flex flex-col", !showConversion && "min-h-[80px] justify-center")}>
+              <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <ArrowRightLeft className="size-6 mr-1 text-muted-foreground" /> Câmbio
+                <Switch
+                  checked={showConversion}
+                  onCheckedChange={handleToggleConversion}
+                  className="ml-auto"
+                />
+              </p>
+              {showConversion && (
+                <div className="space-y-3 mt-3 animate-in fade-in duration-300">
+                  {ratesLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Carregando...</span>}
                   {otherCurrencies.map(cur => {
                     const val = cur === "BRL"
-                      ? consolidated.saldoAtual
-                      : convert(consolidated.saldoAtual, cur as "USD" | "EUR" | "BTC");
-                    const rate = cur === "BRL" ? 1 : rates[cur as "USD" | "EUR" | "BTC"];
+                      ? totalPatrimony
+                      : convert(totalPatrimony, cur as "USD" | "EUR" | "BTC");
+                    const rate = cur === "BRL"
+                      ? 1
+                      : rates[cur as "USD" | "EUR" | "BTC"];
                     return (
                       <div key={cur} className="space-y-0">
                         <p className="text-[0.8rem] text-foreground">
@@ -520,129 +379,10 @@ export default function DashboardView() {
                     );
                   })}
                 </div>
-
-                {/* Converter manual */}
-                <div className="border-t border-border/30 pt-3 space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground">Converter</p>
-                  <div className="flex flex-wrap gap-2 items-end">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-muted-foreground">De</label>
-                      <select
-                        value={cambioFrom}
-                        onChange={(e) => setCambioFrom(e.target.value)}
-                        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-                      >
-                        <option value="">--</option>
-                        {allCurrencies.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-muted-foreground">Valor</label>
-                      <Input
-                        type="number"
-                        value={cambioAmount}
-                        onChange={(e) => setCambioAmount(e.target.value)}
-                        className="h-9 w-28"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-muted-foreground">Para</label>
-                      <select
-                        value={cambioTo}
-                        onChange={(e) => setCambioTo(e.target.value)}
-                        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-                      >
-                        <option value="">--</option>
-                        {allCurrencies.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleCambioUpdate}
-                      className="h-9 gap-1"
-                      disabled={ratesLoading}
-                    >
-                      <RefreshCw className={cn("size-3.5", ratesLoading && "animate-spin")} />
-                      Atualizar
-                    </Button>
-                  </div>
-                  {cambioResult !== null && (
-                    <p className="text-sm font-semibold text-foreground">
-                      = {fmtOther(cambioResult, cambioTo)}
-                    </p>
-                  )}
-                </div>
-
-                {/* Meta de câmbio */}
-                <div className="border-t border-border/30 pt-3 space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-                    <Target className="size-3.5" /> Meta
-                  </p>
-                  <div className="flex gap-2 items-center">
-                    <Input
-                      type="number"
-                      value={cambioMetaInput}
-                      onChange={(e) => setCambioMetaInput(e.target.value)}
-                      className="h-8 w-32 text-sm"
-                      placeholder="Ex: 100000"
-                    />
-                    <Button size="sm" variant="outline" onClick={handleSaveMeta} className="h-8 text-xs">
-                      Salvar meta
-                    </Button>
-                  </div>
-                  {cambioMeta > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-muted-foreground">
-                        <span>{brl(consolidated.saldoAtual)}</span>
-                        <span>{brl(cambioMeta)}</span>
-                      </div>
-                      <Progress value={metaProgress} className="h-2" />
-                      <p className="text-[10px] text-muted-foreground text-right">{metaProgress.toFixed(1)}%</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Histórico */}
-                {cambioHistory.length > 0 && (
-                  <div className="border-t border-border/30 pt-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-muted-foreground">Histórico</p>
-                      <button onClick={handleClearHistory} className="text-[10px] text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5">
-                        <Trash2 className="size-3" /> Limpar
-                      </button>
-                    </div>
-                    <div className="max-h-32 overflow-y-auto">
-                      <table className="w-full text-[11px]">
-                        <thead>
-                          <tr className="text-muted-foreground border-b border-border/30">
-                            <th className="text-left py-1 font-medium">Data</th>
-                            <th className="text-left py-1 font-medium">Origem</th>
-                            <th className="text-right py-1 font-medium">Valor</th>
-                            <th className="text-left py-1 font-medium">Destino</th>
-                            <th className="text-right py-1 font-medium">Resultado</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {cambioHistory.slice(0, 5).map((h, i) => (
-                            <tr key={i} className="border-b border-border/10">
-                              <td className="py-1 text-muted-foreground">{h.date}</td>
-                              <td className="py-1">{h.from}</td>
-                              <td className="py-1 text-right tabular-nums">{h.amount.toLocaleString()}</td>
-                              <td className="py-1">{h.to}</td>
-                              <td className="py-1 text-right tabular-nums font-medium">{fmtOther(h.result, h.to)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
