@@ -6,7 +6,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart as RechartsPieChart, Pie, Cell, Line, Legend, ComposedChart, AreaChart, Area,
@@ -25,7 +24,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyConversion } from "@/hooks/useCurrencyConversion";
 import type { Tables } from "@/integrations/supabase/types";
 
-const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
+const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" };
 
 type PeriodKey = "today" | "3days" | "month" | "year" | "custom";
 
@@ -49,9 +48,7 @@ export default function DashboardView() {
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
-  const [showConversion, setShowConversion] = useState(() => {
-    try { return localStorage.getItem("dashboard-show-cambio") === "true"; } catch { return false; }
-  });
+
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>("year");
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>(getPeriodRange("year"));
@@ -190,11 +187,8 @@ export default function DashboardView() {
     return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const handleToggleConversion = () => {
-    const next = !showConversion;
-    setShowConversion(next);
-    localStorage.setItem("dashboard-show-cambio", String(next));
-  };
+
+
 
   const otherCurrencies = (["BRL", "BTC", "EUR", "USD"] as const).filter(c => c !== currency).sort();
 
@@ -348,42 +342,61 @@ export default function DashboardView() {
           </Card>
         </div>
 
-        {/* Câmbio widget – full width above charts */}
-        <Card className="bg-card transition-all duration-300">
-          <CardContent className={cn("p-3 flex flex-col", !showConversion && "min-h-[60px] justify-center")}>
-            <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <ArrowRightLeft className="size-6 mr-1 text-muted-foreground" /> Câmbio
-              <Switch
-                checked={showConversion}
-                onCheckedChange={handleToggleConversion}
-                className="ml-auto"
-              />
-            </p>
-            {showConversion && (
-              <div className="flex flex-wrap gap-6 mt-3 animate-in fade-in duration-300">
-                {ratesLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Carregando...</span>}
-                {otherCurrencies.map(cur => {
-                  const val = cur === "BRL"
-                    ? totalPatrimony
-                    : convert(totalPatrimony, cur as "USD" | "EUR" | "BTC");
-                  const rate = cur === "BRL"
-                    ? 1
-                    : rates[cur as "USD" | "EUR" | "BTC"];
-                  return (
-                    <div key={cur} className="space-y-0">
-                      <p className="text-[0.8rem] text-foreground">
-                        {cur}: ≈ {fmtOther(val, cur)}
-                      </p>
-                      <p className="text-[0.7rem] text-muted-foreground">
-                        ({cur === "BRL" ? "moeda base" : fmtRate(cur, rate)})
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        {/* Câmbio widget – compact inline */}
+        <Card className="bg-card">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-4 flex-wrap">
+              <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1 shrink-0">
+                <ArrowRightLeft className="size-6 mr-1 text-muted-foreground" /> Câmbio
+              </p>
+              {ratesLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Carregando...</span>}
+              {!ratesLoading && otherCurrencies.map(cur => {
+                const val = cur === "BRL"
+                  ? totalPatrimony
+                  : convert(totalPatrimony, cur as "USD" | "EUR" | "BTC");
+                const rate = cur === "BRL"
+                  ? 1
+                  : rates[cur as "USD" | "EUR" | "BTC"];
+                return (
+                  <div key={cur} className="flex items-center gap-1.5">
+                    <span className="text-[0.8rem] text-foreground font-medium">
+                      {cur}: {fmtOther(val, cur)}
+                    </span>
+                    <span className="text-[0.65rem] text-muted-foreground">
+                      ({cur === "BRL" ? "base" : fmtRate(cur, rate)})
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
+
+        {/* Recursos por Conta - moved from Indicadores */}
+        {accounts.length > 0 && (
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
+                <Wallet className="size-7 mr-2 text-muted-foreground" /> Recursos por Conta
+              </p>
+              <div className="w-full min-w-0">
+                <ResponsiveContainer width="100%" height={Math.max(120, accounts.filter(a => a.is_active !== false).length * 30 + 40)}>
+                  <BarChart data={accounts.filter(a => a.is_active !== false).map(a => ({ name: a.name, balance: a.current_balance })).sort((x: any, y: any) => y.balance - x.balance)} layout="vertical" barSize={18}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v: number) => brl(v)} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={100} />
+                    <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                    <Bar dataKey="balance" name="Saldo" radius={[0, 4, 4, 0]}>
+                      {accounts.filter(a => a.is_active !== false).map(a => ({ name: a.name, balance: a.current_balance })).sort((x: any, y: any) => y.balance - x.balance).map((d: any) => (
+                        <Cell key={d.name} fill={d.balance >= 0 ? "#22c55e" : "#ef4444"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -395,9 +408,9 @@ export default function DashboardView() {
               <div className="w-full min-w-0">
                 <ResponsiveContainer width="100%" height={180}>
                   <ComposedChart data={monthlyData} barGap={0}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
-                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                     <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
                     <Legend wrapperStyle={{ fontSize: 14, fontWeight: 500 }} />
                     <Bar dataKey="receita" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
@@ -423,9 +436,9 @@ export default function DashboardView() {
                         <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
-                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                     <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
                     <Area type="monotone" dataKey="saldo" stroke="hsl(217, 91%, 60%)" fill="url(#saldoGrad)" strokeWidth={2} />
                   </AreaChart>

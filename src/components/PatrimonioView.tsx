@@ -294,7 +294,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
     };
   }, [accounts, entries, investments, projects]);
 
-  const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
+  const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" };
 
   return (
     <>
@@ -398,9 +398,9 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
                         <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
-                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                     <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
                     <Area type="monotone" dataKey="value" stroke="hsl(217, 91%, 60%)" fill="url(#patrimonioGrad)" strokeWidth={2} />
                   </AreaChart>
