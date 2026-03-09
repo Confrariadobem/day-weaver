@@ -304,21 +304,30 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
         {/* Sticky tab bar */}
         <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto backdrop-blur-sm">
           <div className="flex items-center gap-1.5 shrink-0">
-            <Button
-              size="sm"
-              variant={activeTab === "indicadores" ? "default" : "ghost"}
+            <Button size="sm" variant={activeTab === "indicadores" ? "default" : "ghost"}
               className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== "indicadores" && "text-muted-foreground")}
-              onClick={() => setActiveTab("indicadores")}
-            >
+              onClick={() => setActiveTab("indicadores")}>
               <PieChartIcon className="h-3 w-3" /> Indicadores
             </Button>
-            <Button
-              size="sm"
-              variant={activeTab === "carteiras" ? "default" : "ghost"}
+            <Button size="sm" variant={activeTab === "carteiras" ? "default" : "ghost"}
               className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== "carteiras" && "text-muted-foreground")}
-              onClick={() => setActiveTab("carteiras")}
-            >
+              onClick={() => setActiveTab("carteiras")}>
               <Landmark className="h-3 w-3" /> Carteiras
+            </Button>
+            <Button size="sm" variant={activeTab === "imovel" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== "imovel" && "text-muted-foreground")}
+              onClick={() => setActiveTab("imovel")}>
+              <Home className="h-3 w-3" /> Imóveis
+            </Button>
+            <Button size="sm" variant={activeTab === "veiculo" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== "veiculo" && "text-muted-foreground")}
+              onClick={() => setActiveTab("veiculo")}>
+              <Car className="h-3 w-3" /> Veículos
+            </Button>
+            <Button size="sm" variant={activeTab === "joia_outro" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== "joia_outro" && "text-muted-foreground")}
+              onClick={() => setActiveTab("joia_outro")}>
+              <Gem className="h-3 w-3" /> Joias/Outros
             </Button>
           </div>
           {/* Profile filter pills */}
