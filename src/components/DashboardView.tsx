@@ -187,11 +187,8 @@ export default function DashboardView() {
     return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const handleToggleConversion = () => {
-    const next = !showConversion;
-    setShowConversion(next);
-    localStorage.setItem("dashboard-show-cambio", String(next));
-  };
+
+
 
   const otherCurrencies = (["BRL", "BTC", "EUR", "USD"] as const).filter(c => c !== currency).sort();
 
