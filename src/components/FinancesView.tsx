@@ -1710,14 +1710,22 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             </Popover>
             <button
               onClick={() => {
+                // Toggle: if already filtering today, reset
                 const today = new Date();
                 const todayStr = format(today, "dd/MM/yyyy");
-                setFluxoCustomFrom(today); setFluxoCustomTo(today);
-                setFluxoDateFrom(todayStr); setFluxoDateTo(todayStr);
+                if (fluxoDateFrom === todayStr && fluxoDateTo === todayStr) {
+                  setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
+                  setFluxoDateFrom(""); setFluxoDateTo("");
+                } else {
+                  setFluxoCustomFrom(today); setFluxoCustomTo(today);
+                  setFluxoDateFrom(todayStr); setFluxoDateTo(todayStr);
+                }
               }}
               className={cn(
                 "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
-                "border-border hover:border-primary/80 hover:bg-primary/5"
+                fluxoDateFrom === format(new Date(), "dd/MM/yyyy") && fluxoDateTo === format(new Date(), "dd/MM/yyyy")
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border hover:border-primary/80 hover:bg-primary/5"
               )}
             >
               <CalendarDays className="size-4" />
