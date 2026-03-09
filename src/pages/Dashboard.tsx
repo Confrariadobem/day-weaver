@@ -6,10 +6,9 @@ import FinancesView from "@/components/FinancesView";
 import ProfileView from "@/components/ProfileView";
 import PreferencesView from "@/components/PreferencesView";
 import DashboardView from "@/components/DashboardView";
-import ProgramsProjectsView from "@/components/ProgramsProjectsView";
+import ProjectsView from "@/components/ProjectsView";
 import InvestmentsView from "@/components/InvestmentsView";
 import PatrimonioView from "@/components/PatrimonioView";
-import ProjectsDesejosView from "@/components/ProjectsDesejosView";
 import FloatingActionButton from "@/components/FloatingActionButton";
 import MobileNavDrawer from "@/components/MobileNavDrawer";
 import MobileBottomNav from "@/components/MobileBottomNav";
@@ -203,7 +202,6 @@ export default function Dashboard() {
     programs: "Projetos",
     investments: "Investimentos",
     patrimonio: "Patrimônio",
-    desejos: "Projetos & Desejos",
   };
 
   return (
@@ -250,10 +248,9 @@ export default function Dashboard() {
             {activeModule === "dashboard" && <DashboardView />}
             {activeModule === "calendar" && <CalendarView onTabChange={setCalendarTab} />}
             {activeModule === "finances" && <FinancesView onTabChange={setFinanceTab} walletFilter={walletFilter} onClearWalletFilter={() => setWalletFilter(null)} onNavigateToPatrimonio={() => { setWalletFilter(null); setActiveModule("patrimonio"); }} />}
-            {activeModule === "programs" && <ProgramsProjectsView onTabChange={setProjectTab} />}
+            {activeModule === "programs" && <ProjectsView />}
             {activeModule === "investments" && <InvestmentsView onTabChange={setInvestmentTab} />}
             {activeModule === "patrimonio" && <PatrimonioView onNavigateToFluxo={(acc) => { setWalletFilter(acc); setActiveModule("finances"); }} />}
-            {activeModule === "desejos" && <ProjectsDesejosView />}
             {activeModule === "profile" && <ProfileView />}
             {activeModule === "preferences" && <PreferencesView />}
           </div>
