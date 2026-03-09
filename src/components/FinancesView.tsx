@@ -1931,7 +1931,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 <Check className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent className="text-xs">Baixar</TooltipContent>
+                            <TooltipContent className="text-xs text-muted-foreground">Baixar</TooltipContent>
                           </Tooltip>
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
