@@ -15,7 +15,7 @@ import {
   Wallet, TrendingUp, TrendingDown, Landmark, CreditCard, PiggyBank,
   BarChart3, AlertTriangle, Lock, ArrowUpRight, ArrowDownRight,
   Banknote, WalletCards, Bitcoin, Star, Save, Trash2, Eye, EyeOff,
-  ExternalLink,
+  ExternalLink, PieChart as PieChartIcon,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area,
