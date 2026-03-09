@@ -202,7 +202,6 @@ export default function Dashboard() {
     programs: "Projetos",
     investments: "Investimentos",
     patrimonio: "Patrimônio",
-    desejos: "Projetos & Desejos",
   };
 
   return (
