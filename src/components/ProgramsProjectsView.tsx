@@ -22,8 +22,12 @@ import {
   Check, FolderKanban, Layers, ListTodo, Clock, Diamond,
   ArrowLeft, BarChart3, CircleDollarSign, Plus, GripVertical,
   AlertCircle, Flag, Pencil, Copy, Link, FileText, CalendarDays,
-  MoreHorizontal, Filter,
+  MoreHorizontal, Filter, FileUp, Printer, CalendarRange, X,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import { format, differenceInDays, isAfter, isBefore, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
