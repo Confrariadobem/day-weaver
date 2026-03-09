@@ -62,6 +62,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
   const [profileFilter, setProfileFilter] = useState<ProfileFilter>("pessoal");
   const [hasUpgrade] = useState(true);
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<"indicadores" | "carteiras">("indicadores");
 
   // Account edit dialog
   const [editDialogOpen, setEditDialogOpen] = useState(false);
