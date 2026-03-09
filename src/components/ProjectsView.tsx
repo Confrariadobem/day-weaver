@@ -117,6 +117,9 @@ export default function ProjectsView() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
+  // EAP modal
+  const [eapOpen, setEapOpen] = useState(false);
+
   // Interval filter
   const [intervalOpen, setIntervalOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState<Date | undefined>(undefined);
