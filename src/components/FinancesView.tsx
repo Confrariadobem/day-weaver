@@ -1846,7 +1846,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <div className="rounded-lg overflow-auto max-h-[calc(100vh-256px)] border border-border/30">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-card border-b border-border">
-                  <tr className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <tr className="text-xs text-foreground uppercase tracking-wider">
                     <th className="py-2.5 px-2 w-8">
                       <Checkbox
                         checked={filtered.length > 0 && selectedIds.size === filtered.length}
@@ -1859,9 +1859,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     </th>
                     <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("entry_date")}>
                       Vencimento <SortIcon field="entry_date" />
-                    </th>
-                    <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("category")}>
-                      Categoria <SortIcon field="category" />
                     </th>
                     <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("title")}>
                       Título <SortIcon field="title" />
