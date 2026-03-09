@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useModulePreferences } from "@/hooks/useModulePreferences";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,6 +149,7 @@ function CounterpartAutocomplete({ value, onChange, entries }: { value: string; 
 export default function FinancesView({ onTabChange, walletFilter, onClearWalletFilter, onNavigateToPatrimonio }: { onTabChange?: (tab: string) => void; walletFilter?: { id: string; name: string } | null; onClearWalletFilter?: () => void; onNavigateToPatrimonio?: () => void }) {
   const { user } = useAuth();
   const { formatCurrency: brl } = useCurrency();
+  const { formatDate: fmtDate } = useDateFormat();
   const fmtCurrency = (v: number, _cur?: CurrencyType) => brl(v);
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<DBTables<"projects">[]>([]);
@@ -828,7 +830,10 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     const realizado = buildSection(true);
 
     return {
-      months: months.map(m => format(m, "MMM", { locale: ptBR }).toUpperCase()),
+      months: months.map(m => {
+        const name = format(m, "MMM", { locale: ptBR });
+        return name.charAt(0).toUpperCase() + name.slice(1);
+      }),
       ...all,
       previsto,
       realizado,
@@ -848,7 +853,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       const rev = mEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
       const exp = mEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
       accumulated += rev - exp;
-      return { month: format(month, "MMM", { locale: ptBR }).toUpperCase(), receita: rev, despesa: exp, saldo: rev - exp, acumulado: accumulated };
+      return { month: (() => { const n = format(month, "MMM", { locale: ptBR }); return n.charAt(0).toUpperCase() + n.slice(1); })(), receita: rev, despesa: exp, saldo: rev - exp, acumulado: accumulated };
     });
   }, [periodFilteredEntries, periodYear]);
 
@@ -888,7 +893,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       });
       const paid = mEntries.filter(e => e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
       const pending = mEntries.filter(e => !e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
-      return { month: format(month, "MMM", { locale: ptBR }).toUpperCase(), pago: paid, pendente: pending };
+      return { month: (() => { const n = format(month, "MMM", { locale: ptBR }); return n.charAt(0).toUpperCase() + n.slice(1); })(), pago: paid, pendente: pending };
     });
   }, [periodFilteredEntries, periodYear]);
 
@@ -1578,7 +1583,16 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 placeholder="DD/MM/AAAA" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-between">
+            <button onClick={() => {
+              const today = new Date();
+              const todayStr = format(today, "dd/MM/yyyy");
+              setSharedCustomFrom(today); setSharedCustomTo(today);
+              setSharedDateFrom(todayStr); setSharedDateTo(todayStr);
+              setPeriodStart(format(today, "yyyy-MM-dd")); setPeriodEnd(format(today, "yyyy-MM-dd"));
+            }}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
+              style={{ minWidth: 80, height: 32 }}>Hoje</button>
             <button onClick={handleClearSharedInterval}
               className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
               style={{ minWidth: 80, height: 32 }}>Limpar</button>
@@ -1639,7 +1653,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       placeholder="DD/MM/AAAA" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
                   </div>
                 </div>
-                <div className="flex justify-end">
+                <div className="flex justify-between">
+                  <button onClick={() => {
+                    const today = new Date();
+                    const todayStr = format(today, "dd/MM/yyyy");
+                    setFluxoCustomFrom(today); setFluxoCustomTo(today);
+                    setFluxoDateFrom(todayStr); setFluxoDateTo(todayStr);
+                  }}
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
+                    style={{ minWidth: 80, height: 32 }}>Hoje</button>
                   <button onClick={handleClearFluxoInterval}
                     className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
                     style={{ minWidth: 80, height: 32 }}>Limpar</button>
@@ -1838,10 +1860,10 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             </Dialog>
 
             {/* Table */}
-            <div className="rounded-lg overflow-auto max-h-[calc(100vh-320px)] border border-border/30">
+            <div className="rounded-lg overflow-auto max-h-[calc(100vh-256px)] border border-border/30">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-card border-b border-border">
-                  <tr className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <tr className="text-xs text-foreground uppercase tracking-wider">
                     <th className="py-2.5 px-2 w-8">
                       <Checkbox
                         checked={filtered.length > 0 && selectedIds.size === filtered.length}
@@ -1854,9 +1876,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     </th>
                     <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("entry_date")}>
                       Vencimento <SortIcon field="entry_date" />
-                    </th>
-                    <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("category")}>
-                      Categoria <SortIcon field="category" />
                     </th>
                     <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("title")}>
                       Título <SortIcon field="title" />
@@ -1873,13 +1892,13 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <th className="text-center py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("is_paid")}>
                       Status <SortIcon field="is_paid" />
                     </th>
-                    <th className="w-14 py-2.5 px-1">
+                    <th className="w-24 py-2.5 px-1">
                       {selectedIds.size > 0 ? (
-                        <div className="flex items-center justify-center gap-0.5">
+                        <div className="flex items-center justify-center gap-1">
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
                               <button
-                                className="rounded p-1 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] transition-colors"
+                                className="rounded p-0.5 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] transition-colors"
                                 onClick={async () => {
                                   const ids = Array.from(selectedIds);
                                   await supabase.from("financial_entries").update({
@@ -1889,26 +1908,24 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                   fetchData();
                                 }}
                               >
-                                <Check className="h-4 w-4" />
+                                <Check className="h-5 w-5" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent className="text-xs">Baixar selecionados</TooltipContent>
+                            <TooltipContent className="text-xs">Baixar</TooltipContent>
                           </Tooltip>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="rounded p-1 text-muted-foreground hover:bg-accent transition-colors">
-                                <MoreHorizontal className="h-4 w-4" />
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <button onClick={handleBatchCopy}
+                                className="rounded p-0.5 text-muted-foreground hover:text-foreground transition-colors">
+                                <Copy className="h-5 w-5" />
                               </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="min-w-[140px]">
-                              <DropdownMenuItem
-                                className="gap-2 text-xs cursor-pointer"
-                                onClick={handleBatchCopy}
-                              >
-                                <Copy className="h-3.5 w-3.5 text-muted-foreground" /> Duplicar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="gap-2 text-xs cursor-pointer text-destructive focus:text-destructive"
+                            </TooltipTrigger>
+                            <TooltipContent className="text-xs">Duplicar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="rounded p-0.5 text-destructive hover:text-destructive/80 transition-colors"
                                 onClick={async () => {
                                   const ids = Array.from(selectedIds);
                                   await supabase.from("financial_entries").delete().in("id", ids);
@@ -1916,10 +1933,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                   fetchData();
                                 }}
                               >
-                                <Trash2 className="h-3.5 w-3.5" /> Excluir
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                <Trash2 className="h-5 w-5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="text-xs">Excluir</TooltipContent>
+                          </Tooltip>
                         </div>
                       ) : null}
                     </th>
@@ -1927,7 +1945,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={9} className="text-center text-muted-foreground/40 py-12">
+                    <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">
                       Sem lançamentos no período
                     </td></tr>
                   )}
@@ -1984,11 +2002,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             className="h-3.5 w-3.5"
                           />
                         </td>
-                        <td className="py-2.5 px-3 text-muted-foreground text-xs">{format(entDate, "dd/MM/yy")}</td>
-                        <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[140px]">
-                          {categories.find(c => c.id === e.category_id)?.name || "—"}
-                        </td>
-                        <td className={cn("py-2.5 px-3 text-[#F8F9FA] font-bold", e.is_paid && "line-through")}>
+                        <td className="py-2.5 px-3 font-bold text-xs">{fmtDate(entDate)}</td>
+                        <td className={cn("py-2.5 px-3 font-bold", e.is_paid && "line-through")}>
                           <span className="inline-flex items-center gap-1.5">
                             {highlightMatch(e.title, searchQuery)}
                             {isRecurrent && (
@@ -2004,20 +2019,26 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             )}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[140px]">{e.counterpart || "—"}</td>
-                        <td className={cn("py-2.5 px-3 text-right font-semibold tabular-nums",
+                        <td className="py-2.5 px-3 font-bold truncate max-w-[140px]">{e.counterpart || "—"}</td>
+                        <td className={cn("py-2.5 px-3 text-right font-bold tabular-nums",
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
                         </td>
-                        <td className={cn("py-2.5 px-3 text-center",
+                        <td className={cn("py-2.5 px-3 text-center font-bold",
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {e.type === "expense" ? "Despesa" : "Receita"}
                         </td>
-                        <td className={cn("py-2.5 px-3 text-center font-normal", statusColor)}>
+                        <td className={cn("py-2.5 px-3 text-center font-bold", statusColor)}>
                           {statusText}
                         </td>
-                        <td className="py-2.5 px-1 w-14 no-print">
+                        <td className="py-2.5 px-1 w-24 no-print">
                           <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
+                            {!e.is_paid && (
+                              <button onClick={async (ev) => { ev.stopPropagation(); await togglePaid(e); }}
+                                className="rounded p-0.5 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] transition-colors">
+                                <Check className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                             <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }}
                               className="rounded p-0.5 text-foreground hover:text-foreground/80 transition-colors">
                               <Pencil className="h-3.5 w-3.5" />
@@ -2047,17 +2068,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     );
                   })}
                 </tbody>
-                {selectedIds.size > 0 && (
-                  <tfoot className="sticky bottom-0 bg-card border-t border-border">
-                    <tr>
-                      <td colSpan={9} className="py-2 px-4">
-                        <span className="text-xs text-muted-foreground">
-                          Selecionados: {selectedIds.size.toLocaleString("pt-BR")}
-                        </span>
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
+                <tfoot className="sticky bottom-0 bg-card border-t border-border">
+                  <tr>
+                    <td colSpan={8} className="py-2 px-4">
+                      <span className="text-xs text-muted-foreground">
+                        Selecionados: {selectedIds.size.toLocaleString("pt-BR")}
+                      </span>
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </>
