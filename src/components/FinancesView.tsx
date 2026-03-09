@@ -1566,7 +1566,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           <Calendar mode="range" locale={ptBR} showOutsideDays={false}
             selected={{ from: sharedCustomFrom, to: sharedCustomTo }}
             onSelect={handleSharedIntervalSelect}
-            className="pointer-events-auto" />
+            className="pointer-events-auto"
+            formatters={{ formatCaption: (date) => { const m = format(date, "LLLL yyyy", { locale: ptBR }); return m.charAt(0).toUpperCase() + m.slice(1); } }} />
           <div className="space-y-2 border-t border-border/30 pt-3 pr-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold w-8 shrink-0">De:</span>
