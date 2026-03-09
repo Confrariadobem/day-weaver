@@ -2526,7 +2526,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 <CardTitle className="text-sm">Resumo — {periodYear}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                   <div className="rounded-lg bg-success/10 p-3 text-center">
                     <p className="text-[10px] text-muted-foreground">Total Receitas</p>
                     <p className="text-lg font-bold text-success">{brl(periodFilteredEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0))}</p>
