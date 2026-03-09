@@ -893,7 +893,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       });
       const paid = mEntries.filter(e => e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
       const pending = mEntries.filter(e => !e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
-      return { month: format(month, "MMM", { locale: ptBR }).toUpperCase(), pago: paid, pendente: pending };
+      return { month: (() => { const n = format(month, "MMM", { locale: ptBR }); return n.charAt(0).toUpperCase() + n.slice(1); })(), pago: paid, pendente: pending };
     });
   }, [periodFilteredEntries, periodYear]);
 
