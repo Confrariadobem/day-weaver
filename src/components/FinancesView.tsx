@@ -2758,7 +2758,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <div className="w-full min-w-0" style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={costCenterData} barGap={4}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                         <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                         <YAxis tick={{ fontSize: 10 }} />
                         <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
