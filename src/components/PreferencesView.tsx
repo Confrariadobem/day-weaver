@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { LAUNCH_TYPE_ICONS, DATA_MODULE_ICONS, CATEGORY_ICON_MAP, CATEGORY_ICON_KEYS, INVESTMENT_TYPE_ICONS } from "@/lib/icons";
 import { MODULE_REGISTRY, getModuleDef } from "@/config/moduleRegistry";
 import { useModulePreferences } from "@/hooks/useModulePreferences";
+import TeamsSection from "@/components/preferences/TeamsSection";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
