@@ -1580,7 +1580,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <Input value={sharedDateTo}
                 onChange={(e) => setSharedDateTo(normalizeDateInput(e.target.value))}
                 onBlur={() => { const d = parseDMY(sharedDateTo); if (d) { setSharedCustomTo(d); setSharedDateTo(format(d, "dd/MM/yyyy")); setPeriodEnd(format(d, "yyyy-MM-dd")); } }}
-                placeholder="DD/MM/AAAA" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
+                placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
             </div>
           </div>
           <div className="flex justify-end">
