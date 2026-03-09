@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useModulePreferences } from "@/hooks/useModulePreferences";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
