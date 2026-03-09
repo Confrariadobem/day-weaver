@@ -339,14 +339,6 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
             {t.icon} {t.label}
           </Button>
         ))}
-        <div className="w-px h-5 bg-border/50 mx-1 shrink-0" />
-        {INVESTMENT_TYPES.filter(t => visibleTabs.includes(t.value)).map(t => (
-          <Button key={`trades-${t.value}`} size="sm" variant={activeTab === `trades-${t.value}` ? "default" : "ghost"}
-            className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== `trades-${t.value}` && "text-muted-foreground")}
-            onClick={() => setActiveTab(`trades-${t.value}`)}>
-            <ListChecks className="h-3 w-3" /> Trades {t.label}
-          </Button>
-        ))}
         <div className="ml-auto flex items-center gap-3">
           <div className="relative" style={{ width: 200 }}>
             <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
