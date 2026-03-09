@@ -1583,22 +1583,32 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 placeholder="DD/MM/AAAA" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
             </div>
           </div>
-          <div className="flex justify-between">
-            <button onClick={() => {
-              const today = new Date();
-              const todayStr = format(today, "dd/MM/yyyy");
-              setSharedCustomFrom(today); setSharedCustomTo(today);
-              setSharedDateFrom(todayStr); setSharedDateTo(todayStr);
-              setPeriodStart(format(today, "yyyy-MM-dd")); setPeriodEnd(format(today, "yyyy-MM-dd"));
-            }}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
-              style={{ minWidth: 80, height: 32 }}>Hoje</button>
+          <div className="flex justify-end">
             <button onClick={handleClearSharedInterval}
               className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
               style={{ minWidth: 80, height: 32 }}>Limpar</button>
           </div>
         </PopoverContent>
       </Popover>
+    );
+
+    const renderSharedHoje = () => (
+      <button
+        onClick={() => {
+          const today = new Date();
+          const todayStr = format(today, "dd/MM/yyyy");
+          setSharedCustomFrom(today); setSharedCustomTo(today);
+          setSharedDateFrom(todayStr); setSharedDateTo(todayStr);
+          setPeriodStart(format(today, "yyyy-MM-dd")); setPeriodEnd(format(today, "yyyy-MM-dd"));
+        }}
+        className={cn(
+          "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+          "border-border hover:border-primary/80 hover:bg-primary/5"
+        )}
+      >
+        <CalendarDays className="size-4" />
+        <span className="text-xs font-medium">Hoje</span>
+      </button>
     );
 
     return (
@@ -1653,21 +1663,28 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       placeholder="DD/MM/AAAA" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
                   </div>
                 </div>
-                <div className="flex justify-between">
-                  <button onClick={() => {
-                    const today = new Date();
-                    const todayStr = format(today, "dd/MM/yyyy");
-                    setFluxoCustomFrom(today); setFluxoCustomTo(today);
-                    setFluxoDateFrom(todayStr); setFluxoDateTo(todayStr);
-                  }}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
-                    style={{ minWidth: 80, height: 32 }}>Hoje</button>
+                <div className="flex justify-end">
                   <button onClick={handleClearFluxoInterval}
                     className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
                     style={{ minWidth: 80, height: 32 }}>Limpar</button>
                 </div>
               </PopoverContent>
             </Popover>
+            <button
+              onClick={() => {
+                const today = new Date();
+                const todayStr = format(today, "dd/MM/yyyy");
+                setFluxoCustomFrom(today); setFluxoCustomTo(today);
+                setFluxoDateFrom(todayStr); setFluxoDateTo(todayStr);
+              }}
+              className={cn(
+                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                "border-border hover:border-primary/80 hover:bg-primary/5"
+              )}
+            >
+              <CalendarDays className="size-4" />
+              <span className="text-xs font-medium">Hoje</span>
+            </button>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button onClick={() => {
@@ -1728,6 +1745,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               )}
             </div>
             {renderSharedInterval()}
+            {renderSharedHoje()}
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button onClick={isDoar ? handlePrintDOAR : handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
@@ -1863,7 +1881,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <div className="rounded-lg overflow-auto max-h-[calc(100vh-256px)] border border-border/30">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-card border-b border-border">
-                  <tr className="text-xs text-foreground uppercase tracking-wider">
+                  <tr className="text-xs text-muted-foreground uppercase tracking-wider">
                     <th className="py-2.5 px-2 w-8">
                       <Checkbox
                         checked={filtered.length > 0 && selectedIds.size === filtered.length}
@@ -1894,7 +1912,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     </th>
                     <th className="w-24 py-2.5 px-1">
                       {selectedIds.size > 0 ? (
-                        <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-0.5">
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
                               <button
@@ -1908,7 +1926,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                   fetchData();
                                 }}
                               >
-                                <Check className="h-5 w-5" />
+                                <Check className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
                             <TooltipContent className="text-xs">Baixar</TooltipContent>
@@ -1917,7 +1935,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             <TooltipTrigger asChild>
                               <button onClick={handleBatchCopy}
                                 className="rounded p-0.5 text-muted-foreground hover:text-foreground transition-colors">
-                                <Copy className="h-5 w-5" />
+                                <Copy className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
                             <TooltipContent className="text-xs">Duplicar</TooltipContent>
@@ -1933,7 +1951,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                   fetchData();
                                 }}
                               >
-                                <Trash2 className="h-5 w-5" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
                             <TooltipContent className="text-xs">Excluir</TooltipContent>
@@ -2002,8 +2020,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             className="h-3.5 w-3.5"
                           />
                         </td>
-                        <td className="py-2.5 px-3 font-bold text-xs">{fmtDate(entDate)}</td>
-                        <td className={cn("py-2.5 px-3 font-bold", e.is_paid && "line-through")}>
+                        <td className="py-2.5 px-3 text-xs text-muted-foreground">{fmtDate(entDate)}</td>
+                        <td className={cn("py-2.5 px-3 text-xs font-bold text-foreground", e.is_paid && "line-through")}>
                           <span className="inline-flex items-center gap-1.5">
                             {highlightMatch(e.title, searchQuery)}
                             {isRecurrent && (
@@ -2019,16 +2037,16 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             )}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 font-bold truncate max-w-[140px]">{e.counterpart || "—"}</td>
-                        <td className={cn("py-2.5 px-3 text-right font-bold tabular-nums",
+                        <td className="py-2.5 px-3 text-xs text-muted-foreground truncate max-w-[140px]">{e.counterpart || "—"}</td>
+                        <td className={cn("py-2.5 px-3 text-right text-xs font-bold tabular-nums",
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
                         </td>
-                        <td className={cn("py-2.5 px-3 text-center font-bold",
+                        <td className={cn("py-2.5 px-3 text-center text-xs",
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {e.type === "expense" ? "Despesa" : "Receita"}
                         </td>
-                        <td className={cn("py-2.5 px-3 text-center font-bold", statusColor)}>
+                        <td className={cn("py-2.5 px-3 text-center text-xs", statusColor)}>
                           {statusText}
                         </td>
                         <td className="py-2.5 px-1 w-24 no-print">
