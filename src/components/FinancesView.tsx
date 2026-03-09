@@ -2230,8 +2230,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           />
                         </td>
                         <td className="py-2.5 px-3 text-xs text-muted-foreground">{fmtDate(entDate)}</td>
-                        <td className={cn("py-2.5 px-3 text-xs font-bold text-muted-foreground", e.is_paid && "line-through")}>
-                          <span className="inline-flex items-center gap-1.5">
+                        <td className={cn("py-2.5 px-3 text-xs font-bold text-muted-foreground max-w-[200px]", e.is_paid && "line-through")}>
+                          <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full">
                             {highlightMatch(e.title, searchQuery)}
                             {isRecurrent && (
                               <Tooltip delayDuration={200}>
