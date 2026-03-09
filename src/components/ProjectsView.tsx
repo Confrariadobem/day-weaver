@@ -221,46 +221,6 @@ export default function ProjectsView() {
     return Math.round((done / children.length) * 100);
   };
 
-  // ─── Indicadores data ───────────────────────────────────────────────────
-  const indicadoresData = useMemo(() => {
-    const total = allItems.length;
-    const done = allItems.filter(i => i.status === "feito").length;
-    const inProgress = allItems.filter(i => i.status === "em_andamento").length;
-    const pending = allItems.filter(i => i.status === "pendente").length;
-    const overdue = allItems.filter(i => {
-      if (!i.target_date || i.status === "feito") return false;
-      return new Date(i.target_date) < new Date();
-    }).length;
-    const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
-
-    // By responsible
-    const byResponsible: Record<string, number> = {};
-    allItems.forEach(i => {
-      const r = i.responsible || "Sem responsável";
-      byResponsible[r] = (byResponsible[r] || 0) + 1;
-    });
-    const responsibleData = Object.entries(byResponsible).map(([name, value]) => ({ name, value }));
-
-    // Status distribution
-    const statusData = [
-      { name: "Pendente", value: pending, fill: "#f59e0b" },
-      { name: "Em andamento", value: inProgress, fill: "hsl(var(--primary))" },
-      { name: "Concluído", value: done, fill: "hsl(var(--success))" },
-    ].filter(d => d.value > 0);
-
-    // Priority distribution
-    const alta = allItems.filter(i => i.priority === "alta").length;
-    const media = allItems.filter(i => i.priority === "media").length;
-    const baixa = allItems.filter(i => i.priority === "baixa").length;
-    const priorityData = [
-      { name: "Alta", value: alta },
-      { name: "Média", value: media },
-      { name: "Baixa", value: baixa },
-    ];
-
-    return { total, done, inProgress, pending, overdue, progressPct, responsibleData, statusData, priorityData };
-  }, [allItems]);
-
   // Filter by tab (for list tabs)
   const tabFiltered = useMemo(() => {
     return hierarchy.filter(p => {
