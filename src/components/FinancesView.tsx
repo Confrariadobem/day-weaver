@@ -2047,6 +2047,17 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     );
                   })}
                 </tbody>
+                {selectedIds.size > 0 && (
+                  <tfoot className="sticky bottom-0 bg-card border-t border-border">
+                    <tr>
+                      <td colSpan={9} className="py-2 px-4">
+                        <span className="text-xs text-muted-foreground">
+                          Selecionados: {selectedIds.size.toLocaleString("pt-BR")}
+                        </span>
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </>
