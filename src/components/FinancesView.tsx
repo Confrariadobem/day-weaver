@@ -1894,7 +1894,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     </th>
                     <th className="w-24 py-2.5 px-1">
                       {selectedIds.size > 0 ? (
-                        <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-0.5">
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
                               <button
@@ -1908,7 +1908,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                   fetchData();
                                 }}
                               >
-                                <Check className="h-5 w-5" />
+                                <Check className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
                             <TooltipContent className="text-xs">Baixar</TooltipContent>
@@ -1917,7 +1917,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             <TooltipTrigger asChild>
                               <button onClick={handleBatchCopy}
                                 className="rounded p-0.5 text-muted-foreground hover:text-foreground transition-colors">
-                                <Copy className="h-5 w-5" />
+                                <Copy className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
                             <TooltipContent className="text-xs">Duplicar</TooltipContent>
@@ -1933,7 +1933,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                   fetchData();
                                 }}
                               >
-                                <Trash2 className="h-5 w-5" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
                             <TooltipContent className="text-xs">Excluir</TooltipContent>
