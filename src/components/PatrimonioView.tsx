@@ -366,6 +366,8 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
           </Card>
         )}
 
+        {/* ═══ INDICADORES TAB ═══ */}
+        {activeTab === "indicadores" && (<>
         {/* Main KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-card">
