@@ -15,7 +15,7 @@ import {
   FolderHeart,
 } from "lucide-react";
 
-export type ModuleKey = "calendar" | "finances" | "dashboard" | "profile" | "preferences" | "programs" | "investments" | "patrimonio" | "desejos";
+export type ModuleKey = "calendar" | "finances" | "dashboard" | "profile" | "preferences" | "programs" | "investments" | "patrimonio";
 
 interface NavItem {
   key: ModuleKey;
