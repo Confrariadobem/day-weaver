@@ -23,12 +23,13 @@ import { ConfigDialog } from "@/components/shared/ConfigDialog";
 import { ColorPaletteGrid } from "@/components/shared/ColorPaletteGrid";
 import {
   Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp, Plus, DollarSign,
-  FolderKanban, Eye, Sparkles, Sunset, Flower2, Waves, ChevronDown,
+  FolderKanban, Eye, Sparkles, Sunset, Flower2, Waves, ChevronDown, Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LAUNCH_TYPE_ICONS, DATA_MODULE_ICONS, CATEGORY_ICON_MAP, CATEGORY_ICON_KEYS, INVESTMENT_TYPE_ICONS } from "@/lib/icons";
 import { MODULE_REGISTRY, getModuleDef } from "@/config/moduleRegistry";
 import { useModulePreferences } from "@/hooks/useModulePreferences";
+import TeamsSection from "@/components/preferences/TeamsSection";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -429,7 +430,7 @@ export default function PreferencesView() {
           <Accordion
             type="multiple"
             defaultValue={["general"]}
-            className="w-full space-y-16"
+            className="w-full space-y-8"
           >
             {/* ═══════════ GERAL ═══════════ */}
             {(
@@ -758,6 +759,18 @@ export default function PreferencesView() {
                       <div className="flex items-center justify-between"><Label className="text-xs">Exibir valores em múltiplas moedas</Label><Switch defaultChecked /></div>
                     </CardContent>
                   </Card>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+
+            {/* ═══════════ EQUIPES ═══════════ */}
+            {(
+              <AccordionItem value="teams" className="border-none">
+                <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
+                  <span className="flex items-center gap-2"><Users className="h-4 w-4 text-pink-500" /> Equipes</span>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pt-6 pb-16 space-y-4">
+                  <TeamsSection />
                 </AccordionContent>
               </AccordionItem>
             )}
