@@ -221,6 +221,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [fluxoDateTo, setFluxoDateTo] = useState("");
   const [colFilterStatus, setColFilterStatus] = useState<string>("all");
   const [colFilterCounterpart, setColFilterCounterpart] = useState<string>("");
+  const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterCategoryId, setFilterCategoryId] = useState<string>("");
+  const [filterCostCenterId, setFilterCostCenterId] = useState<string>("");
+  const [filterProjectId, setFilterProjectId] = useState<string>("");
+  const [filterAccountId, setFilterAccountId] = useState<string>("");
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>("");
+  const [filterIsFixed, setFilterIsFixed] = useState<string>("all");
+  const [filterCounterpart, setFilterCounterpart] = useState<string>("");
 
   const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
   const splitTotal = splitLines.reduce((s, l) => s + parseNum(l.amount), 0);
@@ -618,6 +627,19 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           if (e.is_paid || ed >= today) return false;
         }
         if (colFilterCounterpart && !(e.counterpart || "").toLowerCase().includes(colFilterCounterpart.toLowerCase())) return false;
+        // Advanced filter fields
+        if (filterType !== "all") {
+          if (filterType === "revenue" && e.type !== "revenue") return false;
+          if (filterType === "expense" && e.type !== "expense") return false;
+        }
+        if (filterCategoryId && e.category_id !== filterCategoryId) return false;
+        if (filterCostCenterId && e.cost_center_id !== filterCostCenterId) return false;
+        if (filterProjectId && e.project_id !== filterProjectId) return false;
+        if (filterAccountId && e.account_id !== filterAccountId) return false;
+        if (filterPaymentMethod && e.payment_method !== filterPaymentMethod) return false;
+        if (filterIsFixed === "yes" && !e.is_fixed) return false;
+        if (filterIsFixed === "no" && e.is_fixed) return false;
+        if (filterCounterpart && !(e.counterpart || "").toLowerCase().includes(filterCounterpart.toLowerCase())) return false;
         return true;
       })
       .filter((e) => {
@@ -665,7 +687,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter]);
+  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterCostCenterId, filterProjectId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart]);
 
   // KPI totals based on current filter
   const kpiData = useMemo(() => {
@@ -1628,6 +1650,18 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </button>
               )}
             </div>
+            <button
+              onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
+              className={cn(
+                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border hover:border-primary/80 hover:bg-primary/5"
+              )}
+            >
+              <Filter className="size-4" />
+              <span className="text-xs font-medium">Filtros</span>
+            </button>
             <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
               <PopoverTrigger asChild>
                 <button
@@ -1873,6 +1907,124 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           <>
 
             {/* Batch actions bar removed — icons now in table header */}
+
+            {/* Advanced Filter Panel */}
+            {advancedFilterOpen && (
+              <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Filter className="h-3.5 w-3.5" /> Filtros Avançados
+                  </p>
+                  <button
+                    onClick={() => {
+                      setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
+                      setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
+                      setFilterIsFixed("all"); setFilterCounterpart("");
+                    }}
+                    className="text-[10px] text-muted-foreground hover:text-primary underline"
+                  >
+                    Limpar filtros
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Tipo</Label>
+                    <Select value={filterType} onValueChange={setFilterType}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="revenue">🟢 Receita</SelectItem>
+                        <SelectItem value="expense">🔴 Despesa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Categoria</Label>
+                    <Select value={filterCategoryId || "__all__"} onValueChange={(v) => setFilterCategoryId(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todas</SelectItem>
+                        {sortedFinCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Centro de Custo</Label>
+                    <Select value={filterCostCenterId || "__all__"} onValueChange={(v) => setFilterCostCenterId(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todos</SelectItem>
+                        {costCenters.map((cc: any) => (
+                          <SelectItem key={cc.id} value={cc.id}>
+                            <span className="flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color }} />
+                              {cc.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Projeto</Label>
+                    <Select value={filterProjectId || "__all__"} onValueChange={(v) => setFilterProjectId(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todos</SelectItem>
+                        {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Carteira</Label>
+                    <Select value={filterAccountId || "__all__"} onValueChange={(v) => setFilterAccountId(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todas</SelectItem>
+                        {accounts.filter(a => a.is_active).map(a => (
+                          <SelectItem key={a.id} value={a.id}>
+                            <span className="flex items-center gap-1.5">
+                              {ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon}
+                              {a.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Forma de Pagamento</Label>
+                    <Select value={filterPaymentMethod || "__all__"} onValueChange={(v) => setFilterPaymentMethod(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todas</SelectItem>
+                        {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Conta Fixa</Label>
+                    <Select value={filterIsFixed} onValueChange={setFilterIsFixed}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="yes">Sim</SelectItem>
+                        <SelectItem value="no">Não</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Contraparte</Label>
+                    <Input
+                      value={filterCounterpart}
+                      onChange={(e) => setFilterCounterpart(e.target.value)}
+                      placeholder="Filtrar..."
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Entry edit dialog */}
             <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
@@ -2526,7 +2678,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 <CardTitle className="text-sm">Resumo — {periodYear}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                   <div className="rounded-lg bg-success/10 p-3 text-center">
                     <p className="text-[10px] text-muted-foreground">Total Receitas</p>
                     <p className="text-lg font-bold text-success">{brl(periodFilteredEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0))}</p>
@@ -2555,7 +2707,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5 text-primary" /> Recursos por Conta</CardTitle></CardHeader>
               <CardContent>
                 {accountBalanceData.length > 0 ? (
-                  <div className="h-[200px]">
+                  <div className="w-full min-w-0" style={{ height: 200 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={accountBalanceData} layout="vertical" barSize={18}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" horizontal={false} />
@@ -2578,7 +2730,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm">Receita × Despesa Mensal — {periodYear}</CardTitle></CardHeader>
               <CardContent>
-                <div className="h-[280px]">
+                <div className="w-full min-w-0" style={{ height: 280 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={reportChartData} barGap={0}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
@@ -2599,7 +2751,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm">Saldo Mensal — {periodYear}</CardTitle></CardHeader>
               <CardContent>
-                <div className="h-[220px]">
+                <div className="w-full min-w-0" style={{ height: 220 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={reportChartData}>
                       <defs>
@@ -2651,7 +2803,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm">Pago × Pendente — {periodYear}</CardTitle></CardHeader>
               <CardContent>
-                <div className="h-[220px]">
+                <div className="w-full min-w-0" style={{ height: 220 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={monthlyTrendData} barGap={0}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
@@ -2672,7 +2824,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> Indicadores por Centro de Custo</CardTitle></CardHeader>
                 <CardContent>
-                  <div className="h-[220px]">
+                  <div className="w-full min-w-0" style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={costCenterData} barGap={4}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
@@ -2694,7 +2846,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><ListChecks className="h-3.5 w-3.5 text-primary" /> Indicadores por Projeto</CardTitle></CardHeader>
                 <CardContent>
-                  <div className="h-[220px]">
+                  <div className="w-full min-w-0" style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={projectFinData} barGap={4}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
@@ -2713,14 +2865,14 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             )}
 
             {/* Pie charts */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Categorias — Despesas</CardTitle></CardHeader>
                 <CardContent>
                   {categoryPieData.length > 0 ? (
-                    <div className="flex items-center gap-4">
-                      <div className="h-[200px] w-[200px] shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      <div className="w-full sm:w-auto shrink-0 flex justify-center">
+                        <ResponsiveContainer width={200} height={200}>
                           <PieChart>
                             <Pie data={categoryPieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
                               outerRadius={80} innerRadius={48} paddingAngle={4} cornerRadius={6}
@@ -2752,9 +2904,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Categorias — Receitas</CardTitle></CardHeader>
                 <CardContent>
                   {revenuePieData.length > 0 ? (
-                    <div className="flex items-center gap-4">
-                      <div className="h-[200px] w-[200px] shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      <div className="w-full sm:w-auto shrink-0 flex justify-center">
+                        <ResponsiveContainer width={200} height={200}>
                           <PieChart>
                             <Pie data={revenuePieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
                               outerRadius={80} innerRadius={48} paddingAngle={4} cornerRadius={6}
