@@ -301,7 +301,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
     <>
     <div className="p-4 max-w-full overflow-hidden space-y-4 module-container">
         {/* Sticky tab bar */}
-        <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto">
+        <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto backdrop-blur-sm">
           <div className="flex items-center gap-1.5 shrink-0">
             <Button
               size="sm"

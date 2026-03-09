@@ -831,7 +831,7 @@ export default function ProjectsView() {
     <ScrollArea className="h-full">
       <div className={cn("p-4 space-y-4 max-w-full overflow-hidden module-container", isMobile && "px-3")}>
         {/* Tab buttons + Toolbar on same line */}
-        <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto">
+        <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto backdrop-blur-sm">
           <div className="flex items-center gap-1.5 shrink-0">
             {tabConfig.map(tab => (
               <Button key={tab.key} size="sm"
