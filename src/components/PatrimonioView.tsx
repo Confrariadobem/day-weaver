@@ -389,21 +389,23 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
               <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
                 <BarChart3 className="h-3.5 w-3.5 text-primary" /> Evolução do Patrimônio
               </p>
-              <ResponsiveContainer width="100%" height={180}>
-                <AreaChart data={metrics.evolution}>
-                  <defs>
-                    <linearGradient id="patrimonioGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
-                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                  <Area type="monotone" dataKey="value" stroke="hsl(217, 91%, 60%)" fill="url(#patrimonioGrad)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <div className="w-full min-w-0">
+                <ResponsiveContainer width="100%" height={180}>
+                  <AreaChart data={metrics.evolution}>
+                    <defs>
+                      <linearGradient id="patrimonioGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                    <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                    <Area type="monotone" dataKey="value" stroke="hsl(217, 91%, 60%)" fill="url(#patrimonioGrad)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
 
