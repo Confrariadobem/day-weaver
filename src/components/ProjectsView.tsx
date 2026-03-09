@@ -264,12 +264,10 @@ export default function ProjectsView() {
 
   // Filter by tab (for list tabs)
   const tabFiltered = useMemo(() => {
-    if (activeTab === "indicadores") return hierarchy;
     return hierarchy.filter(p => {
       const eff = getEffectiveStatus(p);
-      if (activeTab === "andamento") return eff === "pendente" || eff === "em_andamento";
-      if (activeTab === "desejos") return eff === "pendente";
-      return eff === "feito";
+      if (activeTab === "andamento") return eff === "em_andamento" || eff === "pendente";
+      return eff === "pendente"; // backlog
     });
   }, [hierarchy, activeTab]);
 
