@@ -32,6 +32,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 } from "recharts";
 import EventEditDialog from "@/components/calendar/EventEditDialog";
+import TradesTable, { type InvestmentTypeFilter } from "@/components/investments/TradesTable";
+import { ListChecks } from "lucide-react";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
