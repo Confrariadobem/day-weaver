@@ -2205,9 +2205,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       <th className="text-left p-2 border-b border-border font-bold min-w-[180px] uppercase">Descrição</th>
                       <th className="text-right p-2 border-b border-border font-bold min-w-[50px]">%</th>
                       {dreData.months.map(m => (
-                        <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px]">{m}</th>
+                        <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px] uppercase">{m}</th>
                       ))}
-                      <th className="text-right p-2 border-b border-border font-bold min-w-[90px] bg-muted">TOTAL</th>
+                      <th className="text-right p-2 border-b border-border font-bold min-w-[90px] bg-muted uppercase">TOTAL</th>
                     </tr>
                   </thead>
                   <tbody>
