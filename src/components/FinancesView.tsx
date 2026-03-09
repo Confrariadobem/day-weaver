@@ -2419,9 +2419,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <th className="text-left p-2 border-b border-border font-bold min-w-[140px] uppercase">Descrição</th>
                         <th className="text-right p-2 border-b border-border font-bold min-w-[50px]">%</th>
                         {months.map(m => (
-                          <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px]">{m}</th>
+                          <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px] uppercase">{m}</th>
                         ))}
-                        <th className="text-right p-2 border-b border-border font-bold min-w-[90px]">TOTAL</th>
+                        <th className="text-right p-2 border-b border-border font-bold min-w-[90px] uppercase">TOTAL</th>
                       </tr>
                     </thead>
                     <tbody>
