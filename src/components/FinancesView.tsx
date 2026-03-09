@@ -1916,7 +1916,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
         <Card className="bg-card">
           <CardContent className="p-3">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
