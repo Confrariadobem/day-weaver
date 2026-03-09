@@ -26,7 +26,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "@/hooks/use-toast";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
+
 
 type ProjectTab = "andamento" | "backlog";
 type ProjectStatus = "pendente" | "em_andamento" | "feito";
