@@ -853,7 +853,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       const rev = mEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
       const exp = mEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
       accumulated += rev - exp;
-      return { month: format(month, "MMM", { locale: ptBR }).toUpperCase(), receita: rev, despesa: exp, saldo: rev - exp, acumulado: accumulated };
+      return { month: (() => { const n = format(month, "MMM", { locale: ptBR }); return n.charAt(0).toUpperCase() + n.slice(1); })(), receita: rev, despesa: exp, saldo: rev - exp, acumulado: accumulated };
     });
   }, [periodFilteredEntries, periodYear]);
 
