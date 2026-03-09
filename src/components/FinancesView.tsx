@@ -830,7 +830,10 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     const realizado = buildSection(true);
 
     return {
-      months: months.map(m => format(m, "MMM", { locale: ptBR }).toUpperCase()),
+      months: months.map(m => {
+        const name = format(m, "MMM", { locale: ptBR });
+        return name.charAt(0).toUpperCase() + name.slice(1);
+      }),
       ...all,
       previsto,
       realizado,
