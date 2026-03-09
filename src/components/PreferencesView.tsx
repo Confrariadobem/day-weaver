@@ -430,7 +430,7 @@ export default function PreferencesView() {
           <Accordion
             type="multiple"
             defaultValue={["general"]}
-            className="w-full space-y-16"
+            className="w-full space-y-8"
           >
             {/* ═══════════ GERAL ═══════════ */}
             {(
