@@ -1930,7 +1930,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
               <TrendingDown className="h-4 w-4" /> Contas a Pagar
             </p>
-            <p className="text-lg font-bold text-[#ef4444]">{brl(kpiData.totalExpense)}</p>
+            <p className="text-lg font-bold text-destructive">{brl(kpiData.totalExpense)}</p>
           </CardContent>
         </Card>
         <Card className="bg-card">
