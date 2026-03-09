@@ -294,7 +294,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
     };
   }, [accounts, entries, investments, projects]);
 
-  const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
+  const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" };
 
   return (
     <>
