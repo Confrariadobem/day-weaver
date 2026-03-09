@@ -579,12 +579,43 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     return digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4, 8);
   };
 
-  // Highlight helper for search matches
+  // Highlight helper for search matches — preserves full text, no truncation
   const highlightMatch = (text: string, query: string) => {
-    if (!query) return text;
-    const idx = text.toLowerCase().indexOf(query.toLowerCase());
-    if (idx === -1) return text;
-    return <>{text.slice(0, idx)}<strong className="text-foreground">{text.slice(idx, idx + query.length)}</strong>{text.slice(idx + query.length)}</>;
+    if (!query) return <span className="truncate">{text}</span>;
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase().trim();
+    const words = lowerQuery.split(/\s+/).filter(Boolean);
+    if (words.length === 0) return <span className="truncate">{text}</span>;
+    // Find all match ranges
+    const ranges: { start: number; end: number }[] = [];
+    words.forEach(w => {
+      let idx = 0;
+      while ((idx = lowerText.indexOf(w, idx)) !== -1) {
+        ranges.push({ start: idx, end: idx + w.length });
+        idx += w.length;
+      }
+    });
+    if (ranges.length === 0) return <span className="truncate">{text}</span>;
+    // Merge overlapping ranges
+    ranges.sort((a, b) => a.start - b.start);
+    const merged: { start: number; end: number }[] = [ranges[0]];
+    for (let i = 1; i < ranges.length; i++) {
+      const last = merged[merged.length - 1];
+      if (ranges[i].start <= last.end) {
+        last.end = Math.max(last.end, ranges[i].end);
+      } else {
+        merged.push(ranges[i]);
+      }
+    }
+    const parts: React.ReactNode[] = [];
+    let cursor = 0;
+    merged.forEach((r, i) => {
+      if (cursor < r.start) parts.push(<span key={`t${i}`}>{text.slice(cursor, r.start)}</span>);
+      parts.push(<strong key={`h${i}`} className="text-foreground">{text.slice(r.start, r.end)}</strong>);
+      cursor = r.end;
+    });
+    if (cursor < text.length) parts.push(<span key="tail">{text.slice(cursor)}</span>);
+    return <span className="truncate">{parts}</span>;
   };
 
   // Fluxo de caixa: filter logic - expanded search
