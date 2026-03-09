@@ -1922,7 +1922,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
               <TrendingUp className="h-4 w-4" /> Contas a Receber
             </p>
-            <p className="text-lg font-bold text-[#10b981]">{brl(kpiData.totalRevenue)}</p>
+            <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(kpiData.totalRevenue)}</p>
           </CardContent>
         </Card>
         <Card className="bg-card">
