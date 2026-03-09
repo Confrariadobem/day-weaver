@@ -1648,7 +1648,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   selected={{ from: fluxoCustomFrom, to: fluxoCustomTo }}
                   onSelect={handleFluxoIntervalSelect}
                   className="pointer-events-auto"
-                  formatters={{ formatCaption: (date) => { const m = format(date, "LLLL yyyy", { locale: ptBR }); return m.charAt(0).toUpperCase() + m.slice(1); } }} />
+                  formatters={{ formatCaption: (date) => { const m = format(date, "LLLL", { locale: ptBR }); const cap = m.charAt(0).toUpperCase() + m.slice(1); const y = format(date, "yyyy"); return dateFormat === "YYYY/MM/DD" ? `${y} ${cap}` : `${cap} ${y}`; } }} />
                 <div className="space-y-2 border-t border-border/30 pt-3 pr-3">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold w-8 shrink-0">De:</span>
