@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Plus, Pencil, CheckCircle2, Trash2, CalendarDays, Search, X,
-  FolderKanban, Sparkles, ChevronDown, ChevronUp,
+  FolderKanban, Sparkles, ChevronDown, ChevronUp, ChevronRight,
   Filter, Save, Layers, Star, Users,
 } from "lucide-react";
 import { format, startOfYear, endOfYear } from "date-fns";
