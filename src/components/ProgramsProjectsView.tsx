@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useModulePreferences } from "@/hooks/useModulePreferences";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,172 +15,313 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
-  Search, ChevronRight, Star, Trash2, Save, User,
-  Check, FolderKanban, Layers, ListTodo, Clock,
+  Search, ChevronRight, ChevronDown, ChevronUp, Star, Trash2, Save, User,
+  Check, FolderKanban, Layers, ListTodo, Clock, Diamond,
   ArrowLeft, BarChart3, CircleDollarSign, Plus, GripVertical,
-  AlertCircle, Flag,
+  AlertCircle, Flag, Pencil, Copy, Link, FileText, CalendarDays,
+  MoreHorizontal, Filter,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, differenceInDays, isAfter, isBefore, startOfDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import type { Tables } from "@/integrations/supabase/types";
-import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
+  ResponsiveContainer, Legend, Cell,
+} from "recharts";
 
-type FilterStatus = "all" | "programs" | "projects" | "tasks";
-type ProjectTab = "dashboard" | "programs" | "projects" | "tasks";
+type ProjectTab = "indicadores" | "lista" | "dashboard";
+type Priority = "alta" | "media" | "baixa";
+type TaskStatus = "pendente" | "andamento" | "concluido";
 
-const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-
-interface Phase {
-  id: string; project_id: string; user_id: string;
-  name: string; sort_order: number; created_at: string;
+interface TaskWithHierarchy extends Tables<"tasks"> {
+  children?: TaskWithHierarchy[];
+  level: number;
+  numbering: string;
+  priority?: Priority;
+  taskStatus?: TaskStatus;
+  isMilestone?: boolean;
 }
 
-interface Program {
-  id: string; user_id: string; name: string; description: string | null;
-  color: string | null; status: string | null;
-  created_at: string; updated_at: string;
-}
-
-const PRIORITY_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  urgent: { label: "Urgente", icon: <AlertCircle className="h-3 w-3" />, color: "text-destructive" },
-  high: { label: "Alta", icon: <Flag className="h-3 w-3" />, color: "text-destructive" },
-  medium: { label: "Média", icon: <Flag className="h-3 w-3" />, color: "text-warning" },
-  low: { label: "Baixa", icon: <Flag className="h-3 w-3" />, color: "text-[hsl(var(--success))]" },
+const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; bg: string }> = {
+  alta: { label: "Alta", color: "text-destructive", bg: "bg-destructive/10" },
+  media: { label: "Média", color: "text-warning", bg: "bg-warning/10" },
+  baixa: { label: "Baixa", color: "text-[hsl(var(--success))]", bg: "bg-[hsl(var(--success))]/10" },
 };
+
+const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; bg: string }> = {
+  pendente: { label: "Pendente", color: "text-muted-foreground", bg: "bg-muted/30" },
+  andamento: { label: "Em Andamento", color: "text-primary", bg: "bg-primary/10" },
+  concluido: { label: "Concluído", color: "text-[hsl(var(--success))]", bg: "bg-[hsl(var(--success))]/10" },
+};
+
+const tooltipStyle = { background: "hsl(0 0% 10%)", border: "1px solid hsl(0 0% 20%)", borderRadius: 8, fontSize: 12 };
+const CHART_COLORS = ["#3b82f6", "#22c55e", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899"];
 
 export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<ProjectTab>("projects");
+  const { formatCurrency: brl } = useCurrency();
+  const [activeTab, setActiveTab] = useState<ProjectTab>("indicadores");
   const { visibleTabs } = useModulePreferences("programs");
 
   useEffect(() => { onTabChange?.(activeTab); }, [activeTab, onTabChange]);
-  const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(["programs", "projects", "tasks"]));
+
   const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
-  const [completedTasks, setCompletedTasks] = useState<Tables<"tasks">[]>([]);
+  const [projects, setProjects] = useState<Tables<"projects">[]>([]);
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [programs, setPrograms] = useState<Program[]>([]);
+  const [costCenters, setCostCenters] = useState<any[]>([]);
   const [entries, setEntries] = useState<any[]>([]);
-  const [resources, setResources] = useState<any[]>([]);
-  const [phases, setPhases] = useState<Phase[]>([]);
   const [search, setSearch] = useState("");
-  const [newTask, setNewTask] = useState("");
-  const [newPhaseName, setNewPhaseName] = useState("");
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<any | null>(null);
-  const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<string | null>(null);
-  const [projName, setProjName] = useState("");
-  const [projDescription, setProjDescription] = useState("");
-  const [projBudget, setProjBudget] = useState("");
-  const [projStatus, setProjStatus] = useState("active");
-  const [projCategoryId, setProjCategoryId] = useState("");
-  const [projResponsible, setProjResponsible] = useState("");
-  const [projProgramId, setProjProgramId] = useState("");
-  const [projDialogTab, setProjDialogTab] = useState("details");
-  const [resName, setResName] = useState("");
-  const [resRole, setResRole] = useState("");
-  const [taskEditDialogOpen, setTaskEditDialogOpen] = useState(false);
-  const [editingTaskItem, setEditingTaskItem] = useState<CalendarItem | null>(null);
-  const [taskEditDefaultDate, setTaskEditDefaultDate] = useState<Date>(new Date());
-  const lastTaskClickRef = useRef<{ id: string; time: number } | null>(null);
+  const [filterPriority, setFilterPriority] = useState<"all" | Priority>("all");
+  const [filterOverdue, setFilterOverdue] = useState(false);
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  
+  // Edit dialog
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Tables<"tasks"> | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editPriority, setEditPriority] = useState<Priority>("media");
+  const [editStatus, setEditStatus] = useState<TaskStatus>("pendente");
+  const [editCost, setEditCost] = useState("");
+  const [editDateStart, setEditDateStart] = useState("");
+  const [editDateEnd, setEditDateEnd] = useState("");
+  const [editCategoryId, setEditCategoryId] = useState("");
+  const [editCostCenterId, setEditCostCenterId] = useState("");
+  const [editResponsible, setEditResponsible] = useState("");
+  const [editLinks, setEditLinks] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editIsMilestone, setEditIsMilestone] = useState(false);
 
-  // Program dialog
-  const [programDialogOpen, setProgramDialogOpen] = useState(false);
-  const [editingProgram, setEditingProgram] = useState<Program | null>(null);
-  const [progName, setProgName] = useState("");
-  const [progDescription, setProgDescription] = useState("");
-  const [progColor, setProgColor] = useState("#3b82f6");
-  const [progProjectIds, setProgProjectIds] = useState<string[]>([]);
-  const [deleteProgramConfirm, setDeleteProgramConfirm] = useState<string | null>(null);
-
-  // WBS view
-  const [showWBS, setShowWBS] = useState(false);
+  // Drag state
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [tasksRes, completedRes, catsRes, projRes, entRes, resRes, phaseRes, progRes] = await Promise.all([
-      supabase.from("tasks").select("*").eq("user_id", user.id).eq("is_completed", false).order("sort_order"),
-      supabase.from("tasks").select("*").eq("user_id", user.id).eq("is_completed", true).order("updated_at", { ascending: false }).limit(50),
-      supabase.from("categories").select("*").eq("user_id", user.id),
+    const [tasksRes, projRes, catsRes, ccRes, entRes] = await Promise.all([
+      supabase.from("tasks").select("*").eq("user_id", user.id).order("sort_order"),
       supabase.from("projects").select("*").eq("user_id", user.id).order("name"),
+      supabase.from("categories").select("*").eq("user_id", user.id),
+      supabase.from("cost_centers").select("*").eq("user_id", user.id).eq("is_active", true),
       supabase.from("financial_entries").select("*").eq("user_id", user.id),
-      supabase.from("project_resources").select("*"),
-      supabase.from("project_phases").select("*").eq("user_id", user.id).order("sort_order"),
-      supabase.from("programs").select("*").eq("user_id", user.id).order("name"),
     ]);
     if (tasksRes.data) setTasks(tasksRes.data);
-    if (completedRes.data) setCompletedTasks(completedRes.data);
-    if (catsRes.data) setCategories(catsRes.data);
     if (projRes.data) setProjects(projRes.data);
+    if (catsRes.data) setCategories(catsRes.data);
+    if (ccRes.data) setCostCenters(ccRes.data);
     if (entRes.data) setEntries(entRes.data);
-    if (resRes.data) setResources(resRes.data);
-    if (phaseRes.data) setPhases(phaseRes.data as Phase[]);
-    if (progRes.data) setPrograms(progRes.data as Program[]);
   }, [user]);
 
   useEffect(() => {
     fetchData();
-    if (!user) return;
-    const channel = supabase
-      .channel("programs-projects")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` }, fetchData)
-      .on("postgres_changes", { event: "*", schema: "public", table: "projects", filter: `user_id=eq.${user.id}` }, fetchData)
-      .on("postgres_changes", { event: "*", schema: "public", table: "programs", filter: `user_id=eq.${user.id}` }, fetchData)
-      .subscribe();
     const handleDataChanged = () => fetchData();
     window.addEventListener("lovable:data-changed", handleDataChanged);
-    return () => { supabase.removeChannel(channel); window.removeEventListener("lovable:data-changed", handleDataChanged); };
-  }, [user, fetchData]);
+    return () => window.removeEventListener("lovable:data-changed", handleDataChanged);
+  }, [fetchData]);
 
-  const allTasks = useMemo(() => [...tasks, ...completedTasks], [tasks, completedTasks]);
+  // Parse priority from description [prioridade:alta]
+  const getPriority = (task: Tables<"tasks">): Priority => {
+    const match = (task.description || "").match(/\[prioridade:(\w+)\]/);
+    if (match) {
+      if (match[1] === "alta" || match[1] === "high" || match[1] === "urgent") return "alta";
+      if (match[1] === "baixa" || match[1] === "low") return "baixa";
+    }
+    return "media";
+  };
 
+  // Parse status from description [status:andamento]
+  const getStatus = (task: Tables<"tasks">): TaskStatus => {
+    if (task.is_completed) return "concluido";
+    const match = (task.description || "").match(/\[status:(\w+)\]/);
+    if (match && match[1] === "andamento") return "andamento";
+    return "pendente";
+  };
+
+  // Check if milestone [marco]
+  const isMilestone = (task: Tables<"tasks">): boolean => {
+    return (task.description || "").includes("[marco]");
+  };
+
+  // Check if overdue
+  const isOverdue = (task: Tables<"tasks">): boolean => {
+    if (!task.scheduled_date || task.is_completed) return false;
+    return isBefore(new Date(task.scheduled_date), startOfDay(new Date()));
+  };
+
+  // Calculate costs
   const getProjectCosts = useCallback((projectId: string) => {
     const projEntries = entries.filter(e => e.project_id === projectId);
-    const totalCost = projEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
-    const totalRevenue = projEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
-    return { totalCost, totalRevenue };
+    const realizado = projEntries.filter(e => e.type === "expense" && e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
+    return realizado;
   }, [entries]);
 
-  const getProjectProgress = useCallback((projectId: string) => {
-    const pTasks = allTasks.filter(t => t.project_id === projectId);
-    if (pTasks.length === 0) return 0;
-    return Math.round((pTasks.filter(t => t.is_completed).length / pTasks.length) * 100);
-  }, [allTasks]);
+  const getTaskCost = (task: Tables<"tasks">): number => Number(task.estimated_cost || 0);
 
   // KPIs
   const kpis = useMemo(() => {
-    const active = projects.filter(p => p.status !== "completed").length;
-    const completed = projects.filter(p => p.status === "completed").length;
-    const totalBudget = projects.reduce((s, p) => s + Number(p.budget || 0), 0);
-    const totalCost = projects.reduce((s, p) => s + getProjectCosts(p.id).totalCost, 0);
-    const pendingTasks = tasks.length;
-    const programCount = programs.length;
-    return { active, completed, totalBudget, totalCost, pendingTasks, programCount };
-  }, [projects, tasks, getProjectCosts, programs]);
+    const allTasks = tasks;
+    const completed = allTasks.filter(t => t.is_completed).length;
+    const total = allTasks.length;
+    const overdue = allTasks.filter(t => isOverdue(t)).length;
+    const previsto = allTasks.reduce((s, t) => s + getTaskCost(t), 0);
+    const realizado = projects.reduce((s, p) => s + getProjectCosts(p.id), 0);
+    const pctConcluido = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { previsto, realizado, overdue, pctConcluido, total, completed };
+  }, [tasks, projects, entries, getProjectCosts]);
 
-  const visibleProjects = useMemo(() => {
-    let list = projects;
+  // Priority tasks (alta + overdue)
+  const priorityTasks = useMemo(() => {
+    return tasks
+      .filter(t => !t.is_completed && (getPriority(t) === "alta" || isOverdue(t)))
+      .sort((a, b) => {
+        const aOverdue = isOverdue(a);
+        const bOverdue = isOverdue(b);
+        if (aOverdue && !bOverdue) return -1;
+        if (!aOverdue && bOverdue) return 1;
+        return (a.scheduled_date || "").localeCompare(b.scheduled_date || "");
+      })
+      .slice(0, 5);
+  }, [tasks]);
+
+  // Overdue tasks
+  const overdueTasks = useMemo(() => {
+    return tasks
+      .filter(t => isOverdue(t))
+      .sort((a, b) => (a.scheduled_date || "").localeCompare(b.scheduled_date || ""))
+      .slice(0, 5);
+  }, [tasks]);
+
+  // Milestones
+  const milestones = useMemo(() => {
+    return tasks
+      .filter(t => isMilestone(t) && !t.is_completed)
+      .sort((a, b) => (a.scheduled_date || "").localeCompare(b.scheduled_date || ""))
+      .slice(0, 3);
+  }, [tasks]);
+
+  // Budget chart data by category
+  const budgetChartData = useMemo(() => {
+    const catMap = new Map<string, { previsto: number; realizado: number; name: string }>();
+    tasks.forEach(t => {
+      const catId = t.category_id || "sem-categoria";
+      const cat = categories.find(c => c.id === catId);
+      const catName = cat?.name || "Sem categoria";
+      if (!catMap.has(catId)) catMap.set(catId, { previsto: 0, realizado: 0, name: catName });
+      catMap.get(catId)!.previsto += getTaskCost(t);
+    });
+    entries.filter(e => e.type === "expense" && e.is_paid).forEach(e => {
+      const catId = e.category_id || "sem-categoria";
+      const cat = categories.find(c => c.id === catId);
+      const catName = cat?.name || "Sem categoria";
+      if (!catMap.has(catId)) catMap.set(catId, { previsto: 0, realizado: 0, name: catName });
+      catMap.get(catId)!.realizado += Number(e.amount);
+    });
+    return Array.from(catMap.values()).filter(d => d.previsto > 0 || d.realizado > 0).slice(0, 6);
+  }, [tasks, entries, categories]);
+
+  // Build hierarchical task list for Lista tab
+  const hierarchicalTasks = useMemo(() => {
+    // Group by project
+    const projectTasks = new Map<string | null, Tables<"tasks">[]>();
+    tasks.forEach(t => {
+      const pid = t.project_id || null;
+      if (!projectTasks.has(pid)) projectTasks.set(pid, []);
+      projectTasks.get(pid)!.push(t);
+    });
+
+    const result: TaskWithHierarchy[] = [];
+    let mainIdx = 0;
+
+    // Projects first
+    projects.forEach(proj => {
+      const pTasks = projectTasks.get(proj.id) || [];
+      if (pTasks.length === 0) return;
+      mainIdx++;
+      
+      // Sort by sort_order
+      pTasks.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      
+      pTasks.forEach((t, idx) => {
+        result.push({
+          ...t,
+          level: 0,
+          numbering: `${mainIdx}.${idx + 1}`,
+          priority: getPriority(t),
+          taskStatus: getStatus(t),
+          isMilestone: isMilestone(t),
+        });
+      });
+    });
+
+    // Tasks without project
+    const orphanTasks = projectTasks.get(null) || [];
+    if (orphanTasks.length > 0) {
+      mainIdx++;
+      orphanTasks.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      orphanTasks.forEach((t, idx) => {
+        result.push({
+          ...t,
+          level: 0,
+          numbering: `${mainIdx}.${idx + 1}`,
+          priority: getPriority(t),
+          taskStatus: getStatus(t),
+          isMilestone: isMilestone(t),
+        });
+      });
+    }
+
+    return result;
+  }, [tasks, projects]);
+
+  // Filtered list
+  const filteredTasks = useMemo(() => {
+    let list = hierarchicalTasks;
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter(p => p.name.toLowerCase().includes(q));
+      list = list.filter(t => t.title.toLowerCase().includes(q));
+    }
+    if (filterPriority !== "all") {
+      list = list.filter(t => t.priority === filterPriority);
+    }
+    if (filterOverdue) {
+      list = list.filter(t => isOverdue(t));
     }
     return list;
-  }, [projects, search]);
+  }, [hierarchicalTasks, search, filterPriority, filterOverdue]);
 
-  const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId) || null, [projects, selectedProjectId]);
+  // Dashboard data
+  const dashboardData = useMemo(() => {
+    const byProject = projects.map(p => {
+      const pTasks = tasks.filter(t => t.project_id === p.id);
+      const previsto = pTasks.reduce((s, t) => s + getTaskCost(t), 0);
+      const realizado = getProjectCosts(p.id);
+      return { name: p.name, previsto, realizado, id: p.id };
+    }).filter(d => d.previsto > 0 || d.realizado > 0);
+
+    const byCostCenter = costCenters.map(cc => {
+      const ccEntries = entries.filter(e => e.cost_center_id === cc.id && e.type === "expense");
+      const previsto = ccEntries.reduce((s, e) => s + Number(e.amount), 0);
+      const realizado = ccEntries.filter(e => e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
+      return { name: cc.name, previsto, realizado, id: cc.id };
+    }).filter(d => d.previsto > 0 || d.realizado > 0);
+
+    return { byProject, byCostCenter };
+  }, [projects, tasks, costCenters, entries, getProjectCosts]);
 
   // Actions
-  const toggleTaskComplete = async (task: Tables<"tasks">) => {
+  const toggleComplete = async (task: Tables<"tasks">) => {
     await supabase.from("tasks").update({ is_completed: !task.is_completed }).eq("id", task.id);
-    if (task.project_id && !task.is_completed) {
-      const projTasks = allTasks.filter(t => t.project_id === task.project_id);
-      const remaining = projTasks.filter(t => !t.is_completed && t.id !== task.id);
-      if (remaining.length === 0) {
-        await supabase.from("projects").update({ status: "completed" }).eq("id", task.project_id);
-      }
-    }
+    fetchData();
+  };
+
+  const duplicateTask = async (task: Tables<"tasks">) => {
+    if (!user) return;
+    const { id, created_at, updated_at, ...rest } = task;
+    await supabase.from("tasks").insert({ ...rest, title: `${task.title} (cópia)`, user_id: user.id });
     fetchData();
   };
 
@@ -188,696 +330,122 @@ export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (t
     fetchData();
   };
 
-  const toggleFavorite = async (task: Tables<"tasks">) => {
-    await supabase.from("tasks").update({ is_favorite: !task.is_favorite }).eq("id", task.id);
+  const openEditDialog = (task: Tables<"tasks">) => {
+    setEditingTask(task);
+    setEditTitle(task.title);
+    setEditDescription((task.description || "").replace(/\[prioridade:\w+\]/g, "").replace(/\[status:\w+\]/g, "").replace(/\[marco\]/g, "").trim());
+    setEditPriority(getPriority(task));
+    setEditStatus(getStatus(task));
+    setEditCost(task.estimated_cost ? String(task.estimated_cost) : "");
+    setEditDateEnd(task.scheduled_date || "");
+    setEditDateStart("");
+    setEditCategoryId(task.category_id || "");
+    setEditCostCenterId("");
+    setEditResponsible(task.assignee || "");
+    setEditLinks("");
+    setEditNotes("");
+    setEditIsMilestone(isMilestone(task));
+    setEditDialogOpen(true);
+  };
+
+  const saveTask = async () => {
+    if (!editingTask || !user) return;
+    
+    // Build description with metadata
+    let desc = editDescription.trim();
+    desc += ` [prioridade:${editPriority}]`;
+    if (editStatus === "andamento") desc += ` [status:andamento]`;
+    if (editIsMilestone) desc += ` [marco]`;
+    if (editLinks) desc += `\n\n[links]\n${editLinks}`;
+    if (editNotes) desc += `\n\n[anotacoes]\n${editNotes}`;
+
+    await supabase.from("tasks").update({
+      title: editTitle,
+      description: desc,
+      estimated_cost: editCost ? parseFloat(editCost.replace(/\./g, "").replace(",", ".")) : 0,
+      scheduled_date: editDateEnd || null,
+      category_id: editCategoryId || null,
+      assignee: editResponsible || null,
+      is_completed: editStatus === "concluido",
+    }).eq("id", editingTask.id);
+
+    setEditDialogOpen(false);
     fetchData();
   };
 
-  const resetProjectForm = () => {
-    setProjName(""); setProjDescription(""); setProjBudget(""); setProjStatus("active");
-    setProjCategoryId(""); setProjResponsible(""); setProjProgramId(""); setEditingProject(null); setProjDialogTab("details");
-  };
-
-  const openEditProject = (p: any) => {
-    setEditingProject(p);
-    setProjName(p.name); setProjDescription(p.description || "");
-    setProjBudget(p.budget ? String(p.budget) : ""); setProjStatus(p.status || "active");
-    setProjCategoryId(p.category_id || ""); setProjResponsible(p.responsible || "");
-    setProjProgramId(p.program_id || "");
-    setProjDialogTab("details"); setProjectDialogOpen(true);
-  };
-
-  const saveProject = async () => {
-    if (!projName.trim() || !user) return;
-    const data: any = {
-      name: projName.trim(), description: projDescription || null,
-      budget: projBudget ? parseFloat(projBudget.replace(/\./g, "").replace(",", ".")) : 0,
-      status: projStatus, category_id: projCategoryId || null,
-      responsible: projResponsible || null, user_id: user.id,
-      program_id: projProgramId || null,
-    };
-    if (editingProject) await supabase.from("projects").update(data).eq("id", editingProject.id);
-    else await supabase.from("projects").insert(data);
-    resetProjectForm(); setProjectDialogOpen(false); fetchData();
-  };
-
-  const deleteProject = async (id: string) => {
-    if (allTasks.filter(t => t.project_id === id).length > 0) {
-      alert("Não é possível excluir. Tarefas associadas.");
-      setDeleteProjectConfirm(null); return;
-    }
-    await supabase.from("projects").delete().eq("id", id);
-    if (selectedProjectId === id) setSelectedProjectId(null);
-    setDeleteProjectConfirm(null); setProjectDialogOpen(false);
-    resetProjectForm(); fetchData();
-  };
-
-  const addResource = async () => {
-    if (!resName.trim() || !editingProject || !user) return;
-    await supabase.from("project_resources").insert({
-      project_id: editingProject.id, user_id: user.id, name: resName.trim(), role: resRole || null,
+  const addSubTask = async (parentTask: Tables<"tasks">) => {
+    if (!user) return;
+    await supabase.from("tasks").insert({
+      title: "Nova sub-tarefa",
+      user_id: user.id,
+      project_id: parentTask.project_id,
+      sort_order: (parentTask.sort_order || 0) + 1,
     });
-    setResName(""); setResRole(""); fetchData();
-  };
-
-  const removeResource = async (id: string) => {
-    await supabase.from("project_resources").delete().eq("id", id);
     fetchData();
   };
 
-  const addPhase = async (projectId: string) => {
-    if (!newPhaseName.trim() || !user) return;
-    const maxOrder = phases.filter(p => p.project_id === projectId).reduce((m, p) => Math.max(m, p.sort_order), 0);
-    await supabase.from("project_phases").insert({
-      project_id: projectId, user_id: user.id, name: newPhaseName.trim(), sort_order: maxOrder + 1,
-    });
-    setNewPhaseName(""); fetchData();
-  };
-
-  const deletePhase = async (id: string) => {
-    await supabase.from("project_phases").delete().eq("id", id);
+  // Drag handlers
+  const handleDragStart = (idx: number) => setDragIdx(idx);
+  const handleDragOver = (e: React.DragEvent, idx: number) => { e.preventDefault(); setDragOverIdx(idx); };
+  const handleDragEnd = async () => {
+    if (dragIdx === null || dragOverIdx === null || dragIdx === dragOverIdx) {
+      setDragIdx(null);
+      setDragOverIdx(null);
+      return;
+    }
+    const reordered = [...filteredTasks];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(dragOverIdx, 0, moved);
+    
+    const updates = reordered.map((t, i) => supabase.from("tasks").update({ sort_order: i }).eq("id", t.id));
+    await Promise.all(updates);
+    setDragIdx(null);
+    setDragOverIdx(null);
     fetchData();
   };
 
-  const projectResources = useMemo(() => {
-    if (!editingProject) return [];
-    return resources.filter((r: any) => r.project_id === editingProject.id);
-  }, [resources, editingProject]);
-
-  // Program CRUD
-  const resetProgramForm = () => {
-    setProgName(""); setProgDescription(""); setProgColor("#3b82f6");
-    setProgProjectIds([]); setEditingProgram(null);
-  };
-
-  const openEditProgram = (prog: Program) => {
-    setEditingProgram(prog);
-    setProgName(prog.name); setProgDescription(prog.description || "");
-    setProgColor(prog.color || "#3b82f6");
-    const linkedProjects = projects.filter(p => p.program_id === prog.id).map(p => p.id);
-    setProgProjectIds(linkedProjects);
-    setProgramDialogOpen(true);
-  };
-
-  const saveProgram = async () => {
-    if (!progName.trim() || !user) return;
-    const data = {
-      name: progName.trim(), description: progDescription || null,
-      color: progColor, user_id: user.id,
-    };
-    let programId: string;
-    if (editingProgram) {
-      await supabase.from("programs").update(data).eq("id", editingProgram.id);
-      programId = editingProgram.id;
-    } else {
-      const { data: result } = await supabase.from("programs").insert(data).select("id").single();
-      if (!result) return;
-      programId = result.id;
-    }
-    // Update project associations
-    const currentLinked = projects.filter(p => p.program_id === programId).map(p => p.id);
-    const toAdd = progProjectIds.filter(id => !currentLinked.includes(id));
-    const toRemove = currentLinked.filter(id => !progProjectIds.includes(id));
-    for (const id of toAdd) await supabase.from("projects").update({ program_id: programId }).eq("id", id);
-    for (const id of toRemove) await supabase.from("projects").update({ program_id: null }).eq("id", id);
-    resetProgramForm(); setProgramDialogOpen(false); fetchData();
-  };
-
-  const deleteProgram = async (id: string) => {
-    await supabase.from("projects").update({ program_id: null }).eq("program_id", id);
-    await supabase.from("programs").delete().eq("id", id);
-    setDeleteProgramConfirm(null); setProgramDialogOpen(false);
-    resetProgramForm(); fetchData();
-  };
-
-  const toggleProgProjectId = (id: string) => {
-    setProgProjectIds(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
-  };
-
-  const handleTaskClick = (task: Tables<"tasks">) => {
-    const now = Date.now();
-    if (lastTaskClickRef.current?.id === task.id && now - lastTaskClickRef.current.time < 400) {
-      const calItem: CalendarItem = {
-        id: `task-${task.id}`, title: task.title,
-        start_time: task.scheduled_date ? new Date(`${task.scheduled_date}T00:00:00`).toISOString() : new Date().toISOString(),
-        all_day: true, color: "#f97316", description: task.description,
-        task_id: task.id, user_id: task.user_id, is_task: true, is_completed: task.is_completed,
-        is_favorite: task.is_favorite || false,
-      };
-      setEditingTaskItem(calItem);
-      setTaskEditDefaultDate(task.scheduled_date ? new Date(task.scheduled_date) : new Date());
-      setTaskEditDialogOpen(true);
-      lastTaskClickRef.current = null;
-    } else {
-      lastTaskClickRef.current = { id: task.id, time: now };
-    }
-  };
-
-  const statusConfig: Record<string, { label: string; color: string }> = {
-    active: { label: "Em andamento", color: "bg-primary/15 text-primary border-primary/30" },
-    paused: { label: "Pausado", color: "bg-warning/15 text-warning border-warning/30" },
-    completed: { label: "Concluído", color: "bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30" },
-  };
-
-  const getStatusBadge = (status: string | null) => {
-    const cfg = statusConfig[(status || "active")] || statusConfig.active;
-    return <Badge variant="outline" className={cn("text-[10px] font-medium border", cfg.color)}>{cfg.label}</Badge>;
-  };
-
-  const projectCategories = useMemo(() => categories.filter(c => c.is_project).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")), [categories]);
-
-  // Get program name for a project
-  const getProgramName = (programId: string | null) => {
-    if (!programId) return null;
-    return programs.find(p => p.id === programId)?.name || null;
-  };
-
-  // Group projects by program
-  const projectsByProgram = useMemo(() => {
-    const groups: { program: Program | null; projects: any[] }[] = [];
-    const programMap = new Map<string, any[]>();
-    const unlinked: any[] = [];
-
-    visibleProjects.forEach(p => {
-      if (p.program_id) {
-        if (!programMap.has(p.program_id)) programMap.set(p.program_id, []);
-        programMap.get(p.program_id)!.push(p);
-      } else {
-        unlinked.push(p);
-      }
+  const toggleCardExpand = (id: string) => {
+    setExpandedCards(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
+  };
 
-    programs.forEach(prog => {
-      const projList = programMap.get(prog.id) || [];
-      if (projList.length > 0 || activeStatuses.has("programs")) {
-        groups.push({ program: prog, projects: projList });
-      }
-    });
+  const getProjectName = (projectId: string | null) => {
+    if (!projectId) return "Sem projeto";
+    return projects.find(p => p.id === projectId)?.name || "Sem projeto";
+  };
 
-    if (unlinked.length > 0) {
-      groups.push({ program: null, projects: unlinked });
-    }
-
-    return groups;
-  }, [visibleProjects, programs, activeStatuses]);
-
-  // ─── DETAIL VIEW ───
-  if (selectedProject) {
-    const projectTasks = allTasks.filter(t => t.project_id === selectedProject.id);
-    const activeTasks = projectTasks.filter(t => !t.is_completed);
-    const doneTasks = projectTasks.filter(t => t.is_completed);
-    const projectPhases = phases.filter(ph => ph.project_id === selectedProject.id).sort((a, b) => a.sort_order - b.sort_order);
-    const costs = getProjectCosts(selectedProject.id);
-    const progress = getProjectProgress(selectedProject.id);
-    const isOverBudget = Number(selectedProject.budget || 0) > 0 && costs.totalCost > Number(selectedProject.budget);
-
-    const TaskItem = ({ task }: { task: Tables<"tasks"> }) => {
-      const desc = task.description || "";
-      const priorityMatch = desc.match(/\[prioridade:(\w+)\]/);
-      const priority = priorityMatch ? priorityMatch[1] : null;
-      const pConfig = priority ? PRIORITY_CONFIG[priority] : null;
-
-      return (
-        <div
-          onClick={() => handleTaskClick(task)}
-          className="group flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-accent/50 cursor-pointer transition-colors"
-        >
-          <Checkbox
-            checked={!!task.is_completed}
-            onCheckedChange={() => toggleTaskComplete(task)}
-            onClick={(e) => e.stopPropagation()}
-            className="h-4 w-4 shrink-0"
-          />
-          <div className="flex-1 min-w-0">
-            <p className={cn("text-sm truncate", task.is_completed && "line-through text-muted-foreground")}>{task.title}</p>
-            <div className="flex items-center gap-2 mt-0.5">
-              {task.assignee && (
-                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                  <User className="h-2.5 w-2.5" /> {task.assignee}
-                </span>
-              )}
-              {pConfig && (
-                <span className={cn("text-[10px] flex items-center gap-0.5", pConfig.color)}>
-                  {pConfig.icon} {pConfig.label}
-                </span>
-              )}
-            </div>
-          </div>
-          {task.scheduled_date && (
-            <span className="text-[10px] text-muted-foreground flex items-center gap-1 shrink-0">
-              <Clock className="h-3 w-3" /> {format(new Date(task.scheduled_date), "dd/MM")}
-            </span>
-          )}
-          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(task); }} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Star className={cn("h-3.5 w-3.5", task.is_favorite ? "fill-warning text-warning" : "text-muted-foreground")} />
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive">
-            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
-        </div>
-      );
-    };
-
-    return (
-      <>
-        <ScrollArea className="h-full">
-          <div className="p-4 space-y-4">
-            {/* Back + Header */}
-            <div className="flex items-center gap-3">
-              <button onClick={() => setSelectedProjectId(null)} className="p-2 rounded-lg hover:bg-accent transition-colors">
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-bold truncate">{selectedProject.name}</h2>
-                <div className="flex items-center gap-2">
-                  {getProgramName(selectedProject.program_id) && (
-                    <span className="text-[10px] text-primary">Programa: {getProgramName(selectedProject.program_id)}</span>
-                  )}
-                  {selectedProject.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-1">{selectedProject.description}</p>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant={showWBS ? "default" : "outline"} className="h-8 text-xs gap-1" onClick={() => setShowWBS(!showWBS)}>
-                  <BarChart3 className="h-3 w-3" /> EAP
-                </Button>
-                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => openEditProject(selectedProject)}>
-                  Editar
-                </Button>
-              </div>
-            </div>
-
-            {/* KPI row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Card className="bg-card">
-                <CardContent className="p-3 text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Progresso</p>
-                  <p className="text-lg font-bold text-primary">{progress}%</p>
-                  <Progress value={progress} className="h-1.5 mt-1" />
-                </CardContent>
-              </Card>
-              <Card className="bg-card">
-                <CardContent className="p-3 text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Pendentes</p>
-                  <p className="text-lg font-bold">{activeTasks.length}</p>
-                </CardContent>
-              </Card>
-              <Card className="bg-card">
-                <CardContent className="p-3 text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Concluídas</p>
-                  <p className="text-lg font-bold text-[hsl(var(--success))]">{doneTasks.length}</p>
-                </CardContent>
-              </Card>
-              <Card className="bg-card">
-                <CardContent className="p-3 text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Gasto</p>
-                  <p className={cn("text-lg font-bold", isOverBudget ? "text-destructive" : "text-foreground")}>{brl(costs.totalCost)}</p>
-                  {Number(selectedProject.budget) > 0 && (
-                    <p className="text-[10px] text-muted-foreground">/ {brl(Number(selectedProject.budget))}</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* ─── WBS / EAP Table ─── */}
-            {showWBS && (
-              <Card className="bg-card overflow-hidden">
-                <CardContent className="p-0">
-                  <div className="px-4 py-2 border-b border-border/30 bg-muted/30">
-                    <p className="text-xs font-semibold flex items-center gap-1.5">
-                      <BarChart3 className="h-3.5 w-3.5 text-primary" /> Estrutura Analítica do Projeto (EAP)
-                    </p>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20 bg-muted/20">
-                          <th className="text-left py-2 px-3 w-8">#</th>
-                          <th className="text-left py-2 px-3">Atividade</th>
-                          <th className="text-left py-2 px-3">Etapa</th>
-                          <th className="text-left py-2 px-3">Responsável</th>
-                          <th className="text-left py-2 px-3">Prazo</th>
-                          <th className="text-left py-2 px-3">Prioridade</th>
-                          <th className="text-center py-2 px-3">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {projectTasks.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map((task, idx) => {
-                          const phase = phases.find(ph => ph.id === task.phase_id);
-                          const desc = task.description || "";
-                          const priorityMatch = desc.match(/\[prioridade:(\w+)\]/);
-                          const priority = priorityMatch ? priorityMatch[1] : "medium";
-                          const pConfig = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.medium;
-
-                          return (
-                            <tr key={task.id} className={cn(
-                              "border-b border-border/10 transition-colors hover:bg-accent/30 cursor-pointer",
-                              task.is_completed && "opacity-50"
-                            )} onClick={() => handleTaskClick(task)}>
-                              <td className="py-2 px-3 text-xs text-muted-foreground">{idx + 1}</td>
-                              <td className="py-2 px-3 text-xs font-medium">
-                                <span className={cn(task.is_completed && "line-through")}>{task.title}</span>
-                              </td>
-                              <td className="py-2 px-3 text-xs text-muted-foreground">{phase?.name || "—"}</td>
-                              <td className="py-2 px-3 text-xs text-muted-foreground">{task.assignee || "—"}</td>
-                              <td className="py-2 px-3 text-xs text-muted-foreground">
-                                {task.scheduled_date ? format(new Date(task.scheduled_date), "dd/MM/yy") : "—"}
-                              </td>
-                              <td className="py-2 px-3">
-                                <span className={cn("text-[10px] flex items-center gap-0.5", pConfig.color)}>
-                                  {pConfig.icon} {pConfig.label}
-                                </span>
-                              </td>
-                              <td className="py-2 px-3 text-center">
-                                {task.is_completed
-                                  ? <Badge variant="outline" className="text-[10px] bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">Concluída</Badge>
-                                  : <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30">Pendente</Badge>
-                                }
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {projectTasks.length === 0 && (
-                          <tr><td colSpan={7} className="py-4 text-center text-xs text-muted-foreground">Nenhuma atividade cadastrada</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Phases & Tasks */}
-            {projectPhases.map(phase => {
-              const phaseTasks = projectTasks.filter((t: any) => t.phase_id === phase.id);
-              const phaseActive = phaseTasks.filter(t => !t.is_completed);
-              const phaseDone = phaseTasks.filter(t => t.is_completed);
-              const phaseProgress = phaseTasks.length > 0 ? Math.round((phaseDone.length / phaseTasks.length) * 100) : 0;
-              return (
-                <Card key={phase.id} className="bg-card overflow-hidden">
-                  <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border/30">
-                    <Layers className="h-4 w-4 text-primary shrink-0" />
-                    <span className="text-sm font-semibold flex-1">{phase.name}</span>
-                    <span className="text-[10px] text-muted-foreground">{phaseDone.length}/{phaseTasks.length}</span>
-                    <div className="w-16"><Progress value={phaseProgress} className="h-1.5" /></div>
-                    <button onClick={() => deletePhase(phase.id)} className="p-1 rounded hover:bg-destructive/10 opacity-50 hover:opacity-100">
-                      <Trash2 className="h-3 w-3 text-destructive" />
-                    </button>
-                  </div>
-                  <CardContent className="p-0 divide-y divide-border/20">
-                    {phaseActive.map(task => <TaskItem key={task.id} task={task} />)}
-                    {phaseDone.length > 0 && (
-                      <div className="px-4 py-1.5 bg-accent/10">
-                        <p className="text-[10px] text-muted-foreground">{phaseDone.length} concluída{phaseDone.length !== 1 ? "s" : ""}</p>
-                      </div>
-                    )}
-                    {phaseTasks.length === 0 && (
-                      <div className="px-4 py-3 text-xs text-muted-foreground text-center">Nenhuma atividade</div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-
-            {/* Unphased tasks */}
-            {(() => {
-              const phaseIds = new Set(projectPhases.map(ph => ph.id));
-              const unphased = projectTasks.filter((t: any) => !t.phase_id || !phaseIds.has(t.phase_id));
-              const unphasedActive = unphased.filter(t => !t.is_completed);
-              const unphasedDone = unphased.filter(t => t.is_completed);
-              if (unphasedActive.length === 0 && unphasedDone.length === 0 && projectPhases.length > 0) return null;
-              return (
-                <Card className="bg-card overflow-hidden">
-                  <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border/30">
-                    <ListTodo className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="text-sm font-semibold flex-1">
-                      {projectPhases.length > 0 ? "Tarefas Rápidas" : "Atividades"}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">{unphasedDone.length}/{unphased.length}</span>
-                  </div>
-                  <CardContent className="p-0 divide-y divide-border/20">
-                    {unphasedActive.map(task => <TaskItem key={task.id} task={task} />)}
-                    {unphasedDone.length > 0 && (
-                      <div className="px-4 py-1.5 bg-accent/10">
-                        <p className="text-[10px] text-muted-foreground">{unphasedDone.length} concluída{unphasedDone.length !== 1 ? "s" : ""}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })()}
-
-            {/* Quick add */}
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <Input placeholder="Nova etapa..." value={newPhaseName}
-                  onChange={(e) => setNewPhaseName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") addPhase(selectedProject.id); }}
-                  className="h-9 text-xs flex-1" />
-                <Button size="sm" variant="outline" className="h-9 gap-1.5 shrink-0" onClick={() => addPhase(selectedProject.id)}>
-                  <Layers className="h-3.5 w-3.5" /> Etapa
-                </Button>
-              </div>
-              <div className="flex gap-2">
-                <Input placeholder="Nova atividade..." value={newTask}
-                  onChange={(e) => setNewTask(e.target.value)}
-                  onKeyDown={async (e) => {
-                    if (e.key === "Enter" && newTask.trim() && user) {
-                      await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: selectedProject.id });
-                      setNewTask(""); fetchData();
-                    }
-                  }}
-                  className="h-9 text-xs flex-1" />
-                <Button size="sm" className="h-9 gap-1.5 shrink-0" onClick={async () => {
-                  if (newTask.trim() && user) {
-                    await supabase.from("tasks").insert({ title: newTask.trim(), user_id: user.id, project_id: selectedProject.id });
-                    setNewTask(""); fetchData();
-                  }
-                }}>
-                  <ListTodo className="h-3.5 w-3.5" /> Atividade
-                </Button>
-              </div>
-            </div>
-          </div>
-        </ScrollArea>
-
-        {/* Task edit dialog */}
-        <EventEditDialog
-          open={taskEditDialogOpen}
-          onOpenChange={setTaskEditDialogOpen}
-          item={editingTaskItem}
-          defaultDate={taskEditDefaultDate}
-          userId={user?.id || ""}
-          onSaved={() => { setTaskEditDialogOpen(false); fetchData(); }}
-        />
-
-        {/* Project edit dialog */}
-        {renderProjectDialog()}
-      </>
-    );
-  }
-
-  // ─── LIST VIEW ───
-  function renderProjectDialog() {
-    return (
-      <>
-        <Dialog open={projectDialogOpen} onOpenChange={(o) => { setProjectDialogOpen(o); if (!o) resetProjectForm(); }}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-base">{editingProject ? "Editar projeto" : "Novo projeto"}</DialogTitle>
-            </DialogHeader>
-            <Tabs value={projDialogTab} onValueChange={setProjDialogTab}>
-              <TabsList className="w-full">
-                <TabsTrigger value="details" className="flex-1 text-xs">Detalhes</TabsTrigger>
-                {editingProject && <TabsTrigger value="resources" className="flex-1 text-xs">Recursos ({projectResources.length})</TabsTrigger>}
-              </TabsList>
-            </Tabs>
-            {projDialogTab === "details" && (
-              <div className="space-y-3">
-                <div><Label className="text-sm">Nome</Label><Input value={projName} onChange={(e) => setProjName(e.target.value)} placeholder="Nome do projeto" /></div>
-                <div><Label className="text-sm">Descrição</Label><Textarea value={projDescription} onChange={(e) => setProjDescription(e.target.value)} placeholder="Opcional" rows={2} className="resize-none" /></div>
-                <div>
-                  <Label className="text-sm">Programa</Label>
-                  <Select value={projProgramId} onValueChange={setProjProgramId}>
-                    <SelectTrigger><SelectValue placeholder="Selecionar programa (opcional)" /></SelectTrigger>
-                    <SelectContent>
-                      {programs.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-sm">Categoria</Label>
-                    <Select value={projCategoryId} onValueChange={setProjCategoryId}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                      <SelectContent>
-                        {projectCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-sm">Status</Label>
-                    <Select value={projStatus} onValueChange={setProjStatus}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Em andamento</SelectItem>
-                        <SelectItem value="paused">Pausado</SelectItem>
-                        <SelectItem value="completed">Concluído</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-sm">Orçamento (R$)</Label>
-                    <Input type="text" inputMode="decimal" value={projBudget} onChange={(e) => setProjBudget(e.target.value.replace(/[^0-9.,]/g, ""))} placeholder="0,00" />
-                  </div>
-                  <div>
-                    <Label className="text-sm">Responsável</Label>
-                    <Input value={projResponsible} onChange={(e) => setProjResponsible(e.target.value)} placeholder="Opcional" />
-                  </div>
-                </div>
-              </div>
-            )}
-            {projDialogTab === "resources" && editingProject && (
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <Input placeholder="Nome" value={resName} onChange={(e) => setResName(e.target.value)} className="flex-1" />
-                  <Input placeholder="Função" value={resRole} onChange={(e) => setResRole(e.target.value)} className="w-32" />
-                  <Button size="sm" onClick={addResource}><Save className="h-3.5 w-3.5" /></Button>
-                </div>
-                {projectResources.map((r: any) => (
-                  <div key={r.id} className="flex items-center gap-2 text-sm">
-                    <User className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="flex-1">{r.name}</span>
-                    <span className="text-xs text-muted-foreground">{r.role}</span>
-                    <button onClick={() => removeResource(r.id)} className="text-destructive hover:text-destructive/80">
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="flex items-center gap-2 pt-3 border-t border-border/20">
-              {editingProject && (
-                <Button variant="destructive" size="sm" onClick={() => setDeleteProjectConfirm(editingProject.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              <div className="flex gap-2 ml-auto">
-                <Button variant="outline" size="sm" onClick={() => { setProjectDialogOpen(false); resetProjectForm(); }}>Cancelar</Button>
-                <Button size="sm" onClick={saveProject} className="gap-1.5"><Save className="h-3.5 w-3.5" /> Salvar</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={!!deleteProjectConfirm} onOpenChange={(o) => { if (!o) setDeleteProjectConfirm(null); }}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Confirmar exclusão</DialogTitle>
-              <DialogDescription>Tem certeza? Esta ação não pode ser desfeita.</DialogDescription>
-            </DialogHeader>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" size="sm" onClick={() => setDeleteProjectConfirm(null)}>Cancelar</Button>
-              <Button variant="destructive" size="sm" onClick={() => deleteProjectConfirm && deleteProject(deleteProjectConfirm)}>Excluir</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </>
-    );
-  }
-
-  function renderProgramDialog() {
-    return (
-      <>
-        <Dialog open={programDialogOpen} onOpenChange={(o) => { setProgramDialogOpen(o); if (!o) resetProgramForm(); }}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-base">{editingProgram ? "Editar programa" : "Novo programa"}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div><Label className="text-sm">Nome</Label><Input value={progName} onChange={(e) => setProgName(e.target.value)} placeholder="Nome do programa" /></div>
-              <div><Label className="text-sm">Descrição</Label><Textarea value={progDescription} onChange={(e) => setProgDescription(e.target.value)} placeholder="Opcional" rows={2} className="resize-none" /></div>
-              <div>
-                <Label className="text-sm">Cor</Label>
-                <Input type="color" value={progColor} onChange={(e) => setProgColor(e.target.value)} className="h-10 w-20 p-1" />
-              </div>
-              <div>
-                <Label className="text-sm">Projetos associados</Label>
-                <p className="text-[10px] text-muted-foreground mb-2">Selecione os projetos que pertencem a este programa</p>
-                <div className="space-y-1.5 max-h-48 overflow-y-auto rounded-lg border border-border/30 p-2">
-                  {projects.map(p => (
-                    <div key={p.id} className="flex items-center gap-2 py-1">
-                      <Checkbox
-                        checked={progProjectIds.includes(p.id)}
-                        onCheckedChange={() => toggleProgProjectId(p.id)}
-                        id={`prog-proj-${p.id}`}
-                      />
-                      <label htmlFor={`prog-proj-${p.id}`} className="text-sm cursor-pointer flex-1">{p.name}</label>
-                      {p.program_id && p.program_id !== editingProgram?.id && (
-                        <span className="text-[10px] text-warning">Já vinculado</span>
-                      )}
-                    </div>
-                  ))}
-                  {projects.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">Nenhum projeto criado</p>}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 pt-3 border-t border-border/20">
-              {editingProgram && (
-                <Button variant="destructive" size="sm" onClick={() => setDeleteProgramConfirm(editingProgram.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              <div className="flex gap-2 ml-auto">
-                <Button variant="outline" size="sm" onClick={() => { setProgramDialogOpen(false); resetProgramForm(); }}>Cancelar</Button>
-                <Button size="sm" onClick={saveProgram} className="gap-1.5" disabled={!progName.trim()}>
-                  <Save className="h-3.5 w-3.5" /> Salvar
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={!!deleteProgramConfirm} onOpenChange={(o) => { if (!o) setDeleteProgramConfirm(null); }}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Confirmar exclusão do programa</DialogTitle>
-              <DialogDescription>Os projetos associados não serão excluídos, apenas desvinculados.</DialogDescription>
-            </DialogHeader>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" size="sm" onClick={() => setDeleteProgramConfirm(null)}>Cancelar</Button>
-              <Button variant="destructive" size="sm" onClick={() => deleteProgramConfirm && deleteProgram(deleteProgramConfirm)}>Excluir</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </>
-    );
-  }
+  // Calculate parent sums
+  const getProjectSummary = (projectId: string) => {
+    const pTasks = tasks.filter(t => t.project_id === projectId);
+    const previsto = pTasks.reduce((s, t) => s + getTaskCost(t), 0);
+    const overdue = pTasks.filter(t => isOverdue(t)).length;
+    return { previsto, overdue };
+  };
 
   return (
     <>
       <ScrollArea className="h-full">
         <div className="p-4 space-y-4">
-          {/* Tab buttons - Finance pattern */}
-          <div className="flex items-center gap-2 overflow-x-auto">
+          {/* Tab navigation */}
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
             {([
-              { key: "dashboard" as ProjectTab, label: "Dashboard", icon: <BarChart3 className="h-3 w-3" /> },
-              { key: "programs" as ProjectTab, label: "Programas", icon: <FolderKanban className="h-3 w-3" /> },
-              { key: "projects" as ProjectTab, label: "Projetos", icon: <Layers className="h-3 w-3" /> },
-              { key: "tasks" as ProjectTab, label: "Tarefas", icon: <ListTodo className="h-3 w-3" /> },
+              { key: "indicadores" as ProjectTab, label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
+              { key: "lista" as ProjectTab, label: "Lista", icon: <ListTodo className="h-3 w-3" /> },
+              { key: "dashboard" as ProjectTab, label: "Dashboard", icon: <Layers className="h-3 w-3" /> },
             ]).filter(tab => visibleTabs.includes(tab.key)).map(tab => (
               <Button key={tab.key} size="sm"
                 variant={activeTab === tab.key ? "default" : "ghost"}
-                className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== tab.key && "text-muted-foreground")}
+                className={cn("h-7 text-xs px-3 rounded-full gap-1.5 shrink-0", activeTab !== tab.key && "text-muted-foreground")}
                 onClick={() => setActiveTab(tab.key)}
               >
                 {tab.icon} {tab.label}
               </Button>
             ))}
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
                 <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)}
@@ -886,306 +454,513 @@ export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (t
             </div>
           </div>
 
-          {/* KPI Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            <Card className="bg-card">
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <FolderKanban className="h-3 w-3" /> Programas
-                </p>
-                <p className="text-lg font-bold text-primary">{kpis.programCount}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-card">
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <Layers className="h-3 w-3" /> Em Andamento
-                </p>
-                <p className="text-lg font-bold text-primary">{kpis.active}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-card">
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <Check className="h-3 w-3" /> Concluídos
-                </p>
-                <p className="text-lg font-bold text-[hsl(var(--success))]">{kpis.completed}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-card">
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <ListTodo className="h-3 w-3" /> Tarefas
-                </p>
-                <p className="text-lg font-bold">{kpis.pendingTasks}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-card">
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <CircleDollarSign className="h-3 w-3" /> Orçamento
-                </p>
-                <p className="text-lg font-bold">{brl(kpis.totalBudget)}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-card">
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <BarChart3 className="h-3 w-3" /> Gasto
-                </p>
-                <p className={cn("text-lg font-bold", kpis.totalCost > kpis.totalBudget && kpis.totalBudget > 0 ? "text-destructive" : "text-foreground")}>
-                  {brl(kpis.totalCost)}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Dashboard Tab Content */}
-          {activeTab === "dashboard" && (
+          {/* ════════════════ INDICADORES TAB ════════════════ */}
+          {activeTab === "indicadores" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="bg-card">
-                  <CardContent className="p-4">
-                    <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
-                      <Layers className="h-3.5 w-3.5 text-primary" /> Projetos por Status
-                    </p>
-                    <div className="space-y-2">
-                      {(["active", "paused", "completed"] as const).map(status => {
-                        const count = projects.filter(p => (p.status || "active") === status).length;
-                        const cfg = statusConfig[status];
-                        return (
-                          <div key={status} className="flex items-center justify-between">
-                            <Badge variant="outline" className={cn("text-[10px] font-medium border", cfg.color)}>{cfg.label}</Badge>
-                            <span className="text-sm font-bold">{count}</span>
-                          </div>
-                        );
-                      })}
+              {/* Summary Card */}
+              <Card className="bg-card">
+                <CardContent className="p-4">
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-primary" /> Resumo
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <p className="text-[10px] text-muted-foreground uppercase">Previsto</p>
+                      <p className="text-lg font-bold">{brl(kpis.previsto)}</p>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="text-center">
+                      <p className="text-[10px] text-muted-foreground uppercase">Realizado</p>
+                      <p className="text-lg font-bold text-primary">{brl(kpis.realizado)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] text-muted-foreground uppercase">Atrasados</p>
+                      <p className={cn("text-lg font-bold", kpis.overdue > 0 ? "text-destructive" : "text-muted-foreground")}>{kpis.overdue}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] text-muted-foreground uppercase">Concluído</p>
+                      <p className="text-lg font-bold text-[hsl(var(--success))]">{kpis.pctConcluido}%</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Priority + Overdue + Milestones */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Prioridades do Dia */}
+                <Collapsible open={expandedCards.has("priority")} onOpenChange={() => toggleCardExpand("priority")}>
+                  <Card className="bg-card">
+                    <CardContent className="p-4">
+                      <CollapsibleTrigger className="w-full">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-semibold flex items-center gap-2">
+                            <Flag className="h-4 w-4 text-destructive" /> Prioridades do Dia
+                          </h3>
+                          <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", expandedCards.has("priority") && "rotate-180")} />
+                        </div>
+                      </CollapsibleTrigger>
+                      <div className="mt-3 space-y-2">
+                        {priorityTasks.slice(0, expandedCards.has("priority") ? 5 : 3).map(t => (
+                          <div key={t.id} className="flex items-center gap-2 text-sm">
+                            <div className={cn("w-2 h-2 rounded-full shrink-0", isOverdue(t) ? "bg-destructive" : "bg-warning")} />
+                            <span className="flex-1 truncate">{t.title}</span>
+                            {t.scheduled_date && (
+                              <span className={cn("text-[10px] shrink-0", isOverdue(t) ? "text-destructive font-bold" : "text-muted-foreground")}>
+                                {format(new Date(t.scheduled_date), "dd/MM")}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                        {priorityTasks.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma tarefa prioritária</p>}
+                      </div>
+                      <CollapsibleContent>
+                        {priorityTasks.slice(3).map(t => (
+                          <div key={t.id} className="flex items-center gap-2 text-sm mt-2">
+                            <div className={cn("w-2 h-2 rounded-full shrink-0", isOverdue(t) ? "bg-destructive" : "bg-warning")} />
+                            <span className="flex-1 truncate">{t.title}</span>
+                            {t.scheduled_date && (
+                              <span className={cn("text-[10px] shrink-0", isOverdue(t) ? "text-destructive font-bold" : "text-muted-foreground")}>
+                                {format(new Date(t.scheduled_date), "dd/MM")}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </CollapsibleContent>
+                    </CardContent>
+                  </Card>
+                </Collapsible>
+
+                {/* Atrasados */}
+                <Collapsible open={expandedCards.has("overdue")} onOpenChange={() => toggleCardExpand("overdue")}>
+                  <Card className="bg-card">
+                    <CardContent className="p-4">
+                      <CollapsibleTrigger className="w-full">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-semibold flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-destructive" /> Atrasados
+                          </h3>
+                          <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", expandedCards.has("overdue") && "rotate-180")} />
+                        </div>
+                      </CollapsibleTrigger>
+                      <div className="mt-3 space-y-2">
+                        {overdueTasks.slice(0, expandedCards.has("overdue") ? 5 : 3).map(t => (
+                          <div key={t.id} className="flex items-center gap-2 text-sm">
+                            <div className="w-2 h-2 rounded-full bg-destructive shrink-0" />
+                            <span className="flex-1 truncate text-destructive">{t.title}</span>
+                            {t.scheduled_date && (
+                              <span className="text-[10px] text-destructive font-bold shrink-0">
+                                {format(new Date(t.scheduled_date), "dd/MM")}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                        {overdueTasks.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma tarefa atrasada 🎉</p>}
+                      </div>
+                      <CollapsibleContent>
+                        {overdueTasks.slice(3).map(t => (
+                          <div key={t.id} className="flex items-center gap-2 text-sm mt-2">
+                            <div className="w-2 h-2 rounded-full bg-destructive shrink-0" />
+                            <span className="flex-1 truncate text-destructive">{t.title}</span>
+                            {t.scheduled_date && (
+                              <span className="text-[10px] text-destructive font-bold shrink-0">
+                                {format(new Date(t.scheduled_date), "dd/MM")}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </CollapsibleContent>
+                    </CardContent>
+                  </Card>
+                </Collapsible>
+
+                {/* Marcos Próximos */}
                 <Card className="bg-card">
                   <CardContent className="p-4">
-                    <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
-                      <CircleDollarSign className="h-3.5 w-3.5 text-primary" /> Orçamento vs Gasto
-                    </p>
+                    <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                      <Diamond className="h-4 w-4 text-primary" /> Marcos Próximos
+                    </h3>
                     <div className="space-y-2">
-                      {projects.filter(p => Number(p.budget || 0) > 0).slice(0, 5).map(p => {
-                        const costs = getProjectCosts(p.id);
-                        const pct = Number(p.budget) > 0 ? Math.min(100, (costs.totalCost / Number(p.budget)) * 100) : 0;
-                        return (
-                          <div key={p.id} className="space-y-1">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="truncate flex-1">{p.name}</span>
-                              <span className={cn("font-medium", pct > 100 ? "text-destructive" : "text-foreground")}>{pct.toFixed(0)}%</span>
-                            </div>
-                            <Progress value={pct} className="h-1.5" />
-                          </div>
-                        );
-                      })}
-                      {projects.filter(p => Number(p.budget || 0) > 0).length === 0 && (
-                        <p className="text-xs text-muted-foreground text-center py-2">Nenhum projeto com orçamento</p>
-                      )}
+                      {milestones.map(t => (
+                        <div key={t.id} className="flex items-center gap-2 text-sm">
+                          <Diamond className="h-3 w-3 text-primary shrink-0" />
+                          <span className="flex-1 truncate">{t.title}</span>
+                          {t.scheduled_date && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              {format(new Date(t.scheduled_date), "dd/MM")}
+                            </span>
+                          )}
+                          <Badge variant="outline" className="text-[9px]">
+                            {getStatus(t) === "concluido" ? "Concluído" : "Pendente"}
+                          </Badge>
+                        </div>
+                      ))}
+                      {milestones.length === 0 && <p className="text-xs text-muted-foreground">Nenhum marco definido</p>}
                     </div>
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Budget Chart */}
               <Card className="bg-card">
                 <CardContent className="p-4">
-                  <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
-                    <ListTodo className="h-3.5 w-3.5 text-primary" /> Tarefas Pendentes por Projeto
-                  </p>
-                  <div className="space-y-2">
-                    {projects.map(p => {
-                      const pTasks = tasks.filter(t => t.project_id === p.id);
-                      if (pTasks.length === 0) return null;
-                      return (
-                        <div key={p.id} className="flex items-center justify-between text-xs">
-                          <span className="truncate flex-1">{p.name}</span>
-                          <span className="font-medium">{pTasks.length}</span>
-                        </div>
-                      );
-                    })}
-                    {tasks.filter(t => !t.project_id).length > 0 && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="truncate flex-1 text-muted-foreground">Sem projeto</span>
-                        <span className="font-medium">{tasks.filter(t => !t.project_id).length}</span>
-                      </div>
-                    )}
-                  </div>
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <CircleDollarSign className="h-4 w-4 text-primary" /> Previsto vs Realizado por Categoria
+                  </h3>
+                  {budgetChartData.length > 0 ? (
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={budgetChartData} layout="vertical" margin={{ left: 80, right: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => brl(v)} />
+                          <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} width={80} />
+                          <RechartsTooltip contentStyle={tooltipStyle} formatter={(value: number) => brl(value)} />
+                          <Legend wrapperStyle={{ fontSize: 10 }} />
+                          <Bar dataKey="previsto" name="Previsto" fill="hsl(var(--muted-foreground))" radius={[0, 4, 4, 0]} />
+                          <Bar dataKey="realizado" name="Realizado" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-8">Sem dados para exibir</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
           )}
 
-          {/* Programs Tab - Table view */}
-          {activeTab === "programs" && (
-            <div className="rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
-                    <th className="text-left py-2 px-2">Programa</th>
-                    <th className="text-left py-2 px-2">Status</th>
-                    <th className="text-center py-2 px-2">Projetos</th>
-                    <th className="text-center py-2 px-2">Tarefas</th>
-                    <th className="text-right py-2 px-2">Orçamento</th>
-                    <th className="text-right py-2 px-2">Gasto</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {programs.length === 0 && (
-                    <tr><td colSpan={6} className="text-center text-muted-foreground/40 py-12">Nenhum programa criado. Use o botão + para criar.</td></tr>
-                  )}
-                  {programs.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase())).map((prog, idx) => {
-                    const progProjects = projects.filter(p => p.program_id === prog.id);
-                    const progTasks = allTasks.filter(t => progProjects.some(p => p.id === t.project_id));
-                    const totalBudget = progProjects.reduce((s, p) => s + Number(p.budget || 0), 0);
-                    const totalCost = progProjects.reduce((s, p) => s + getProjectCosts(p.id).totalCost, 0);
-                    return (
-                      <tr key={prog.id}
-                        className={cn("cursor-pointer transition-colors hover:bg-muted/20", idx > 0 && "border-t border-border/10")}
-                        onDoubleClick={() => openEditProgram(prog)}
-                      >
-                        <td className="py-2.5 px-2">
-                          <div className="flex items-center gap-2">
-                            <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: prog.color || "#3b82f6" }} />
-                            <span className="font-medium">{prog.name}</span>
-                          </div>
-                          {prog.description && <p className="text-[11px] text-muted-foreground mt-0.5 pl-[18px]">{prog.description}</p>}
-                        </td>
-                        <td className="py-2.5 px-2">{getStatusBadge(prog.status)}</td>
-                        <td className="py-2.5 px-2 text-center">{progProjects.length}</td>
-                        <td className="py-2.5 px-2 text-center">{progTasks.filter(t => !t.is_completed).length}</td>
-                        <td className="py-2.5 px-2 text-right font-medium tabular-nums">{brl(totalBudget)}</td>
-                        <td className={cn("py-2.5 px-2 text-right font-medium tabular-nums", totalCost > totalBudget && totalBudget > 0 ? "text-destructive" : "text-foreground")}>{brl(totalCost)}</td>
+          {/* ════════════════ LISTA TAB (EAP) ════════════════ */}
+          {activeTab === "lista" && (
+            <div className="space-y-3">
+              {/* Filters */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Select value={filterPriority} onValueChange={(v) => setFilterPriority(v as any)}>
+                  <SelectTrigger className="h-7 w-32 text-xs">
+                    <SelectValue placeholder="Prioridade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="alta">🔴 Alta</SelectItem>
+                    <SelectItem value="media">🟡 Média</SelectItem>
+                    <SelectItem value="baixa">🟢 Baixa</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" variant={filterOverdue ? "default" : "outline"} className="h-7 text-xs gap-1"
+                  onClick={() => setFilterOverdue(!filterOverdue)}>
+                  <AlertCircle className="h-3 w-3" /> Atrasadas
+                </Button>
+              </div>
+
+              {/* Table */}
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider bg-muted/30 border-b border-border/30">
+                        <th className="py-2.5 px-2 w-10 text-center">#</th>
+                        <th className="py-2.5 px-2 text-left">Tarefa</th>
+                        <th className="py-2.5 px-2 w-24 text-center">Prioridade</th>
+                        <th className="py-2.5 px-2 w-28 text-center">Status</th>
+                        <th className="py-2.5 px-2 w-28 text-right">Valor Previsto</th>
+                        <th className="py-2.5 px-2 w-24 text-center">Data Fim</th>
+                        <th className="py-2.5 px-2 w-14">Ações</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                      {filteredTasks.length === 0 && (
+                        <tr><td colSpan={7} className="py-12 text-center text-muted-foreground/40">Nenhuma tarefa encontrada</td></tr>
+                      )}
+                      {filteredTasks.map((task, idx) => {
+                        const taskOverdue = isOverdue(task);
+                        const pConfig = PRIORITY_CONFIG[task.priority || "media"];
+                        const sConfig = STATUS_CONFIG[task.taskStatus || "pendente"];
+                        
+                        return (
+                          <tr key={task.id}
+                            draggable
+                            onDragStart={() => handleDragStart(idx)}
+                            onDragOver={(e) => handleDragOver(e, idx)}
+                            onDragEnd={handleDragEnd}
+                            className={cn(
+                              "border-b border-border/10 transition-colors hover:bg-muted/20 group cursor-grab",
+                              dragOverIdx === idx && "bg-primary/10",
+                              task.is_completed && "opacity-50"
+                            )}
+                          >
+                            <td className="py-2.5 px-2 text-center text-xs text-muted-foreground">
+                              <div className="flex items-center justify-center gap-1">
+                                <GripVertical className="h-3 w-3 opacity-0 group-hover:opacity-50 cursor-grab" />
+                                {task.isMilestone ? <Diamond className="h-3 w-3 text-primary" /> : task.numbering}
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-2">
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={task.is_completed || false}
+                                  onCheckedChange={() => toggleComplete(task)}
+                                  className="h-3.5 w-3.5 shrink-0"
+                                />
+                                <span className={cn("font-medium", task.is_completed && "line-through text-muted-foreground")}>
+                                  {task.title}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground ml-6">{getProjectName(task.project_id)}</p>
+                            </td>
+                            <td className="py-2.5 px-2 text-center">
+                              <Select value={task.priority} onValueChange={async (v) => {
+                                const newDesc = (task.description || "").replace(/\[prioridade:\w+\]/g, "") + ` [prioridade:${v}]`;
+                                await supabase.from("tasks").update({ description: newDesc }).eq("id", task.id);
+                                fetchData();
+                              }}>
+                                <SelectTrigger className={cn("h-6 text-[10px] border-none", pConfig.bg, pConfig.color)}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="alta">🔴 Alta</SelectItem>
+                                  <SelectItem value="media">🟡 Média</SelectItem>
+                                  <SelectItem value="baixa">🟢 Baixa</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="py-2.5 px-2 text-center">
+                              <Select value={task.taskStatus} onValueChange={async (v) => {
+                                const isCompleted = v === "concluido";
+                                let newDesc = (task.description || "").replace(/\[status:\w+\]/g, "");
+                                if (v === "andamento") newDesc += " [status:andamento]";
+                                await supabase.from("tasks").update({ description: newDesc, is_completed: isCompleted }).eq("id", task.id);
+                                fetchData();
+                              }}>
+                                <SelectTrigger className={cn("h-6 text-[10px] border-none", sConfig.bg, sConfig.color)}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pendente">Pendente</SelectItem>
+                                  <SelectItem value="andamento">Em Andamento</SelectItem>
+                                  <SelectItem value="concluido">Concluído</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="py-2.5 px-2 text-right font-medium tabular-nums text-xs">
+                              {getTaskCost(task) > 0 ? brl(getTaskCost(task)) : "—"}
+                            </td>
+                            <td className="py-2.5 px-2 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                {taskOverdue && <AlertCircle className="h-3 w-3 text-destructive" />}
+                                <span className={cn("text-xs", taskOverdue && "text-destructive font-bold")}>
+                                  {task.scheduled_date ? format(new Date(task.scheduled_date), "dd/MM/yy") : "—"}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-2">
+                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => toggleComplete(task)} className="p-1 rounded hover:bg-[hsl(var(--success))]/10">
+                                  <Check className="h-3.5 w-3.5 text-[hsl(var(--success))]" />
+                                </button>
+                                <button onClick={() => duplicateTask(task)} className="p-1 rounded hover:bg-muted">
+                                  <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                                </button>
+                                <button onClick={() => openEditDialog(task)} className="p-1 rounded hover:bg-muted">
+                                  <Pencil className="h-3.5 w-3.5 text-foreground" />
+                                </button>
+                                <button onClick={() => deleteTask(task.id)} className="p-1 rounded hover:bg-destructive/10">
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </button>
+                                <button onClick={() => addSubTask(task)} className="p-1 rounded hover:bg-primary/10">
+                                  <Plus className="h-3.5 w-3.5 text-primary" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Project summaries */}
+              <div className="space-y-2">
+                {projects.filter(p => tasks.some(t => t.project_id === p.id)).map(p => {
+                  const summary = getProjectSummary(p.id);
+                  return (
+                    <div key={p.id} className="flex items-center justify-between text-xs px-2 py-1.5 bg-muted/20 rounded">
+                      <span className="font-medium">{p.name}</span>
+                      <div className="flex items-center gap-3">
+                        <span>{brl(summary.previsto)}</span>
+                        {summary.overdue > 0 && <span className="text-destructive font-bold">{summary.overdue} atrasados</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          {/* Projects Tab - Table view */}
-          {activeTab === "projects" && (
-            <div className="rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
-                    <th className="text-left py-2 px-2">Projeto</th>
-                    <th className="text-left py-2 px-2">Programa</th>
-                    <th className="text-left py-2 px-2">Status</th>
-                    <th className="text-center py-2 px-2">Progresso</th>
-                    <th className="text-center py-2 px-2">Tarefas</th>
-                    <th className="text-right py-2 px-2">Orçamento</th>
-                    <th className="text-right py-2 px-2">Gasto</th>
-                    <th className="text-left py-2 px-2">Responsável</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleProjects.length === 0 && (
-                    <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">Nenhum projeto encontrado. Use o botão + para criar.</td></tr>
-                  )}
-                  {visibleProjects.map((p, idx) => {
-                    const progress = getProjectProgress(p.id);
-                    const costs = getProjectCosts(p.id);
-                    const pTasks = allTasks.filter(t => t.project_id === p.id);
-                    const pending = pTasks.filter(t => !t.is_completed).length;
-                    const isOverBudget = Number(p.budget || 0) > 0 && costs.totalCost > Number(p.budget);
-                    const programName = getProgramName(p.program_id);
-                    return (
-                      <tr key={p.id}
-                        className={cn("cursor-pointer transition-colors hover:bg-muted/20", idx > 0 && "border-t border-border/10")}
-                        onClick={() => setSelectedProjectId(p.id)}
-                      >
-                        <td className="py-2.5 px-2">
-                          <span className="font-medium">{p.name}</span>
-                          {p.description && <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{p.description}</p>}
-                        </td>
-                        <td className="py-2.5 px-2 text-muted-foreground text-xs">{programName || "—"}</td>
-                        <td className="py-2.5 px-2">{getStatusBadge(p.status)}</td>
-                        <td className="py-2.5 px-2 text-center">
-                          <div className="flex items-center gap-2">
-                            <Progress value={progress} className="h-1.5 flex-1" />
-                            <span className="text-xs font-medium w-8 text-right">{progress}%</span>
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-2 text-center">{pending}</td>
-                        <td className="py-2.5 px-2 text-right font-medium tabular-nums">{Number(p.budget || 0) > 0 ? brl(Number(p.budget)) : "—"}</td>
-                        <td className={cn("py-2.5 px-2 text-right font-medium tabular-nums", isOverBudget ? "text-destructive" : "text-foreground")}>{costs.totalCost > 0 ? brl(costs.totalCost) : "—"}</td>
-                        <td className="py-2.5 px-2 text-muted-foreground text-xs truncate max-w-[100px]">{p.responsible || "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {/* ════════════════ DASHBOARD TAB ════════════════ */}
+          {activeTab === "dashboard" && (
+            <div className="space-y-4">
+              {/* Totals */}
+              <div className="grid grid-cols-2 gap-4">
+                <Card className="bg-card">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase">Total Previsto</p>
+                    <p className="text-2xl font-bold">{brl(kpis.previsto)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase">Total Realizado</p>
+                    <p className="text-2xl font-bold text-primary">{brl(kpis.realizado)}</p>
+                  </CardContent>
+                </Card>
+              </div>
 
-          {/* Tasks Tab - Table view */}
-          {activeTab === "tasks" && (
-            <div className="rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
-                    <th className="text-left py-2 px-2 w-8"></th>
-                    <th className="text-left py-2 px-2">Tarefa</th>
-                    <th className="text-left py-2 px-2">Projeto</th>
-                    <th className="text-left py-2 px-2">Data</th>
-                    <th className="text-center py-2 px-2">Status</th>
-                    <th className="text-center py-2 px-2 w-8">★</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allTasks.filter(t => !search || t.title.toLowerCase().includes(search.toLowerCase())).length === 0 && (
-                    <tr><td colSpan={6} className="text-center text-muted-foreground/40 py-12">Nenhuma tarefa encontrada.</td></tr>
+              {/* Chart by Project */}
+              <Card className="bg-card">
+                <CardContent className="p-4">
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <FolderKanban className="h-4 w-4 text-primary" /> Por Projeto
+                  </h3>
+                  {dashboardData.byProject.length > 0 ? (
+                    <div className="h-56">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={dashboardData.byProject} margin={{ left: 20, right: 20, bottom: 40 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} angle={-45} textAnchor="end" height={60} />
+                          <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => brl(v)} />
+                          <RechartsTooltip contentStyle={tooltipStyle} formatter={(value: number) => brl(value)} />
+                          <Legend wrapperStyle={{ fontSize: 10 }} />
+                          <Bar dataKey="previsto" name="Previsto" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="realizado" name="Realizado" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-8">Sem dados de projetos</p>
                   )}
-                  {allTasks.filter(t => !search || t.title.toLowerCase().includes(search.toLowerCase())).map((t, idx) => {
-                    const projName = projects.find(p => p.id === t.project_id)?.name;
-                    return (
-                      <tr key={t.id}
-                        className={cn("cursor-pointer transition-colors hover:bg-muted/20", idx > 0 && "border-t border-border/10", t.is_completed && "opacity-50")}
-                        onClick={() => handleTaskClick(t)}
-                      >
-                        <td className="py-2 px-2">
-                          <Checkbox checked={!!t.is_completed}
-                            onCheckedChange={() => toggleTaskComplete(t)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-3.5 w-3.5" />
-                        </td>
-                        <td className={cn("py-2 px-2", t.is_completed && "line-through text-muted-foreground")}>{t.title}</td>
-                        <td className="py-2 px-2 text-muted-foreground text-xs">{projName || "Avulsa"}</td>
-                        <td className="py-2 px-2 text-muted-foreground text-xs">{t.scheduled_date ? format(new Date(t.scheduled_date), "dd/MM/yy") : "—"}</td>
-                        <td className="py-2 px-2 text-center">
-                          {t.is_completed
-                            ? <Badge variant="outline" className="text-[10px] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30">Concluída</Badge>
-                            : <Badge variant="outline" className="text-[10px] bg-primary/15 text-primary border-primary/30">Pendente</Badge>
-                          }
-                        </td>
-                        <td className="py-2 px-2 text-center">
-                          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(t); }} className="p-0.5">
-                            <Star className={cn("h-3 w-3", t.is_favorite ? "fill-warning text-warning" : "text-muted-foreground/30")} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                </CardContent>
+              </Card>
 
-          {visibleProjects.length === 0 && programs.length === 0 && activeTab === "dashboard" && (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <FolderKanban className="h-12 w-12 mb-3 opacity-20" />
-              <p className="text-sm font-medium">Nenhum projeto encontrado</p>
-              <p className="text-xs mt-1">Use o botão + para criar um novo projeto ou programa.</p>
+              {/* Chart by Cost Center */}
+              <Card className="bg-card">
+                <CardContent className="p-4">
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <Layers className="h-4 w-4 text-primary" /> Por Centro de Custo
+                  </h3>
+                  {dashboardData.byCostCenter.length > 0 ? (
+                    <div className="h-56">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={dashboardData.byCostCenter} margin={{ left: 20, right: 20, bottom: 40 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} angle={-45} textAnchor="end" height={60} />
+                          <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => brl(v)} />
+                          <RechartsTooltip contentStyle={tooltipStyle} formatter={(value: number) => brl(value)} />
+                          <Legend wrapperStyle={{ fontSize: 10 }} />
+                          <Bar dataKey="previsto" name="Previsto" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="realizado" name="Realizado" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-8">Sem dados de centros de custo</p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           )}
         </div>
       </ScrollArea>
 
-      {renderProjectDialog()}
-      {renderProgramDialog()}
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={(o) => { setEditDialogOpen(o); if (!o) setEditingTask(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base">Editar Tarefa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-sm">Título</Label>
+              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-sm">Anotações</Label>
+              <Textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Texto livre..." rows={3} className="resize-none" />
+            </div>
+            <div>
+              <Label className="text-sm">Links</Label>
+              <Input value={editLinks} onChange={(e) => setEditLinks(e.target.value)} placeholder="https://..." />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-sm">Categoria</Label>
+                <Select value={editCategoryId} onValueChange={setEditCategoryId}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Centro de Custo</Label>
+                <Select value={editCostCenterId} onValueChange={setEditCostCenterId}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent>
+                    {costCenters.map(cc => <SelectItem key={cc.id} value={cc.id}>{cc.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm">Responsável</Label>
+              <Input value={editResponsible} onChange={(e) => setEditResponsible(e.target.value)} placeholder="Nome ou avatar" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-sm">Data Início</Label>
+                <Input type="date" value={editDateStart} onChange={(e) => setEditDateStart(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-sm">Data Fim</Label>
+                <Input type="date" value={editDateEnd} onChange={(e) => setEditDateEnd(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-sm">Prioridade</Label>
+                <Select value={editPriority} onValueChange={(v) => setEditPriority(v as Priority)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="alta">🔴 Alta</SelectItem>
+                    <SelectItem value="media">🟡 Média</SelectItem>
+                    <SelectItem value="baixa">🟢 Baixa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Valor Previsto (R$)</Label>
+                <Input value={editCost} onChange={(e) => setEditCost(e.target.value.replace(/[^0-9.,]/g, ""))} placeholder="0,00" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox checked={editIsMilestone} onCheckedChange={(c) => setEditIsMilestone(!!c)} id="milestone" />
+              <Label htmlFor="milestone" className="text-sm cursor-pointer flex items-center gap-1">
+                <Diamond className="h-3 w-3 text-primary" /> Marcar como Marco
+              </Label>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-3 border-t border-border/20">
+            {editingTask && (
+              <Button variant="destructive" size="sm" onClick={() => { deleteTask(editingTask.id); setEditDialogOpen(false); }}>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+              <Button size="sm" onClick={saveTask} className="gap-1.5 bg-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/90">
+                <Save className="h-3.5 w-3.5" /> Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
