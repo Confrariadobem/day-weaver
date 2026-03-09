@@ -357,6 +357,51 @@ export type Database = {
         }
         Relationships: []
       }
+      patrimony_assets: {
+        Row: {
+          asset_type: string
+          created_at: string
+          current_value: number
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          photo_url: string | null
+          purchase_date: string | null
+          purchase_value: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_type?: string
+          created_at?: string
+          current_value?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          photo_url?: string | null
+          purchase_date?: string | null
+          purchase_value?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_type?: string
+          created_at?: string
+          current_value?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          photo_url?: string | null
+          purchase_date?: string | null
+          purchase_value?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payment_splits: {
         Row: {
           account_id: string | null
