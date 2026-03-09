@@ -392,18 +392,20 @@ export default function DashboardView() {
               <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
                 <BarChart3 className="size-7 mr-2 text-muted-foreground" /> Receita × Despesa
               </p>
-              <ResponsiveContainer width="100%" height={180}>
-                <ComposedChart data={monthlyData} barGap={0}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
-                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
-                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                  <Legend wrapperStyle={{ fontSize: 14, fontWeight: 500 }} />
-                  <Bar dataKey="receita" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="despesa" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                  <Line type="monotone" dataKey="acumulado" name="Acumulado" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6" }} />
-                </ComposedChart>
-              </ResponsiveContainer>
+              <div className="w-full min-w-0">
+                <ResponsiveContainer width="100%" height={180}>
+                  <ComposedChart data={monthlyData} barGap={0}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
+                    <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                    <Legend wrapperStyle={{ fontSize: 14, fontWeight: 500 }} />
+                    <Bar dataKey="receita" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="despesa" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    <Line type="monotone" dataKey="acumulado" name="Acumulado" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6" }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
 
@@ -412,21 +414,23 @@ export default function DashboardView() {
               <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
                 <Scale size={28} className="text-muted-foreground mr-2" /> Saldo Mensal
               </p>
-              <ResponsiveContainer width="100%" height={180}>
-                <AreaChart data={monthlyData}>
-                  <defs>
-                    <linearGradient id="saldoGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
-                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                  <Area type="monotone" dataKey="saldo" stroke="hsl(217, 91%, 60%)" fill="url(#saldoGrad)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <div className="w-full min-w-0">
+                <ResponsiveContainer width="100%" height={180}>
+                  <AreaChart data={monthlyData}>
+                    <defs>
+                      <linearGradient id="saldoGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                    <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                    <Area type="monotone" dataKey="saldo" stroke="hsl(217, 91%, 60%)" fill="url(#saldoGrad)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
 
@@ -436,16 +440,18 @@ export default function DashboardView() {
                 <PieChartIcon className="size-7 mr-2 text-muted-foreground" /> Despesas por Categoria
               </p>
               {categoryBreakdown.length > 0 ? (
-                <div className="flex items-center gap-4">
-                  <ResponsiveContainer width={140} height={140}>
-                    <RechartsPieChart>
-                      <Pie data={categoryBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} innerRadius={30} strokeWidth={1}>
-                        {categoryBreakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                      </Pie>
-                      <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
-                  <div className="space-y-1.5 flex-1">
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="w-full sm:w-auto shrink-0 flex justify-center">
+                    <ResponsiveContainer width={140} height={140}>
+                      <RechartsPieChart>
+                        <Pie data={categoryBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} innerRadius={30} strokeWidth={1}>
+                          {categoryBreakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        </Pie>
+                        <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="space-y-1.5 flex-1 min-w-0">
                     {categoryBreakdown.slice(0, 6).map((c, i) => {
                       const pct = totalExpense > 0 ? ((c.value / totalExpense) * 100).toFixed(1) : "0";
                       return (
