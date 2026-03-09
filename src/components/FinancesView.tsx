@@ -2713,14 +2713,14 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             )}
 
             {/* Pie charts */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Categorias — Despesas</CardTitle></CardHeader>
                 <CardContent>
                   {categoryPieData.length > 0 ? (
-                    <div className="flex items-center gap-4">
-                      <div className="h-[200px] w-[200px] shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      <div className="w-full sm:w-auto shrink-0 flex justify-center">
+                        <ResponsiveContainer width={200} height={200}>
                           <PieChart>
                             <Pie data={categoryPieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
                               outerRadius={80} innerRadius={48} paddingAngle={4} cornerRadius={6}
@@ -2752,9 +2752,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Categorias — Receitas</CardTitle></CardHeader>
                 <CardContent>
                   {revenuePieData.length > 0 ? (
-                    <div className="flex items-center gap-4">
-                      <div className="h-[200px] w-[200px] shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      <div className="w-full sm:w-auto shrink-0 flex justify-center">
+                        <ResponsiveContainer width={200} height={200}>
                           <PieChart>
                             <Pie data={revenuePieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
                               outerRadius={80} innerRadius={48} paddingAngle={4} cornerRadius={6}
