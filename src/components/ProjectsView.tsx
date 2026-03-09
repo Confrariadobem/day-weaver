@@ -29,7 +29,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "@/hooks/use-toast";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 
-type ProjectTab = "indicadores" | "andamento" | "desejos" | "concluidos";
+type ProjectTab = "andamento" | "backlog";
 type ProjectStatus = "pendente" | "em_andamento" | "feito";
 type Priority = "alta" | "media" | "baixa";
 type WeekPriority = "hoje" | "essa_semana" | "proxima" | "adiar" | null;
