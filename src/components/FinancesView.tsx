@@ -1653,21 +1653,28 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       placeholder="DD/MM/AAAA" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
                   </div>
                 </div>
-                <div className="flex justify-between">
-                  <button onClick={() => {
-                    const today = new Date();
-                    const todayStr = format(today, "dd/MM/yyyy");
-                    setFluxoCustomFrom(today); setFluxoCustomTo(today);
-                    setFluxoDateFrom(todayStr); setFluxoDateTo(todayStr);
-                  }}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
-                    style={{ minWidth: 80, height: 32 }}>Hoje</button>
+                <div className="flex justify-end">
                   <button onClick={handleClearFluxoInterval}
                     className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
                     style={{ minWidth: 80, height: 32 }}>Limpar</button>
                 </div>
               </PopoverContent>
             </Popover>
+            <button
+              onClick={() => {
+                const today = new Date();
+                const todayStr = format(today, "dd/MM/yyyy");
+                setFluxoCustomFrom(today); setFluxoCustomTo(today);
+                setFluxoDateFrom(todayStr); setFluxoDateTo(todayStr);
+              }}
+              className={cn(
+                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                "border-border hover:border-primary/80 hover:bg-primary/5"
+              )}
+            >
+              <CalendarDays className="size-4" />
+              <span className="text-xs font-medium">Hoje</span>
+            </button>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button onClick={() => {
