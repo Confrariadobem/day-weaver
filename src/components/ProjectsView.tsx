@@ -772,7 +772,7 @@ export default function ProjectsView() {
               </div>
             </div>
             <div className="border-t border-border/50" />
-          </>
+          </div>
         )}
 
         {/* Desktop Table / Mobile Cards */}
