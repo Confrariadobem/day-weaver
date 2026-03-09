@@ -476,6 +476,27 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
           </Card>
         </div>
 
+        {/* Alerts in Indicadores */}
+        {metrics.alerts.length > 0 && (
+          <Card className="bg-card border-warning/30">
+            <CardContent className="p-3">
+              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-warning" /> Alertas
+              </p>
+              <div className="space-y-1.5">
+                {metrics.alerts.map((alert, i) => (
+                  <p key={i} className="text-xs text-warning flex items-center gap-1.5">
+                    ⚠️ {alert}
+                  </p>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        </>)}
+
+        {/* ═══ CARTEIRAS TAB ═══ */}
+        {activeTab === "carteiras" && (<>
         {/* Accounts overview — flat list */}
         <div>
           <p className="text-xs font-semibold mb-2 flex items-center gap-1.5 px-1">
