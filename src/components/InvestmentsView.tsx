@@ -18,7 +18,12 @@ import {
   Plus, TrendingUp, TrendingDown, ArrowLeft, Trash2, Save, Search,
   PieChart as PieChartIcon, Wallet, Calendar, BarChart3, AlertTriangle,
   Edit, PiggyBank, Building2, Bitcoin, Coins, Eye, EyeOff, BadgeDollarSign,
+  FileUp, Printer, CalendarRange, CalendarDays, X,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
