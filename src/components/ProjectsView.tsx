@@ -15,21 +15,25 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Plus, Pencil, CheckCircle2, Trash2, CalendarDays, Search, X,
   FolderKanban, Sparkles, Archive, ChevronDown, ChevronUp, ChevronRight,
   FileUp, FileDown, Printer, CalendarRange, Filter, Save, Layers,
+  Star, Users, BarChart3, TrendingUp, Clock, AlertTriangle,
 } from "lucide-react";
 import { format, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "@/hooks/use-toast";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 
-type ProjectTab = "andamento" | "desejos" | "concluidos";
+type ProjectTab = "indicadores" | "andamento" | "desejos" | "concluidos";
 type ProjectStatus = "pendente" | "em_andamento" | "feito";
 type Priority = "alta" | "media" | "baixa";
-type SortField = "name" | "status" | "priority" | "target_date" | "observation";
+type WeekPriority = "hoje" | "essa_semana" | "proxima" | "adiar" | null;
+type SortField = "name" | "responsible" | "status" | "priority" | "target_date" | "observation" | "week_priority";
 type SortDir = "asc" | "desc";
 
 interface ProjectItem {
@@ -41,6 +45,8 @@ interface ProjectItem {
   observation: string | null;
   user_id: string;
   parent_id: string | null;
+  responsible: string | null;
+  week_priority: WeekPriority;
   children?: ProjectItem[];
 }
 
@@ -56,7 +62,17 @@ const PRIORITY_LABELS: Record<Priority, { label: string; className: string }> = 
   baixa: { label: "Baixa", className: "text-[hsl(var(--success))]" },
 };
 
+const WEEK_PRIORITY_LABELS: Record<string, { label: string; className: string }> = {
+  hoje: { label: "Hoje", className: "text-destructive" },
+  essa_semana: { label: "Essa Semana", className: "text-amber-500" },
+  proxima: { label: "Próxima", className: "text-primary" },
+  adiar: { label: "Adiado", className: "text-muted-foreground" },
+};
+
 const PRIORITY_ORDER: Record<Priority, number> = { alta: 0, media: 1, baixa: 2 };
+const WEEK_PRIORITY_ORDER: Record<string, number> = { hoje: 0, essa_semana: 1, proxima: 2, adiar: 3 };
+
+const PIE_COLORS = ["hsl(var(--primary))", "hsl(var(--destructive))", "hsl(var(--success))", "#f59e0b", "#8b5cf6", "#06b6d4"];
 
 function mapStatus(dbStatus: string | null): ProjectStatus {
   if (!dbStatus) return "pendente";
@@ -77,7 +93,6 @@ function parsePriority(p: string | null): Priority {
   return "media";
 }
 
-// Date input helpers
 const normalizeDateInput = (val: string) => {
   const digits = val.replace(/\D/g, "");
   let out = "";
@@ -100,8 +115,11 @@ export default function ProjectsView() {
   const { user } = useAuth();
   const { formatDate: fmtDate, dateFormat } = useDateFormat();
   const isMobile = useIsMobile();
-  const [activeTab, setActiveTab] = useState<ProjectTab>("andamento");
+  const [activeTab, setActiveTab] = useState<ProjectTab>("indicadores");
   const [rawProjects, setRawProjects] = useState<any[]>([]);
+
+  // Local week_priority state (not persisted to DB yet, stored in memory)
+  const [weekPriorities, setWeekPriorities] = useState<Record<string, WeekPriority>>({});
 
   // Sort
   const [sortField, setSortField] = useState<SortField>("priority");
@@ -136,7 +154,11 @@ export default function ProjectsView() {
   const [formDate, setFormDate] = useState<Date | undefined>();
   const [formObs, setFormObs] = useState("");
   const [formParentId, setFormParentId] = useState<string>("");
+  const [formResponsible, setFormResponsible] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // FAB menu
+  const [fabOpen, setFabOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -166,10 +188,11 @@ export default function ProjectsView() {
       observation: p.description || null,
       user_id: p.user_id,
       parent_id: (p as any).parent_id || null,
+      responsible: (p as any).responsible || null,
+      week_priority: weekPriorities[p.id] || null,
     }));
-  }, [rawProjects]);
+  }, [rawProjects, weekPriorities]);
 
-  // Parents with children
   const hierarchy = useMemo(() => {
     const parents = allItems.filter(i => !i.parent_id);
     const childMap = new Map<string, ProjectItem[]>();
@@ -184,7 +207,6 @@ export default function ProjectsView() {
     }));
   }, [allItems]);
 
-  // Compute parent status from children
   const getEffectiveStatus = (parent: ProjectItem & { children: ProjectItem[] }): ProjectStatus => {
     if (parent.children.length === 0) return parent.status;
     const allDone = parent.children.every(c => c.status === "feito");
@@ -200,8 +222,49 @@ export default function ProjectsView() {
     return Math.round((done / children.length) * 100);
   };
 
-  // Filter by tab
+  // ─── Indicadores data ───────────────────────────────────────────────────
+  const indicadoresData = useMemo(() => {
+    const total = allItems.length;
+    const done = allItems.filter(i => i.status === "feito").length;
+    const inProgress = allItems.filter(i => i.status === "em_andamento").length;
+    const pending = allItems.filter(i => i.status === "pendente").length;
+    const overdue = allItems.filter(i => {
+      if (!i.target_date || i.status === "feito") return false;
+      return new Date(i.target_date) < new Date();
+    }).length;
+    const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    // By responsible
+    const byResponsible: Record<string, number> = {};
+    allItems.forEach(i => {
+      const r = i.responsible || "Sem responsável";
+      byResponsible[r] = (byResponsible[r] || 0) + 1;
+    });
+    const responsibleData = Object.entries(byResponsible).map(([name, value]) => ({ name, value }));
+
+    // Status distribution
+    const statusData = [
+      { name: "Pendente", value: pending, fill: "#f59e0b" },
+      { name: "Em andamento", value: inProgress, fill: "hsl(var(--primary))" },
+      { name: "Concluído", value: done, fill: "hsl(var(--success))" },
+    ].filter(d => d.value > 0);
+
+    // Priority distribution
+    const alta = allItems.filter(i => i.priority === "alta").length;
+    const media = allItems.filter(i => i.priority === "media").length;
+    const baixa = allItems.filter(i => i.priority === "baixa").length;
+    const priorityData = [
+      { name: "Alta", value: alta },
+      { name: "Média", value: media },
+      { name: "Baixa", value: baixa },
+    ];
+
+    return { total, done, inProgress, pending, overdue, progressPct, responsibleData, statusData, priorityData };
+  }, [allItems]);
+
+  // Filter by tab (for list tabs)
   const tabFiltered = useMemo(() => {
+    if (activeTab === "indicadores") return hierarchy;
     return hierarchy.filter(p => {
       const eff = getEffectiveStatus(p);
       if (activeTab === "andamento") return eff === "pendente" || eff === "em_andamento";
@@ -210,25 +273,19 @@ export default function ProjectsView() {
     });
   }, [hierarchy, activeTab]);
 
-  // Apply search + advanced filters + date range
   const filtered = useMemo(() => {
     let list = tabFiltered;
-
-    // Search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(p =>
         p.name.toLowerCase().includes(q) ||
         (p.observation || "").toLowerCase().includes(q) ||
+        (p.responsible || "").toLowerCase().includes(q) ||
         p.children.some(c => c.name.toLowerCase().includes(q) || (c.observation || "").toLowerCase().includes(q))
       );
     }
-
-    // Advanced filters
     if (filterStatus !== "all") list = list.filter(p => getEffectiveStatus(p) === filterStatus);
     if (filterPriority !== "all") list = list.filter(p => p.priority === filterPriority);
-
-    // Date range
     if (dateFrom || dateTo) {
       const from = dateFrom ? parseDMY(dateFrom) : null;
       const to = dateTo ? parseDMY(dateTo) : null;
@@ -240,14 +297,14 @@ export default function ProjectsView() {
         return true;
       });
     }
-
-    // Sort
     return [...list].sort((a, b) => {
       let aVal: any, bVal: any;
       if (sortField === "name") { aVal = a.name; bVal = b.name; }
+      else if (sortField === "responsible") { aVal = a.responsible || ""; bVal = b.responsible || ""; }
       else if (sortField === "status") { aVal = a.status; bVal = b.status; }
       else if (sortField === "priority") { aVal = PRIORITY_ORDER[a.priority]; bVal = PRIORITY_ORDER[b.priority]; }
       else if (sortField === "target_date") { aVal = a.target_date || ""; bVal = b.target_date || ""; }
+      else if (sortField === "week_priority") { aVal = WEEK_PRIORITY_ORDER[a.week_priority || "adiar"] ?? 9; bVal = WEEK_PRIORITY_ORDER[b.week_priority || "adiar"] ?? 9; }
       else { aVal = a.observation || ""; bVal = b.observation || ""; }
       const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
       return sortDir === "asc" ? cmp : -cmp;
@@ -282,7 +339,7 @@ export default function ProjectsView() {
 
   const resetForm = () => {
     setFormName(""); setFormStatus("pendente"); setFormPriority("media");
-    setFormDate(undefined); setFormObs(""); setFormParentId(""); setEditing(null);
+    setFormDate(undefined); setFormObs(""); setFormParentId(""); setFormResponsible(""); setEditing(null);
   };
 
   const openDialog = (item?: ProjectItem) => {
@@ -294,6 +351,7 @@ export default function ProjectsView() {
       setFormDate(item.target_date ? new Date(item.target_date) : undefined);
       setFormObs(item.observation || "");
       setFormParentId(item.parent_id || "");
+      setFormResponsible(item.responsible || "");
     } else {
       resetForm();
     }
@@ -310,14 +368,13 @@ export default function ProjectsView() {
       priority: formPriority,
       target_date: dateStr,
       parent_id: formParentId || null,
+      responsible: formResponsible.trim() || null,
     };
-
     if (editing) {
       await supabase.from("projects").update(payload).eq("id", editing.id);
     } else {
       await supabase.from("projects").insert({ ...payload, user_id: user.id });
     }
-
     setDialogOpen(false);
     resetForm();
     fetchData();
@@ -334,7 +391,6 @@ export default function ProjectsView() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    // Delete children first via RPC-style raw
     const { data: children } = await supabase.from("projects").select("*").eq("user_id", user!.id);
     const childIds = (children || []).filter((c: any) => c.parent_id === deleteId).map((c: any) => c.id);
     if (childIds.length > 0) await supabase.from("projects").delete().in("id", childIds);
@@ -348,7 +404,6 @@ export default function ProjectsView() {
 
   const handleBatchDelete = async () => {
     const ids = Array.from(selectedIds);
-    // Delete children of selected parents
     const { data: allProj } = await supabase.from("projects").select("*").eq("user_id", user!.id);
     const childIdsToDelete = (allProj || []).filter((c: any) => ids.includes(c.parent_id)).map((c: any) => c.id);
     if (childIdsToDelete.length > 0) await supabase.from("projects").delete().in("id", childIdsToDelete);
@@ -370,11 +425,11 @@ export default function ProjectsView() {
   };
 
   const handleExportCSV = () => {
-    const rows = [["Nome", "Pai", "Status", "Prioridade", "Data", "Observação"]];
+    const rows = [["Nome", "Responsável", "Pai", "Status", "Prioridade", "Data", "Observação"]];
     filtered.forEach(p => {
-      rows.push([p.name, "", STATUS_LABELS[getEffectiveStatus(p)].label, PRIORITY_LABELS[p.priority].label, p.target_date || "", p.observation || ""]);
+      rows.push([p.name, p.responsible || "", "", STATUS_LABELS[getEffectiveStatus(p)].label, PRIORITY_LABELS[p.priority].label, p.target_date || "", p.observation || ""]);
       p.children.forEach(c => {
-        rows.push([c.name, p.name, STATUS_LABELS[c.status].label, PRIORITY_LABELS[c.priority].label, c.target_date || "", c.observation || ""]);
+        rows.push([c.name, c.responsible || "", p.name, STATUS_LABELS[c.status].label, PRIORITY_LABELS[c.priority].label, c.target_date || "", c.observation || ""]);
       });
     });
     const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
@@ -387,9 +442,7 @@ export default function ProjectsView() {
     URL.revokeObjectURL(url);
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
   const handleIntervalSelect = (range: any) => {
     if (range?.from) { setCustomFrom(range.from); setDateFrom(format(range.from, "dd/MM/yyyy")); }
@@ -406,16 +459,22 @@ export default function ProjectsView() {
     try { return fmtDate(new Date(d)); } catch { return d; }
   };
 
-  // Top-level parents for parent selector
   const parentOptions = allItems.filter(i => !i.parent_id && i.id !== editing?.id);
 
+  // Unique responsibles for select
+  const uniqueResponsibles = useMemo(() => {
+    const set = new Set<string>();
+    allItems.forEach(i => { if (i.responsible) set.add(i.responsible); });
+    return Array.from(set).sort();
+  }, [allItems]);
+
   const tabConfig: { key: ProjectTab; label: string; icon: React.ReactNode }[] = [
+    { key: "indicadores", label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
     { key: "andamento", label: "Em Andamento", icon: <FolderKanban className="h-3 w-3" /> },
     { key: "desejos", label: "Desejos", icon: <Sparkles className="h-3 w-3" /> },
     { key: "concluidos", label: "Concluídos", icon: <Archive className="h-3 w-3" /> },
   ];
 
-  // Highlight match in search
   const highlightMatch = (text: string, query: string) => {
     if (!query.trim()) return text;
     const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -439,7 +498,48 @@ export default function ProjectsView() {
     return <>{result}</>;
   };
 
-  // Render a project row (parent or child)
+  // Week priority handler
+  const setWeekPriorityForItem = (id: string, wp: WeekPriority) => {
+    setWeekPriorities(prev => ({ ...prev, [id]: wp }));
+    toast({ title: wp ? `Priorizado: ${WEEK_PRIORITY_LABELS[wp]?.label}` : "Prioridade removida" });
+  };
+
+  // Star priority popover component
+  const StarPriority = ({ item }: { item: ProjectItem }) => {
+    const wp = item.week_priority;
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className={cn("rounded p-0.5 transition-colors", wp ? "text-amber-400" : "text-muted-foreground/40 hover:text-amber-400")}>
+            <Star className={cn("h-3.5 w-3.5", wp && "fill-amber-400")} />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-36 p-1" align="start">
+          <div className="space-y-0.5">
+            {(["hoje", "essa_semana", "proxima", "adiar"] as WeekPriority[]).map(wp => (
+              <button key={wp} onClick={() => setWeekPriorityForItem(item.id, wp)}
+                className={cn("w-full text-left px-2 py-1.5 text-xs rounded hover:bg-muted/50 transition-colors",
+                  item.week_priority === wp && "bg-muted font-semibold"
+                )}>
+                <span className={WEEK_PRIORITY_LABELS[wp!].className}>{WEEK_PRIORITY_LABELS[wp!].label}</span>
+              </button>
+            ))}
+            {item.week_priority && (
+              <>
+                <Separator className="my-1" />
+                <button onClick={() => setWeekPriorityForItem(item.id, null)}
+                  className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-muted/50 text-muted-foreground">
+                  Remover
+                </button>
+              </>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
+  // Render table row
   const renderRow = (item: ProjectItem, isChild: boolean, parent?: ProjectItem & { children: ProjectItem[] }) => {
     const hasChildren = !isChild && (hierarchy.find(h => h.id === item.id)?.children.length || 0) > 0;
     const isExpanded = expandedIds.has(item.id);
@@ -488,6 +588,20 @@ export default function ProjectsView() {
           </div>
         </td>
         <td className="py-2.5 px-3">
+          <div className="flex items-center gap-1.5">
+            {item.responsible ? (
+              <>
+                <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold shrink-0">
+                  {item.responsible.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-xs text-muted-foreground truncate max-w-[100px]">{item.responsible}</span>
+              </>
+            ) : (
+              <span className="text-xs text-muted-foreground/40">—</span>
+            )}
+          </div>
+        </td>
+        <td className="py-2.5 px-3">
           <span className={cn("text-xs font-medium", STATUS_LABELS[item.status].className)}>
             {STATUS_LABELS[item.status].label}
           </span>
@@ -497,11 +611,16 @@ export default function ProjectsView() {
             {PRIORITY_LABELS[item.priority].label}
           </span>
         </td>
+        <td className="py-2.5 px-2 text-center">
+          <StarPriority item={item} />
+          {item.week_priority && (
+            <span className={cn("text-[9px] block", WEEK_PRIORITY_LABELS[item.week_priority].className)}>
+              {WEEK_PRIORITY_LABELS[item.week_priority].label}
+            </span>
+          )}
+        </td>
         <td className="py-2.5 px-3 text-xs text-muted-foreground tabular-nums">
           {formatDateDisplay(item.target_date)}
-        </td>
-        <td className="py-2.5 px-3 text-xs text-muted-foreground max-w-[200px] truncate">
-          {item.observation ? highlightMatch(item.observation, searchQuery) : "—"}
         </td>
         <td className="py-2.5 px-1 w-24 no-print">
           <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
@@ -548,7 +667,7 @@ export default function ProjectsView() {
     const progress = getProgress(children);
 
     return (
-      <div key={item.id} className={cn("rounded-lg border border-border/30 p-3 space-y-2", isChild && "ml-6 border-l-2 border-l-primary/20")}>
+      <div key={item.id} className={cn("rounded-lg border border-border/30 p-3 space-y-2", isChild && "ml-4 border-l-2 border-l-primary/20")}>
         <div className="flex items-start gap-2">
           <Checkbox
             checked={selectedIds.has(item.id)}
@@ -569,6 +688,7 @@ export default function ProjectsView() {
                 </button>
               )}
               <span className="text-sm font-bold text-foreground truncate">{item.name}</span>
+              <StarPriority item={item} />
             </div>
             {hasChildren && (
               <div className="flex items-center gap-1.5 mt-1">
@@ -582,6 +702,11 @@ export default function ProjectsView() {
           <span className={cn("font-medium", STATUS_LABELS[item.status].className)}>{STATUS_LABELS[item.status].label}</span>
           <span className={cn("font-medium", PRIORITY_LABELS[item.priority].className)}>{PRIORITY_LABELS[item.priority].label}</span>
           <span className="text-muted-foreground tabular-nums">{formatDateDisplay(item.target_date)}</span>
+          {item.responsible && (
+            <span className="text-muted-foreground flex items-center gap-1">
+              <Users className="h-3 w-3" /> {item.responsible}
+            </span>
+          )}
         </div>
         {item.observation && <p className="text-xs text-muted-foreground truncate">{item.observation}</p>}
         <div className="flex items-center gap-1 justify-end">
@@ -602,9 +727,109 @@ export default function ProjectsView() {
     );
   };
 
+  // ─── Indicadores View ─────────────────────────────────────────────────────
+  const renderIndicadores = () => {
+    const { total, done, inProgress, pending, overdue, progressPct, responsibleData, statusData, priorityData } = indicadoresData;
+
+    const summaryCards = [
+      { label: "Total", value: total, icon: <FolderKanban className="h-4 w-4" />, color: "text-primary" },
+      { label: "Concluídos", value: done, icon: <CheckCircle2 className="h-4 w-4" />, color: "text-[hsl(var(--success))]" },
+      { label: "Em Andamento", value: inProgress, icon: <TrendingUp className="h-4 w-4" />, color: "text-primary" },
+      { label: "Atrasados", value: overdue, icon: <AlertTriangle className="h-4 w-4" />, color: "text-destructive" },
+    ];
+
+    return (
+      <div className="space-y-4 px-1">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {summaryCards.map(c => (
+            <Card key={c.label} className="border-border/30">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className={cn("shrink-0", c.color)}>{c.icon}</div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{c.value}</p>
+                  <p className="text-[11px] text-muted-foreground">{c.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Progress bar */}
+        <Card className="border-border/30">
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold">Progresso Geral</p>
+              <span className="text-sm font-bold text-foreground">{progressPct}%</span>
+            </div>
+            <Progress value={progressPct} className="h-2" />
+            <p className="text-[11px] text-muted-foreground">{done} de {total} projetos concluídos</p>
+          </CardContent>
+        </Card>
+
+        {/* Charts row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Status Pie */}
+          <Card className="border-border/30">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold mb-3">Distribuição por Status</p>
+              {statusData.length > 0 ? (
+                <div className="flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie data={statusData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value" paddingAngle={2}>
+                        {statusData.map((entry, idx) => (
+                          <Cell key={idx} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-8">Sem dados</p>
+              )}
+              <div className="flex items-center justify-center gap-4 mt-2">
+                {statusData.map(d => (
+                  <div key={d.name} className="flex items-center gap-1.5">
+                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: d.fill }} />
+                    <span className="text-[10px] text-muted-foreground">{d.name} ({d.value})</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Responsible Bar */}
+          <Card className="border-border/30">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold mb-3">Distribuição por Responsável</p>
+              {responsibleData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={responsibleData} layout="vertical" margin={{ left: 0, right: 16 }}>
+                    <XAxis type="number" tick={{ fontSize: 10 }} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
+                    <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                      {responsibleData.map((_, idx) => (
+                        <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-8">Sem dados</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-4 max-w-full overflow-hidden">
+      <div className={cn("p-4 space-y-4 max-w-full overflow-hidden", isMobile && "px-3")}>
         {/* Tab buttons + Toolbar on same line */}
         <div className="flex items-center gap-2 overflow-x-auto">
           <div className="flex items-center gap-1.5 shrink-0">
@@ -618,146 +843,133 @@ export default function ProjectsView() {
               </Button>
             ))}
           </div>
-          <div className="ml-auto flex items-center gap-3">
-            {/* Search with filter icon inside */}
-            <div className="relative" style={{ width: isMobile ? 200 : 400 }}>
-              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input placeholder="Buscar projetos..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-7 pl-8 pr-14 text-xs rounded-lg" />
-              <div className="absolute right-2 top-1 flex items-center gap-1">
-                {searchQuery && (
-                  <button onClick={() => setSearchQuery("")} className="text-muted-foreground hover:text-foreground">
-                    <X className="h-3.5 w-3.5" />
+          {activeTab !== "indicadores" && (
+            <div className="ml-auto flex items-center gap-3">
+              {/* Search */}
+              <div className="relative" style={{ width: isMobile ? 200 : 400 }}>
+                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input placeholder="Buscar projetos..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-7 pl-8 pr-14 text-xs rounded-lg" />
+                <div className="absolute right-2 top-1 flex items-center gap-1">
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery("")} className="text-muted-foreground hover:text-foreground">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
+                    className={cn("rounded p-0.5 transition-colors",
+                      advancedFilterOpen || filterStatus !== "all" || filterPriority !== "all" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                    )}>
+                    <Filter className="h-3.5 w-3.5" />
                   </button>
-                )}
-                <button
-                  onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
-                  className={cn(
-                    "rounded p-0.5 transition-colors",
-                    advancedFilterOpen || filterStatus !== "all" || filterPriority !== "all"
-                      ? "text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Filter className="h-3.5 w-3.5" />
-                </button>
+                </div>
               </div>
-            </div>
 
-            {/* Interval */}
-            <Popover open={intervalOpen} onOpenChange={setIntervalOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  className={cn(
+              {/* Interval */}
+              <Popover open={intervalOpen} onOpenChange={setIntervalOpen}>
+                <PopoverTrigger asChild>
+                  <button className={cn(
                     "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
-                    (dateFrom || dateTo)
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "border-border hover:border-primary/80 hover:bg-primary/5"
-                  )}
-                >
-                  <CalendarRange className="size-4" />
-                  <span className="text-xs font-medium">Intervalo</span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-3" align="start">
-                <Calendar mode="range" locale={ptBR} showOutsideDays={false}
-                  selected={{ from: customFrom, to: customTo }}
-                  onSelect={handleIntervalSelect}
-                  className="pointer-events-auto"
-                  formatters={{ formatCaption: (date) => { const m = format(date, "LLLL", { locale: ptBR }); const cap = m.charAt(0).toUpperCase() + m.slice(1); const y = format(date, "yyyy"); return dateFormat === "YYYY/MM/DD" ? `${y} ${cap}` : `${cap} ${y}`; } }} />
-                <div className="space-y-2 border-t border-border/30 pt-3 pr-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold w-8 shrink-0">De:</span>
-                    <Input value={dateFrom}
-                      onChange={(e) => setDateFrom(normalizeDateInput(e.target.value))}
-                      onBlur={() => { const d = parseDMY(dateFrom); if (d) { setCustomFrom(d); setDateFrom(format(d, "dd/MM/yyyy")); } }}
-                      placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
+                    (dateFrom || dateTo) ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/80 hover:bg-primary/5"
+                  )}>
+                    <CalendarRange className="size-4" />
+                    <span className="text-xs font-medium">Intervalo</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-3" align="start">
+                  <Calendar mode="range" locale={ptBR} showOutsideDays={false}
+                    selected={{ from: customFrom, to: customTo }}
+                    onSelect={handleIntervalSelect}
+                    className="pointer-events-auto"
+                    formatters={{ formatCaption: (date) => { const m = format(date, "LLLL", { locale: ptBR }); const cap = m.charAt(0).toUpperCase() + m.slice(1); const y = format(date, "yyyy"); return dateFormat === "YYYY/MM/DD" ? `${y} ${cap}` : `${cap} ${y}`; } }} />
+                  <div className="space-y-2 border-t border-border/30 pt-3 pr-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold w-8 shrink-0">De:</span>
+                      <Input value={dateFrom} onChange={(e) => setDateFrom(normalizeDateInput(e.target.value))}
+                        onBlur={() => { const d = parseDMY(dateFrom); if (d) { setCustomFrom(d); setDateFrom(format(d, "dd/MM/yyyy")); } }}
+                        placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold w-8 shrink-0">Até:</span>
+                      <Input value={dateTo} onChange={(e) => setDateTo(normalizeDateInput(e.target.value))}
+                        onBlur={() => { const d = parseDMY(dateTo); if (d) { setCustomTo(d); setDateTo(format(d, "dd/MM/yyyy")); } }}
+                        placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold w-8 shrink-0">Até:</span>
-                    <Input value={dateTo}
-                      onChange={(e) => setDateTo(normalizeDateInput(e.target.value))}
-                      onBlur={() => { const d = parseDMY(dateTo); if (d) { setCustomTo(d); setDateTo(format(d, "dd/MM/yyyy")); } }}
-                      placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
+                  <div className="flex justify-end">
+                    <button onClick={handleClearInterval}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
+                      style={{ minWidth: 80, height: 32 }}>Limpar</button>
                   </div>
-                </div>
-                <div className="flex justify-end">
-                  <button onClick={handleClearInterval}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
-                    style={{ minWidth: 80, height: 32 }}>Limpar</button>
-                </div>
-              </PopoverContent>
-            </Popover>
+                </PopoverContent>
+              </Popover>
 
-            {/* Hoje toggle */}
-            <button
-              onClick={() => {
-                const today = new Date();
-                const todayStr = format(today, "dd/MM/yyyy");
-                if (dateFrom === todayStr && dateTo === todayStr) {
-                  handleClearInterval();
-                } else {
-                  setCustomFrom(today); setCustomTo(today);
-                  setDateFrom(todayStr); setDateTo(todayStr);
-                }
-              }}
-              className={cn(
-                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
-                dateFrom === format(new Date(), "dd/MM/yyyy") && dateTo === format(new Date(), "dd/MM/yyyy")
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border hover:border-primary/80 hover:bg-primary/5"
-              )}
-            >
-              <CalendarDays className="size-4" />
-              <span className="text-xs font-medium">Hoje</span>
-            </button>
+              {/* Hoje toggle */}
+              <button
+                onClick={() => {
+                  const today = new Date();
+                  const todayStr = format(today, "dd/MM/yyyy");
+                  if (dateFrom === todayStr && dateTo === todayStr) {
+                    handleClearInterval();
+                  } else {
+                    setCustomFrom(today); setCustomTo(today);
+                    setDateFrom(todayStr); setDateTo(todayStr);
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                  dateFrom === format(new Date(), "dd/MM/yyyy") && dateTo === format(new Date(), "dd/MM/yyyy")
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border hover:border-primary/80 hover:bg-primary/5"
+                )}
+              >
+                <CalendarDays className="size-4" />
+                <span className="text-xs font-medium">Hoje</span>
+              </button>
 
-            {/* Criar EAP */}
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <button onClick={() => setEapOpen(true)}
-                  className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:border-primary/80 hover:text-primary hover:bg-primary/5 transition-all duration-200 shrink-0">
-                  <Layers className="size-4" />
-                  <span>EAP</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Estrutura Analítica do Projeto</TooltipContent>
-            </Tooltip>
+              {/* EAP */}
+              <Tooltip delayDuration={200}>
+                <TooltipTrigger asChild>
+                  <button onClick={() => setEapOpen(true)}
+                    className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:border-primary/80 hover:text-primary hover:bg-primary/5 transition-all duration-200 shrink-0">
+                    <Layers className="size-4" />
+                    <span>EAP</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Estrutura Analítica do Projeto</TooltipContent>
+              </Tooltip>
 
-            {/* Export/Print */}
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <button onClick={handleExportCSV} className="text-muted-foreground hover:text-primary transition-colors">
-                  <FileUp className="h-5 w-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Exportar CSV</TooltipContent>
-            </Tooltip>
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors">
-                  <Printer className="h-5 w-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Imprimir</TooltipContent>
-            </Tooltip>
-          </div>
+              {/* Export/Print */}
+              <Tooltip delayDuration={200}>
+                <TooltipTrigger asChild>
+                  <button onClick={handleExportCSV} className="text-muted-foreground hover:text-primary transition-colors">
+                    <FileUp className="h-5 w-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Exportar CSV</TooltipContent>
+              </Tooltip>
+              <Tooltip delayDuration={200}>
+                <TooltipTrigger asChild>
+                  <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors">
+                    <Printer className="h-5 w-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Imprimir</TooltipContent>
+              </Tooltip>
+            </div>
+          )}
         </div>
 
         {/* Advanced Filter Panel */}
-        {advancedFilterOpen && (
+        {activeTab !== "indicadores" && advancedFilterOpen && (
           <div className="my-4 space-y-4">
             <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Filter className="h-3.5 w-3.5" /> Filtros Avançados
                 </p>
-                <button
-                  onClick={() => { setFilterStatus("all"); setFilterPriority("all"); }}
-                  className="text-[10px] text-muted-foreground hover:text-primary underline"
-                >
-                  Limpar filtros
-                </button>
+                <button onClick={() => { setFilterStatus("all"); setFilterPriority("all"); }}
+                  className="text-[10px] text-muted-foreground hover:text-primary underline">Limpar filtros</button>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                 <div>
@@ -790,8 +1002,10 @@ export default function ProjectsView() {
           </div>
         )}
 
-        {/* Desktop Table / Mobile Cards */}
-        {isMobile ? (
+        {/* Content */}
+        {activeTab === "indicadores" ? (
+          renderIndicadores()
+        ) : isMobile ? (
           <div className="space-y-2">
             {filtered.length === 0 && (
               <p className="text-center text-muted-foreground/50 text-sm py-12">Nenhum projeto nesta aba</p>
@@ -816,17 +1030,20 @@ export default function ProjectsView() {
                   <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("name")}>
                     Nome <SortIcon field="name" />
                   </th>
+                  <th className="text-left py-2.5 px-3 cursor-pointer select-none w-32" onClick={() => toggleSort("responsible")}>
+                    Responsável <SortIcon field="responsible" />
+                  </th>
                   <th className="text-left py-2.5 px-3 cursor-pointer select-none w-32" onClick={() => toggleSort("status")}>
                     Status <SortIcon field="status" />
                   </th>
                   <th className="text-left py-2.5 px-3 cursor-pointer select-none w-28" onClick={() => toggleSort("priority")}>
                     Prioridade <SortIcon field="priority" />
                   </th>
+                  <th className="text-center py-2.5 px-2 cursor-pointer select-none w-24" onClick={() => toggleSort("week_priority")}>
+                    <Star className="h-3 w-3 inline" /> <SortIcon field="week_priority" />
+                  </th>
                   <th className="text-left py-2.5 px-3 cursor-pointer select-none w-28" onClick={() => toggleSort("target_date")}>
                     Data <SortIcon field="target_date" />
-                  </th>
-                  <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("observation")}>
-                    Observação <SortIcon field="observation" />
                   </th>
                   <th className="w-24 py-2.5 px-1">
                     {selectedIds.size > 0 ? (
@@ -856,7 +1073,7 @@ export default function ProjectsView() {
               </thead>
               <tbody>
                 {filtered.length === 0 && (
-                  <tr><td colSpan={7} className="text-center text-muted-foreground/40 py-12">
+                  <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">
                     Nenhum projeto nesta aba
                   </td></tr>
                 )}
@@ -871,7 +1088,7 @@ export default function ProjectsView() {
               </tbody>
               <tfoot className="sticky bottom-0 bg-card border-t border-border">
                 <tr>
-                  <td colSpan={7} className="py-2 px-4">
+                  <td colSpan={8} className="py-2 px-4">
                     <span className="text-xs text-muted-foreground">
                       Selecionados: {selectedIds.size.toLocaleString("pt-BR")}
                     </span>
@@ -883,20 +1100,38 @@ export default function ProjectsView() {
         )}
       </div>
 
-      {/* FAB */}
-      <button
-        onClick={() => { resetForm(); setDialogOpen(true); }}
-        className={cn(
-          "fixed z-50 flex h-14 w-14 items-center justify-center rounded-full",
-          "bottom-20 right-4 md:bottom-6 md:right-6",
-          "bg-primary text-primary-foreground shadow-lg",
-          "transition-all duration-200 hover:scale-110 hover:shadow-xl",
-          "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+      {/* FAB with menu */}
+      <div className="fixed z-50 bottom-20 right-4 md:bottom-6 md:right-6">
+        {fabOpen && (
+          <div className="mb-2 flex flex-col gap-1.5 animate-in slide-in-from-bottom-2 duration-200">
+            <button onClick={() => { setFabOpen(false); resetForm(); setDialogOpen(true); }}
+              className="flex items-center gap-2 rounded-full bg-card border border-border shadow-lg px-4 py-2 text-xs font-medium hover:bg-muted/50 transition-colors">
+              <FolderKanban className="h-3.5 w-3.5 text-primary" /> Novo Projeto
+            </button>
+            <button onClick={() => { setFabOpen(false); window.dispatchEvent(new CustomEvent("lovable:open-fab-event", { detail: { type: "project" } })); }}
+              className="flex items-center gap-2 rounded-full bg-card border border-border shadow-lg px-4 py-2 text-xs font-medium hover:bg-muted/50 transition-colors">
+              <CheckCircle2 className="h-3.5 w-3.5 text-[hsl(var(--success))]" /> Nova Tarefa
+            </button>
+            <button onClick={() => { setFabOpen(false); window.dispatchEvent(new CustomEvent("lovable:open-team-modal")); }}
+              className="flex items-center gap-2 rounded-full bg-card border border-border shadow-lg px-4 py-2 text-xs font-medium hover:bg-muted/50 transition-colors">
+              <Users className="h-3.5 w-3.5 text-pink-500" /> Nova Equipe
+            </button>
+          </div>
         )}
-        aria-label="Novo projeto"
-      >
-        <Plus className="h-7 w-7" />
-      </button>
+        <button
+          onClick={() => setFabOpen(!fabOpen)}
+          className={cn(
+            "flex h-14 w-14 items-center justify-center rounded-full",
+            "bg-primary text-primary-foreground shadow-lg",
+            "transition-all duration-200 hover:scale-110 hover:shadow-xl",
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            fabOpen && "rotate-45"
+          )}
+          aria-label="Novo lançamento"
+        >
+          <Plus className="h-7 w-7" />
+        </button>
+      </div>
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) { setDialogOpen(false); resetForm(); } }}>
@@ -940,6 +1175,21 @@ export default function ProjectsView() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Responsável</Label>
+                <Input value={formResponsible} onChange={(e) => setFormResponsible(e.target.value)}
+                  placeholder="Nome do responsável" className="text-xs" />
+                {uniqueResponsibles.length > 0 && !formResponsible && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {uniqueResponsibles.slice(0, 5).map(r => (
+                      <button key={r} onClick={() => setFormResponsible(r)}
+                        className="text-[10px] bg-muted rounded-full px-2 py-0.5 hover:bg-muted/80 transition-colors">
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
