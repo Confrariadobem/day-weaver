@@ -1908,6 +1908,124 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
             {/* Batch actions bar removed — icons now in table header */}
 
+            {/* Advanced Filter Panel */}
+            {advancedFilterOpen && (
+              <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Filter className="h-3.5 w-3.5" /> Filtros Avançados
+                  </p>
+                  <button
+                    onClick={() => {
+                      setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
+                      setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
+                      setFilterIsFixed("all"); setFilterCounterpart("");
+                    }}
+                    className="text-[10px] text-muted-foreground hover:text-primary underline"
+                  >
+                    Limpar filtros
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Tipo</Label>
+                    <Select value={filterType} onValueChange={setFilterType}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="revenue">🟢 Receita</SelectItem>
+                        <SelectItem value="expense">🔴 Despesa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Categoria</Label>
+                    <Select value={filterCategoryId || "__all__"} onValueChange={(v) => setFilterCategoryId(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todas</SelectItem>
+                        {sortedFinCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Centro de Custo</Label>
+                    <Select value={filterCostCenterId || "__all__"} onValueChange={(v) => setFilterCostCenterId(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todos</SelectItem>
+                        {costCenters.map((cc: any) => (
+                          <SelectItem key={cc.id} value={cc.id}>
+                            <span className="flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color }} />
+                              {cc.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Projeto</Label>
+                    <Select value={filterProjectId || "__all__"} onValueChange={(v) => setFilterProjectId(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todos</SelectItem>
+                        {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Carteira</Label>
+                    <Select value={filterAccountId || "__all__"} onValueChange={(v) => setFilterAccountId(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todas</SelectItem>
+                        {accounts.filter(a => a.is_active).map(a => (
+                          <SelectItem key={a.id} value={a.id}>
+                            <span className="flex items-center gap-1.5">
+                              {ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon}
+                              {a.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Forma de Pagamento</Label>
+                    <Select value={filterPaymentMethod || "__all__"} onValueChange={(v) => setFilterPaymentMethod(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todas</SelectItem>
+                        {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Conta Fixa</Label>
+                    <Select value={filterIsFixed} onValueChange={setFilterIsFixed}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="yes">Sim</SelectItem>
+                        <SelectItem value="no">Não</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Contraparte</Label>
+                    <Input
+                      value={filterCounterpart}
+                      onChange={(e) => setFilterCounterpart(e.target.value)}
+                      placeholder="Filtrar..."
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Entry edit dialog */}
             <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
               {renderEntryDialog()}
