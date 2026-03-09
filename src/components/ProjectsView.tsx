@@ -18,18 +18,17 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Plus, Pencil, CheckCircle2, Trash2, CalendarDays, Search, X,
-  FolderKanban, Sparkles, Archive, ChevronDown, ChevronUp, ChevronRight,
-  FileUp, FileDown, Printer, CalendarRange, Filter, Save, Layers,
-  Star, Users, BarChart3, TrendingUp, Clock, AlertTriangle,
+  FolderKanban, Sparkles, ChevronDown, ChevronUp, ChevronRight,
+  Filter, Save, Layers, Star, Users,
 } from "lucide-react";
 import { format, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "@/hooks/use-toast";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 
-type ProjectTab = "indicadores" | "andamento" | "desejos" | "concluidos";
+
+type ProjectTab = "andamento" | "backlog";
 type ProjectStatus = "pendente" | "em_andamento" | "feito";
 type Priority = "alta" | "media" | "baixa";
 type WeekPriority = "hoje" | "essa_semana" | "proxima" | "adiar" | null;
@@ -72,7 +71,7 @@ const WEEK_PRIORITY_LABELS: Record<string, { label: string; className: string }>
 const PRIORITY_ORDER: Record<Priority, number> = { alta: 0, media: 1, baixa: 2 };
 const WEEK_PRIORITY_ORDER: Record<string, number> = { hoje: 0, essa_semana: 1, proxima: 2, adiar: 3 };
 
-const PIE_COLORS = ["hsl(var(--primary))", "hsl(var(--destructive))", "hsl(var(--success))", "#f59e0b", "#8b5cf6", "#06b6d4"];
+
 
 function mapStatus(dbStatus: string | null): ProjectStatus {
   if (!dbStatus) return "pendente";
@@ -115,7 +114,7 @@ export default function ProjectsView() {
   const { user } = useAuth();
   const { formatDate: fmtDate, dateFormat } = useDateFormat();
   const isMobile = useIsMobile();
-  const [activeTab, setActiveTab] = useState<ProjectTab>("indicadores");
+  const [activeTab, setActiveTab] = useState<ProjectTab>("andamento");
   const [rawProjects, setRawProjects] = useState<any[]>([]);
 
   // Local week_priority state (not persisted to DB yet, stored in memory)
@@ -222,54 +221,12 @@ export default function ProjectsView() {
     return Math.round((done / children.length) * 100);
   };
 
-  // ─── Indicadores data ───────────────────────────────────────────────────
-  const indicadoresData = useMemo(() => {
-    const total = allItems.length;
-    const done = allItems.filter(i => i.status === "feito").length;
-    const inProgress = allItems.filter(i => i.status === "em_andamento").length;
-    const pending = allItems.filter(i => i.status === "pendente").length;
-    const overdue = allItems.filter(i => {
-      if (!i.target_date || i.status === "feito") return false;
-      return new Date(i.target_date) < new Date();
-    }).length;
-    const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
-
-    // By responsible
-    const byResponsible: Record<string, number> = {};
-    allItems.forEach(i => {
-      const r = i.responsible || "Sem responsável";
-      byResponsible[r] = (byResponsible[r] || 0) + 1;
-    });
-    const responsibleData = Object.entries(byResponsible).map(([name, value]) => ({ name, value }));
-
-    // Status distribution
-    const statusData = [
-      { name: "Pendente", value: pending, fill: "#f59e0b" },
-      { name: "Em andamento", value: inProgress, fill: "hsl(var(--primary))" },
-      { name: "Concluído", value: done, fill: "hsl(var(--success))" },
-    ].filter(d => d.value > 0);
-
-    // Priority distribution
-    const alta = allItems.filter(i => i.priority === "alta").length;
-    const media = allItems.filter(i => i.priority === "media").length;
-    const baixa = allItems.filter(i => i.priority === "baixa").length;
-    const priorityData = [
-      { name: "Alta", value: alta },
-      { name: "Média", value: media },
-      { name: "Baixa", value: baixa },
-    ];
-
-    return { total, done, inProgress, pending, overdue, progressPct, responsibleData, statusData, priorityData };
-  }, [allItems]);
-
   // Filter by tab (for list tabs)
   const tabFiltered = useMemo(() => {
-    if (activeTab === "indicadores") return hierarchy;
     return hierarchy.filter(p => {
       const eff = getEffectiveStatus(p);
-      if (activeTab === "andamento") return eff === "pendente" || eff === "em_andamento";
-      if (activeTab === "desejos") return eff === "pendente";
-      return eff === "feito";
+      if (activeTab === "andamento") return eff === "em_andamento" || eff === "pendente";
+      return eff === "pendente"; // backlog
     });
   }, [hierarchy, activeTab]);
 
@@ -469,10 +426,8 @@ export default function ProjectsView() {
   }, [allItems]);
 
   const tabConfig: { key: ProjectTab; label: string; icon: React.ReactNode }[] = [
-    { key: "indicadores", label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
     { key: "andamento", label: "Em Andamento", icon: <FolderKanban className="h-3 w-3" /> },
-    { key: "desejos", label: "Desejos", icon: <Sparkles className="h-3 w-3" /> },
-    { key: "concluidos", label: "Concluídos", icon: <Archive className="h-3 w-3" /> },
+    { key: "backlog", label: "Backlog", icon: <Sparkles className="h-3 w-3" /> },
   ];
 
   const highlightMatch = (text: string, query: string) => {
@@ -539,290 +494,109 @@ export default function ProjectsView() {
     );
   };
 
-  // Render table row
-  const renderRow = (item: ProjectItem, isChild: boolean, parent?: ProjectItem & { children: ProjectItem[] }) => {
+  // ─── Show completed toggle ─────────────────────────────────────────
+  const [showCompleted, setShowCompleted] = useState(false);
+
+  const completedItems = useMemo(() => {
+    return hierarchy.filter(p => getEffectiveStatus(p) === "feito");
+  }, [hierarchy]);
+
+  // ─── Card renderer (unified for desktop & mobile) ─────────────────
+  const renderProjectCard = (item: ProjectItem, isChild: boolean) => {
     const hasChildren = !isChild && (hierarchy.find(h => h.id === item.id)?.children.length || 0) > 0;
     const isExpanded = expandedIds.has(item.id);
     const children = hierarchy.find(h => h.id === item.id)?.children || [];
     const progress = getProgress(children);
+    const isOverdue = item.target_date && item.status !== "feito" && new Date(item.target_date) < new Date();
 
     return (
-      <tr
-        key={item.id}
-        className={cn(
-          "group transition-colors hover:bg-primary/5",
-          "border-t border-border/10",
-          item.status === "feito" && "opacity-60",
-        )}
-      >
-        <td className="py-2.5 px-2">
-          <Checkbox
-            checked={selectedIds.has(item.id)}
-            onCheckedChange={(c) => {
-              setSelectedIds(prev => {
-                const next = new Set(prev);
-                if (c) next.add(item.id); else next.delete(item.id);
-                return next;
-              });
-            }}
-            className="h-3.5 w-3.5"
-          />
-        </td>
-        <td className="py-2.5 px-3">
-          <div className="flex items-center gap-1.5" style={{ paddingLeft: isChild ? 30 : 0 }}>
+      <div key={item.id} className={cn("space-y-0", isChild && "ml-5")}>
+        <div
+          className={cn(
+            "group relative rounded-xl border bg-card transition-all duration-200 hover:shadow-md hover:border-primary/30",
+            isChild ? "border-border/20" : "border-border/40",
+            item.status === "feito" && "opacity-50",
+          )}
+          style={{ minHeight: isChild ? 72 : 100 }}
+        >
+          <div className="flex items-center gap-3 p-4">
+            {/* Checkbox to complete */}
+            <button
+              onClick={() => item.status !== "feito" ? markComplete(item) : undefined}
+              className={cn(
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                item.status === "feito"
+                  ? "bg-[hsl(var(--success))] border-[hsl(var(--success))] text-primary-foreground"
+                  : "border-muted-foreground/30 hover:border-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)]"
+              )}
+            >
+              {item.status === "feito" && <CheckCircle2 className="h-3.5 w-3.5" />}
+            </button>
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className={cn("text-sm font-semibold text-foreground truncate", item.status === "feito" && "line-through text-muted-foreground")}>
+                  {highlightMatch(item.name, searchQuery)}
+                </span>
+                <StarPriority item={item} />
+              </div>
+              {item.observation && (
+                <p className="text-xs text-muted-foreground truncate mt-0.5 max-w-[400px]">{item.observation}</p>
+              )}
+              {/* Meta row */}
+              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                {item.responsible && (
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold shrink-0">
+                      {item.responsible.charAt(0).toUpperCase()}
+                    </div>
+                    {item.responsible}
+                  </span>
+                )}
+                {item.target_date && (
+                  <span className={cn("flex items-center gap-1 text-xs", isOverdue ? "text-destructive font-medium" : "text-muted-foreground")}>
+                    <CalendarDays className="h-3 w-3" />
+                    {formatDateDisplay(item.target_date)}
+                  </span>
+                )}
+                <span className={cn("text-[10px] font-medium uppercase tracking-wide", PRIORITY_LABELS[item.priority].className)}>
+                  {PRIORITY_LABELS[item.priority].label}
+                </span>
+                {hasChildren && (
+                  <div className="flex items-center gap-1.5">
+                    <Progress value={progress} className="h-1.5 w-16" />
+                    <span className="text-[10px] text-muted-foreground tabular-nums">{progress}%</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Expand button for children */}
             {hasChildren && (
-              <button onClick={() => toggleExpand(item.id)} className="p-0.5 rounded hover:bg-muted/30 transition-colors">
-                <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", isExpanded && "rotate-90")} />
+              <button onClick={() => toggleExpand(item.id)} className="p-1 rounded-lg hover:bg-muted/50 transition-colors shrink-0">
+                <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200", isExpanded && "rotate-180")} />
               </button>
             )}
-            {!hasChildren && !isChild && <span className="w-[18px]" />}
-            <span className="text-xs font-bold text-foreground truncate max-w-[200px]">
-              {highlightMatch(item.name, searchQuery)}
-            </span>
-            {hasChildren && (
-              <div className="flex items-center gap-1.5 ml-2">
-                <Progress value={progress} className="h-1.5 w-16" />
-                <span className="text-[10px] text-muted-foreground">{progress}%</span>
-              </div>
-            )}
-          </div>
-        </td>
-        <td className="py-2.5 px-3">
-          <div className="flex items-center gap-1.5">
-            {item.responsible ? (
-              <>
-                <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold shrink-0">
-                  {item.responsible.charAt(0).toUpperCase()}
-                </div>
-                <span className="text-xs text-muted-foreground truncate max-w-[100px]">{item.responsible}</span>
-              </>
-            ) : (
-              <span className="text-xs text-muted-foreground/40">—</span>
-            )}
-          </div>
-        </td>
-        <td className="py-2.5 px-3">
-          <span className={cn("text-xs font-medium", STATUS_LABELS[item.status].className)}>
-            {STATUS_LABELS[item.status].label}
-          </span>
-        </td>
-        <td className="py-2.5 px-3">
-          <span className={cn("text-xs font-medium", PRIORITY_LABELS[item.priority].className)}>
-            {PRIORITY_LABELS[item.priority].label}
-          </span>
-        </td>
-        <td className="py-2.5 px-2 text-center">
-          <StarPriority item={item} />
-          {item.week_priority && (
-            <span className={cn("text-[9px] block", WEEK_PRIORITY_LABELS[item.week_priority].className)}>
-              {WEEK_PRIORITY_LABELS[item.week_priority].label}
-            </span>
-          )}
-        </td>
-        <td className="py-2.5 px-3 text-xs text-muted-foreground tabular-nums">
-          {formatDateDisplay(item.target_date)}
-        </td>
-        <td className="py-2.5 px-1 w-24 no-print">
-          <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
-            {item.status !== "feito" && (
-              <Tooltip delayDuration={200}>
-                <TooltipTrigger asChild>
-                  <button onClick={() => markComplete(item)}
-                    className="rounded p-0.5 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] transition-colors">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent className="text-xs">Concluir</TooltipContent>
-              </Tooltip>
-            )}
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <button onClick={() => openDialog(item)}
-                  className="rounded p-0.5 text-foreground hover:text-foreground/80 transition-colors">
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="text-xs">Editar</TooltipContent>
-            </Tooltip>
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <button onClick={() => setDeleteId(item.id)}
-                  className="rounded p-0.5 text-destructive hover:text-destructive/80 transition-colors">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="text-xs">Excluir</TooltipContent>
-            </Tooltip>
-          </div>
-        </td>
-      </tr>
-    );
-  };
 
-  // Mobile card renderer
-  const renderCard = (item: ProjectItem, isChild: boolean) => {
-    const hasChildren = !isChild && (hierarchy.find(h => h.id === item.id)?.children.length || 0) > 0;
-    const isExpanded = expandedIds.has(item.id);
-    const children = hierarchy.find(h => h.id === item.id)?.children || [];
-    const progress = getProgress(children);
-
-    return (
-      <div key={item.id} className={cn("rounded-lg border border-border/30 p-3 space-y-2", isChild && "ml-4 border-l-2 border-l-primary/20")}>
-        <div className="flex items-start gap-2">
-          <Checkbox
-            checked={selectedIds.has(item.id)}
-            onCheckedChange={(c) => {
-              setSelectedIds(prev => {
-                const next = new Set(prev);
-                if (c) next.add(item.id); else next.delete(item.id);
-                return next;
-              });
-            }}
-            className="h-3.5 w-3.5 mt-0.5"
-          />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              {hasChildren && (
-                <button onClick={() => toggleExpand(item.id)} className="p-0.5">
-                  <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", isExpanded && "rotate-90")} />
-                </button>
-              )}
-              <span className="text-sm font-bold text-foreground truncate">{item.name}</span>
-              <StarPriority item={item} />
+            {/* Hover actions */}
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <button onClick={() => openDialog(item)} className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button onClick={() => setDeleteId(item.id)} className="rounded-lg p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </div>
-            {hasChildren && (
-              <div className="flex items-center gap-1.5 mt-1">
-                <Progress value={progress} className="h-1.5 flex-1" />
-                <span className="text-[10px] text-muted-foreground">{progress}%</span>
-              </div>
-            )}
           </div>
         </div>
-        <div className="flex items-center gap-3 text-xs flex-wrap">
-          <span className={cn("font-medium", STATUS_LABELS[item.status].className)}>{STATUS_LABELS[item.status].label}</span>
-          <span className={cn("font-medium", PRIORITY_LABELS[item.priority].className)}>{PRIORITY_LABELS[item.priority].label}</span>
-          <span className="text-muted-foreground tabular-nums">{formatDateDisplay(item.target_date)}</span>
-          {item.responsible && (
-            <span className="text-muted-foreground flex items-center gap-1">
-              <Users className="h-3 w-3" /> {item.responsible}
-            </span>
-          )}
-        </div>
-        {item.observation && <p className="text-xs text-muted-foreground truncate">{item.observation}</p>}
-        <div className="flex items-center gap-1 justify-end">
-          {item.status !== "feito" && (
-            <button onClick={() => markComplete(item)} className="rounded p-1 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)]">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <button onClick={() => openDialog(item)} className="rounded p-1 text-foreground hover:text-foreground/80">
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={() => setDeleteId(item.id)} className="rounded p-1 text-destructive hover:text-destructive/80">
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        {hasChildren && isExpanded && children.map(c => renderCard(c, true))}
-      </div>
-    );
-  };
 
-  // ─── Indicadores View ─────────────────────────────────────────────────────
-  const renderIndicadores = () => {
-    const { total, done, inProgress, pending, overdue, progressPct, responsibleData, statusData, priorityData } = indicadoresData;
-
-    const summaryCards = [
-      { label: "Total", value: total, icon: <FolderKanban className="h-4 w-4" />, color: "text-primary" },
-      { label: "Concluídos", value: done, icon: <CheckCircle2 className="h-4 w-4" />, color: "text-[hsl(var(--success))]" },
-      { label: "Em Andamento", value: inProgress, icon: <TrendingUp className="h-4 w-4" />, color: "text-primary" },
-      { label: "Atrasados", value: overdue, icon: <AlertTriangle className="h-4 w-4" />, color: "text-destructive" },
-    ];
-
-    return (
-      <div className="space-y-4 px-1">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {summaryCards.map(c => (
-            <Card key={c.label} className="border-border/30">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className={cn("shrink-0", c.color)}>{c.icon}</div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">{c.value}</p>
-                  <p className="text-[11px] text-muted-foreground">{c.label}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Progress bar */}
-        <Card className="border-border/30">
-          <CardContent className="p-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold">Progresso Geral</p>
-              <span className="text-sm font-bold text-foreground">{progressPct}%</span>
-            </div>
-            <Progress value={progressPct} className="h-2" />
-            <p className="text-[11px] text-muted-foreground">{done} de {total} projetos concluídos</p>
-          </CardContent>
-        </Card>
-
-        {/* Charts row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {/* Status Pie */}
-          <Card className="border-border/30">
-            <CardContent className="p-4">
-              <p className="text-xs font-semibold mb-3">Distribuição por Status</p>
-              {statusData.length > 0 ? (
-                <div className="flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height={180}>
-                    <PieChart>
-                      <Pie data={statusData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value" paddingAngle={2}>
-                        {statusData.map((entry, idx) => (
-                          <Cell key={idx} fill={entry.fill} />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground text-center py-8">Sem dados</p>
-              )}
-              <div className="flex items-center justify-center gap-4 mt-2">
-                {statusData.map(d => (
-                  <div key={d.name} className="flex items-center gap-1.5">
-                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: d.fill }} />
-                    <span className="text-[10px] text-muted-foreground">{d.name} ({d.value})</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Responsible Bar */}
-          <Card className="border-border/30">
-            <CardContent className="p-4">
-              <p className="text-xs font-semibold mb-3">Distribuição por Responsável</p>
-              {responsibleData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={responsibleData} layout="vertical" margin={{ left: 0, right: 16 }}>
-                    <XAxis type="number" tick={{ fontSize: 10 }} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
-                    <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                      {responsibleData.map((_, idx) => (
-                        <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <p className="text-xs text-muted-foreground text-center py-8">Sem dados</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        {/* Children (subtasks) */}
+        {hasChildren && isExpanded && (
+          <div className="space-y-1.5 mt-1.5 pl-2 border-l-2 border-primary/15 ml-3">
+            {children.map(c => renderProjectCard(c, true))}
+          </div>
+        )}
       </div>
     );
   };
@@ -830,7 +604,7 @@ export default function ProjectsView() {
   return (
     <ScrollArea className="h-full">
       <div className={cn("p-4 space-y-4 max-w-full overflow-hidden", isMobile && "px-3")}>
-        {/* Tab buttons + Toolbar on same line */}
+        {/* Tab buttons + Toolbar */}
         <div className="bg-card border-b border-border py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto">
           <div className="flex items-center gap-1.5 shrink-0">
             {tabConfig.map(tab => (
@@ -843,260 +617,84 @@ export default function ProjectsView() {
               </Button>
             ))}
           </div>
-          {activeTab !== "indicadores" && (
-            <div className="ml-auto flex items-center gap-3">
-              {/* Search */}
-              <div className="relative" style={{ width: isMobile ? 200 : 400 }}>
-                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input placeholder="Buscar projetos..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-7 pl-8 pr-14 text-xs rounded-lg" />
-                <div className="absolute right-2 top-1 flex items-center gap-1">
-                  {searchQuery && (
-                    <button onClick={() => setSearchQuery("")} className="text-muted-foreground hover:text-foreground">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                  <button onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
-                    className={cn("rounded p-0.5 transition-colors",
-                      advancedFilterOpen || filterStatus !== "all" || filterPriority !== "all" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                    )}>
-                    <Filter className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
+          <div className="ml-auto flex items-center gap-3">
+            {/* Show completed toggle */}
+            <button
+              onClick={() => setShowCompleted(!showCompleted)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0 text-xs font-medium",
+                showCompleted
+                  ? "bg-[hsl(var(--success))] text-primary-foreground border-[hsl(var(--success))]"
+                  : "border-border text-muted-foreground hover:border-primary/80 hover:bg-primary/5"
+              )}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Concluídos {completedItems.length > 0 && `(${completedItems.length})`}
+            </button>
 
-              {/* Interval */}
-              <Popover open={intervalOpen} onOpenChange={setIntervalOpen}>
-                <PopoverTrigger asChild>
-                  <button className={cn(
-                    "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
-                    (dateFrom || dateTo) ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/80 hover:bg-primary/5"
-                  )}>
-                    <CalendarRange className="size-4" />
-                    <span className="text-xs font-medium">Intervalo</span>
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-3" align="start">
-                  <Calendar mode="range" locale={ptBR} showOutsideDays={false}
-                    selected={{ from: customFrom, to: customTo }}
-                    onSelect={handleIntervalSelect}
-                    className="pointer-events-auto"
-                    formatters={{ formatCaption: (date) => { const m = format(date, "LLLL", { locale: ptBR }); const cap = m.charAt(0).toUpperCase() + m.slice(1); const y = format(date, "yyyy"); return dateFormat === "YYYY/MM/DD" ? `${y} ${cap}` : `${cap} ${y}`; } }} />
-                  <div className="space-y-2 border-t border-border/30 pt-3 pr-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold w-8 shrink-0">De:</span>
-                      <Input value={dateFrom} onChange={(e) => setDateFrom(normalizeDateInput(e.target.value))}
-                        onBlur={() => { const d = parseDMY(dateFrom); if (d) { setCustomFrom(d); setDateFrom(format(d, "dd/MM/yyyy")); } }}
-                        placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold w-8 shrink-0">Até:</span>
-                      <Input value={dateTo} onChange={(e) => setDateTo(normalizeDateInput(e.target.value))}
-                        onBlur={() => { const d = parseDMY(dateTo); if (d) { setCustomTo(d); setDateTo(format(d, "dd/MM/yyyy")); } }}
-                        placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <button onClick={handleClearInterval}
-                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
-                      style={{ minWidth: 80, height: 32 }}>Limpar</button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-
-              {/* Hoje toggle */}
-              <button
-                onClick={() => {
-                  const today = new Date();
-                  const todayStr = format(today, "dd/MM/yyyy");
-                  if (dateFrom === todayStr && dateTo === todayStr) {
-                    handleClearInterval();
-                  } else {
-                    setCustomFrom(today); setCustomTo(today);
-                    setDateFrom(todayStr); setDateTo(todayStr);
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
-                  dateFrom === format(new Date(), "dd/MM/yyyy") && dateTo === format(new Date(), "dd/MM/yyyy")
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border hover:border-primary/80 hover:bg-primary/5"
-                )}
-              >
-                <CalendarDays className="size-4" />
-                <span className="text-xs font-medium">Hoje</span>
-              </button>
-
-              {/* EAP */}
-              <Tooltip delayDuration={200}>
-                <TooltipTrigger asChild>
-                  <button onClick={() => setEapOpen(true)}
-                    className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:border-primary/80 hover:text-primary hover:bg-primary/5 transition-all duration-200 shrink-0">
-                    <Layers className="size-4" />
-                    <span>EAP</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>Estrutura Analítica do Projeto</TooltipContent>
-              </Tooltip>
-
-              {/* Export/Print */}
-              <Tooltip delayDuration={200}>
-                <TooltipTrigger asChild>
-                  <button onClick={handleExportCSV} className="text-muted-foreground hover:text-primary transition-colors">
-                    <FileUp className="h-5 w-5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>Exportar CSV</TooltipContent>
-              </Tooltip>
-              <Tooltip delayDuration={200}>
-                <TooltipTrigger asChild>
-                  <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors">
-                    <Printer className="h-5 w-5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>Imprimir</TooltipContent>
-              </Tooltip>
+            {/* Search */}
+            <div className="relative" style={{ width: isMobile ? 160 : 260 }}>
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-7 pl-8 pr-7 text-xs rounded-lg" />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1.5 text-muted-foreground hover:text-foreground">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
-          )}
+
+            {/* EAP */}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={() => setEapOpen(true)}
+                  className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:border-primary/80 hover:text-primary hover:bg-primary/5 transition-all duration-200 shrink-0">
+                  <Layers className="size-4" />
+                  <span>EAP</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Estrutura Analítica do Projeto</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
 
-        {/* Advanced Filter Panel */}
-        {activeTab !== "indicadores" && advancedFilterOpen && (
-          <div className="my-4 space-y-4">
-            <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Filter className="h-3.5 w-3.5" /> Filtros Avançados
-                </p>
-                <button onClick={() => { setFilterStatus("all"); setFilterPriority("all"); }}
-                  className="text-[10px] text-muted-foreground hover:text-primary underline">Limpar filtros</button>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                <div>
-                  <Label className="text-[10px] text-muted-foreground">Status</Label>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="em_andamento">Em andamento</SelectItem>
-                      <SelectItem value="feito">Concluído</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-[10px] text-muted-foreground">Prioridade</Label>
-                  <Select value={filterPriority} onValueChange={setFilterPriority}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="alta">Alta</SelectItem>
-                      <SelectItem value="media">Média</SelectItem>
-                      <SelectItem value="baixa">Baixa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+        {/* Card list */}
+        <div className="flex flex-col items-center space-y-2.5">
+          {filtered.length === 0 && !showCompleted && (
+            <div className="text-center py-16">
+              <FolderKanban className="h-12 w-12 text-muted-foreground/20 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground/50">Nenhum projeto nesta aba</p>
+              <Button size="sm" variant="outline" className="mt-3 gap-1.5 text-xs" onClick={() => { resetForm(); setDialogOpen(true); }}>
+                <Plus className="h-3.5 w-3.5" /> Criar Projeto
+              </Button>
             </div>
-            <div className="border-t border-border/50" />
+          )}
+          {filtered.map(p => (
+            <div key={p.id} className="w-full" style={{ maxWidth: isMobile ? "100%" : "90%" }}>
+              {renderProjectCard(p, false)}
+            </div>
+          ))}
+        </div>
+
+        {/* Completed section */}
+        {showCompleted && completedItems.length > 0 && (
+          <div className="space-y-2.5 mt-6">
+            <div className="flex items-center gap-2 px-1">
+              <div className="h-px flex-1 bg-border/50" />
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Concluídos ({completedItems.length})</span>
+              <div className="h-px flex-1 bg-border/50" />
+            </div>
+            <div className="flex flex-col items-center space-y-2">
+              {completedItems.map(p => (
+                <div key={p.id} className="w-full" style={{ maxWidth: isMobile ? "100%" : "90%" }}>
+                  {renderProjectCard(p, false)}
+                </div>
+              ))}
+            </div>
           </div>
         )}
-
-        {/* Content */}
-        {activeTab === "indicadores" ? (
-          renderIndicadores()
-        ) : isMobile ? (
-          <div className="space-y-2">
-            {filtered.length === 0 && (
-              <p className="text-center text-muted-foreground/50 text-sm py-12">Nenhum projeto nesta aba</p>
-            )}
-            {filtered.map(p => renderCard(p, false))}
-          </div>
-        ) : (
-          <div className="rounded-lg overflow-auto max-h-[calc(100vh-256px)] border border-border/30">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-card border-b border-border">
-                <tr className="text-xs text-muted-foreground uppercase tracking-wider">
-                  <th className="py-2.5 px-2 w-8">
-                    <Checkbox
-                      checked={filtered.length > 0 && selectedIds.size === allFilteredIds.length}
-                      onCheckedChange={(c) => {
-                        if (c) setSelectedIds(new Set(allFilteredIds));
-                        else setSelectedIds(new Set());
-                      }}
-                      className="h-3.5 w-3.5"
-                    />
-                  </th>
-                  <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("name")}>
-                    Nome <SortIcon field="name" />
-                  </th>
-                  <th className="text-left py-2.5 px-3 cursor-pointer select-none w-32" onClick={() => toggleSort("responsible")}>
-                    Responsável <SortIcon field="responsible" />
-                  </th>
-                  <th className="text-left py-2.5 px-3 cursor-pointer select-none w-32" onClick={() => toggleSort("status")}>
-                    Status <SortIcon field="status" />
-                  </th>
-                  <th className="text-left py-2.5 px-3 cursor-pointer select-none w-28" onClick={() => toggleSort("priority")}>
-                    Prioridade <SortIcon field="priority" />
-                  </th>
-                  <th className="text-center py-2.5 px-2 cursor-pointer select-none w-24" onClick={() => toggleSort("week_priority")}>
-                    <Star className="h-3 w-3 inline" /> <SortIcon field="week_priority" />
-                  </th>
-                  <th className="text-left py-2.5 px-3 cursor-pointer select-none w-28" onClick={() => toggleSort("target_date")}>
-                    Data <SortIcon field="target_date" />
-                  </th>
-                  <th className="w-24 py-2.5 px-1">
-                    {selectedIds.size > 0 ? (
-                      <div className="flex items-center justify-center gap-0.5">
-                        <Tooltip delayDuration={200}>
-                          <TooltipTrigger asChild>
-                            <button onClick={handleBatchComplete}
-                              className="rounded p-0.5 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] transition-colors">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent className="text-xs">Concluir</TooltipContent>
-                        </Tooltip>
-                        <Tooltip delayDuration={200}>
-                          <TooltipTrigger asChild>
-                            <button onClick={handleBatchDelete}
-                              className="rounded p-0.5 text-destructive hover:text-destructive/80 transition-colors">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent className="text-xs">Excluir</TooltipContent>
-                        </Tooltip>
-                      </div>
-                    ) : null}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 && (
-                  <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">
-                    Nenhum projeto nesta aba
-                  </td></tr>
-                )}
-                {filtered.map(p => {
-                  const rows: React.ReactNode[] = [];
-                  rows.push(renderRow(p, false));
-                  if (expandedIds.has(p.id)) {
-                    p.children.forEach(c => rows.push(renderRow(c, true, p)));
-                  }
-                  return rows;
-                })}
-              </tbody>
-              <tfoot className="sticky bottom-0 bg-card border-t border-border">
-                <tr>
-                  <td colSpan={8} className="py-2 px-4">
-                    <span className="text-xs text-muted-foreground">
-                      Selecionados: {selectedIds.size.toLocaleString("pt-BR")}
-                    </span>
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+        {showCompleted && completedItems.length === 0 && (
+          <p className="text-center text-xs text-muted-foreground/40 py-6">Nenhum projeto concluído</p>
         )}
       </div>
 
