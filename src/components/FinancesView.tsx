@@ -1644,7 +1644,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       placeholder="DD/MM/AAAA" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
                   </div>
                 </div>
-                <div className="flex justify-end">
+                <div className="flex justify-between">
+                  <button onClick={() => {
+                    const today = new Date();
+                    const todayStr = format(today, "dd/MM/yyyy");
+                    setFluxoCustomFrom(today); setFluxoCustomTo(today);
+                    setFluxoDateFrom(todayStr); setFluxoDateTo(todayStr);
+                  }}
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
+                    style={{ minWidth: 80, height: 32 }}>Hoje</button>
                   <button onClick={handleClearFluxoInterval}
                     className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
                     style={{ minWidth: 80, height: 32 }}>Limpar</button>
