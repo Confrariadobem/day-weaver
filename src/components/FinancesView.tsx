@@ -2054,34 +2054,54 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td className="py-2.5 px-1 w-24 no-print">
                           <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
                             {!e.is_paid && (
-                              <button onClick={async (ev) => { ev.stopPropagation(); await togglePaid(e); }}
-                                className="rounded p-0.5 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] transition-colors">
-                                <Check className="h-3.5 w-3.5" />
-                              </button>
+                              <Tooltip delayDuration={200}>
+                                <TooltipTrigger asChild>
+                                  <button onClick={async (ev) => { ev.stopPropagation(); await togglePaid(e); }}
+                                    className="rounded p-0.5 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] transition-colors">
+                                    <Check className="h-3.5 w-3.5" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs text-muted-foreground">Baixar</TooltipContent>
+                              </Tooltip>
                             )}
-                            <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }}
-                              className="rounded p-0.5 text-foreground hover:text-foreground/80 transition-colors">
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                            <button onClick={async (ev) => {
-                              ev.stopPropagation();
-                              if (!user) return;
-                              await supabase.from("financial_entries").insert({
-                                user_id: user.id, title: e.title, amount: Number(e.amount), type: e.type,
-                                category_id: e.category_id || null, project_id: e.project_id || null,
-                                cost_center_id: e.cost_center_id || null, entry_date: e.entry_date,
-                                account_id: e.account_id || null, payment_method: e.payment_method || null,
-                                is_paid: false, counterpart: e.counterpart || null, is_fixed: e.is_fixed || false,
-                                description: e.description || null, currency: e.currency || "BRL",
-                              });
-                              fetchData();
-                            }} className="rounded p-0.5 text-muted-foreground hover:text-muted-foreground/80 transition-colors">
-                              <Copy className="h-3.5 w-3.5" />
-                            </button>
-                            <button onClick={(ev) => { ev.stopPropagation(); setDeleteEntryConfirm(e.id); }}
-                              className="rounded p-0.5 text-destructive hover:text-destructive/80 transition-colors">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            <Tooltip delayDuration={200}>
+                              <TooltipTrigger asChild>
+                                <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }}
+                                  className="rounded p-0.5 text-foreground hover:text-foreground/80 transition-colors">
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs text-muted-foreground">Editar</TooltipContent>
+                            </Tooltip>
+                            <Tooltip delayDuration={200}>
+                              <TooltipTrigger asChild>
+                                <button onClick={async (ev) => {
+                                  ev.stopPropagation();
+                                  if (!user) return;
+                                  await supabase.from("financial_entries").insert({
+                                    user_id: user.id, title: e.title, amount: Number(e.amount), type: e.type,
+                                    category_id: e.category_id || null, project_id: e.project_id || null,
+                                    cost_center_id: e.cost_center_id || null, entry_date: e.entry_date,
+                                    account_id: e.account_id || null, payment_method: e.payment_method || null,
+                                    is_paid: false, counterpart: e.counterpart || null, is_fixed: e.is_fixed || false,
+                                    description: e.description || null, currency: e.currency || "BRL",
+                                  });
+                                  fetchData();
+                                }} className="rounded p-0.5 text-muted-foreground hover:text-muted-foreground/80 transition-colors">
+                                  <Copy className="h-3.5 w-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs text-muted-foreground">Duplicar</TooltipContent>
+                            </Tooltip>
+                            <Tooltip delayDuration={200}>
+                              <TooltipTrigger asChild>
+                                <button onClick={(ev) => { ev.stopPropagation(); setDeleteEntryConfirm(e.id); }}
+                                  className="rounded p-0.5 text-destructive hover:text-destructive/80 transition-colors">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs text-muted-foreground">Excluir</TooltipContent>
+                            </Tooltip>
                           </div>
                         </td>
                       </tr>
