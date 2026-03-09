@@ -209,7 +209,7 @@ export default function DashboardView() {
     <ScrollArea className="h-full">
       <div className="p-4 pt-3 max-w-full overflow-hidden space-y-4">
         {/* Period filter buttons */}
-        <div className="sticky top-0 z-10 bg-card border-b border-border py-2 -mx-4 px-4 flex flex-row gap-2 overflow-x-auto pb-1">
+        <div className="bg-card border-b border-border py-2 -mx-4 px-4 flex flex-row gap-2 overflow-x-auto pb-1">
           {periodButtons.map(({ key, label, icon: Icon }) => (
             <Popover key={key} open={key === "custom" ? intervalOpen : undefined} onOpenChange={key === "custom" ? setIntervalOpen : undefined}>
               <PopoverTrigger asChild>
