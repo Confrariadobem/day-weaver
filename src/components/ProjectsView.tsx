@@ -712,6 +712,18 @@ export default function ProjectsView() {
               <span className="text-xs font-medium">Hoje</span>
             </button>
 
+            {/* Criar EAP */}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={() => setEapOpen(true)}
+                  className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:border-primary/80 hover:text-primary hover:bg-primary/5 transition-all duration-200 shrink-0">
+                  <Layers className="size-4" />
+                  <span>EAP</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Estrutura Analítica do Projeto</TooltipContent>
+            </Tooltip>
+
             {/* Export/Print */}
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
