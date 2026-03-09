@@ -331,8 +331,10 @@ export default function ProjectsView() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    // Delete children first
-    await supabase.from("projects").delete().eq("parent_id" as any, deleteId);
+    // Delete children first via RPC-style raw
+    const { data: children } = await supabase.from("projects").select("id").eq("user_id", user!.id);
+    const childIds = (children || []).filter((c: any) => c.parent_id === deleteId).map((c: any) => c.id);
+    if (childIds.length > 0) await supabase.from("projects").delete().in("id", childIds);
     await supabase.from("tasks").delete().eq("project_id", deleteId);
     await supabase.from("projects").delete().eq("id", deleteId);
     setDeleteId(null);
