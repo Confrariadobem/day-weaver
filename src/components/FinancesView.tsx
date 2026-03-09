@@ -1583,22 +1583,32 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 placeholder="DD/MM/AAAA" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
             </div>
           </div>
-          <div className="flex justify-between">
-            <button onClick={() => {
-              const today = new Date();
-              const todayStr = format(today, "dd/MM/yyyy");
-              setSharedCustomFrom(today); setSharedCustomTo(today);
-              setSharedDateFrom(todayStr); setSharedDateTo(todayStr);
-              setPeriodStart(format(today, "yyyy-MM-dd")); setPeriodEnd(format(today, "yyyy-MM-dd"));
-            }}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
-              style={{ minWidth: 80, height: 32 }}>Hoje</button>
+          <div className="flex justify-end">
             <button onClick={handleClearSharedInterval}
               className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors duration-200"
               style={{ minWidth: 80, height: 32 }}>Limpar</button>
           </div>
         </PopoverContent>
       </Popover>
+    );
+
+    const renderSharedHoje = () => (
+      <button
+        onClick={() => {
+          const today = new Date();
+          const todayStr = format(today, "dd/MM/yyyy");
+          setSharedCustomFrom(today); setSharedCustomTo(today);
+          setSharedDateFrom(todayStr); setSharedDateTo(todayStr);
+          setPeriodStart(format(today, "yyyy-MM-dd")); setPeriodEnd(format(today, "yyyy-MM-dd"));
+        }}
+        className={cn(
+          "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+          "border-border hover:border-primary/80 hover:bg-primary/5"
+        )}
+      >
+        <CalendarDays className="size-4" />
+        <span className="text-xs font-medium">Hoje</span>
+      </button>
     );
 
     return (
