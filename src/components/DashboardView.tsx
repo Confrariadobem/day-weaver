@@ -48,9 +48,7 @@ export default function DashboardView() {
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
-  const [showConversion, setShowConversion] = useState(() => {
-    try { return localStorage.getItem("dashboard-show-cambio") === "true"; } catch { return false; }
-  });
+
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>("year");
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>(getPeriodRange("year"));
