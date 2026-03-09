@@ -2694,7 +2694,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><ListChecks className="h-3.5 w-3.5 text-primary" /> Indicadores por Projeto</CardTitle></CardHeader>
                 <CardContent>
-                  <div className="h-[220px]">
+                  <div className="w-full min-w-0" style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={projectFinData} barGap={4}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
