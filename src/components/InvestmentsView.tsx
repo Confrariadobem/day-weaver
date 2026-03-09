@@ -301,7 +301,7 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                 <TrendingUp className="h-3 w-3" /> Patrimônio Total
               </p>
-              <p className="text-lg font-bold text-foreground">{brl(metrics.totalCurrent)}</p>
+              <p className={cn("text-lg font-bold", metrics.totalCurrent >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(metrics.totalCurrent)}</p>
             </CardContent>
           </Card>
           <Card className="bg-card">

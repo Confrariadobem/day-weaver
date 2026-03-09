@@ -579,12 +579,43 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     return digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4, 8);
   };
 
-  // Highlight helper for search matches
+  // Highlight helper for search matches — preserves full text, no truncation
   const highlightMatch = (text: string, query: string) => {
-    if (!query) return text;
-    const idx = text.toLowerCase().indexOf(query.toLowerCase());
-    if (idx === -1) return text;
-    return <>{text.slice(0, idx)}<strong className="text-foreground">{text.slice(idx, idx + query.length)}</strong>{text.slice(idx + query.length)}</>;
+    if (!query) return <span className="truncate">{text}</span>;
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase().trim();
+    const words = lowerQuery.split(/\s+/).filter(Boolean);
+    if (words.length === 0) return <span className="truncate">{text}</span>;
+    // Find all match ranges
+    const ranges: { start: number; end: number }[] = [];
+    words.forEach(w => {
+      let idx = 0;
+      while ((idx = lowerText.indexOf(w, idx)) !== -1) {
+        ranges.push({ start: idx, end: idx + w.length });
+        idx += w.length;
+      }
+    });
+    if (ranges.length === 0) return <span className="truncate">{text}</span>;
+    // Merge overlapping ranges
+    ranges.sort((a, b) => a.start - b.start);
+    const merged: { start: number; end: number }[] = [ranges[0]];
+    for (let i = 1; i < ranges.length; i++) {
+      const last = merged[merged.length - 1];
+      if (ranges[i].start <= last.end) {
+        last.end = Math.max(last.end, ranges[i].end);
+      } else {
+        merged.push(ranges[i]);
+      }
+    }
+    const parts: React.ReactNode[] = [];
+    let cursor = 0;
+    merged.forEach((r, i) => {
+      if (cursor < r.start) parts.push(<span key={`t${i}`}>{text.slice(cursor, r.start)}</span>);
+      parts.push(<strong key={`h${i}`} className="text-foreground">{text.slice(r.start, r.end)}</strong>);
+      cursor = r.end;
+    });
+    if (cursor < text.length) parts.push(<span key="tail">{text.slice(cursor)}</span>);
+    return <span className="truncate">{parts}</span>;
   };
 
   // Fluxo de caixa: filter logic - expanded search
@@ -1615,24 +1646,35 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       </Popover>
     );
 
-    const renderSharedHoje = () => (
-      <button
-        onClick={() => {
-          const today = new Date();
-          const todayStr = format(today, "dd/MM/yyyy");
-          setSharedCustomFrom(today); setSharedCustomTo(today);
-          setSharedDateFrom(todayStr); setSharedDateTo(todayStr);
-          setPeriodStart(format(today, "yyyy-MM-dd")); setPeriodEnd(format(today, "yyyy-MM-dd"));
-        }}
-        className={cn(
-          "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
-          "border-border hover:border-primary/80 hover:bg-primary/5"
-        )}
-      >
-        <CalendarDays className="size-4" />
-        <span className="text-xs font-medium">Hoje</span>
-      </button>
-    );
+  const renderSharedHoje = () => {
+      const today = new Date();
+      const todayYmd = format(today, "yyyy-MM-dd");
+      const isActive = periodStart === todayYmd && periodEnd === todayYmd;
+      return (
+        <button
+          onClick={() => {
+            if (isActive) {
+              // Reset to default year
+              handleClearSharedInterval();
+            } else {
+              const todayStr = format(today, "dd/MM/yyyy");
+              setSharedCustomFrom(today); setSharedCustomTo(today);
+              setSharedDateFrom(todayStr); setSharedDateTo(todayStr);
+              setPeriodStart(todayYmd); setPeriodEnd(todayYmd);
+            }
+          }}
+          className={cn(
+            "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+            isActive
+              ? "bg-primary text-primary-foreground border-primary"
+              : "border-border hover:border-primary/80 hover:bg-primary/5"
+          )}
+        >
+          <CalendarDays className="size-4" />
+          <span className="text-xs font-medium">Hoje</span>
+        </button>
+      );
+    };
 
     return (
       <div className="flex items-center gap-3">
@@ -1643,25 +1685,27 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <div className="relative" style={{ width: 400 }}>
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
               <Input placeholder="Buscar título, categoria, contraparte, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-7 pl-8 pr-7 text-xs rounded-lg" />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery("")} className="absolute right-2 top-2 text-[#9ca3af] hover:text-foreground">
-                  <X className="h-4 w-4" />
+                className="h-7 pl-8 pr-14 text-xs rounded-lg" />
+              <div className="absolute right-2 top-1 flex items-center gap-1">
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="text-muted-foreground hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
+                  className={cn(
+                    "rounded p-0.5 transition-colors",
+                    advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Filter className="h-3.5 w-3.5" />
                 </button>
-              )}
+              </div>
             </div>
-            <button
-              onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
-              className={cn(
-                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
-                advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border hover:border-primary/80 hover:bg-primary/5"
-              )}
-            >
-              <Filter className="size-4" />
-              <span className="text-xs font-medium">Filtros</span>
-            </button>
+            
             <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
               <PopoverTrigger asChild>
                 <button
@@ -1708,14 +1752,22 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             </Popover>
             <button
               onClick={() => {
+                // Toggle: if already filtering today, reset
                 const today = new Date();
                 const todayStr = format(today, "dd/MM/yyyy");
-                setFluxoCustomFrom(today); setFluxoCustomTo(today);
-                setFluxoDateFrom(todayStr); setFluxoDateTo(todayStr);
+                if (fluxoDateFrom === todayStr && fluxoDateTo === todayStr) {
+                  setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
+                  setFluxoDateFrom(""); setFluxoDateTo("");
+                } else {
+                  setFluxoCustomFrom(today); setFluxoCustomTo(today);
+                  setFluxoDateFrom(todayStr); setFluxoDateTo(todayStr);
+                }
               }}
               className={cn(
                 "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
-                "border-border hover:border-primary/80 hover:bg-primary/5"
+                fluxoDateFrom === format(new Date(), "dd/MM/yyyy") && fluxoDateTo === format(new Date(), "dd/MM/yyyy")
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border hover:border-primary/80 hover:bg-primary/5"
               )}
             >
               <CalendarDays className="size-4" />
@@ -1829,7 +1881,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-4 print-fluxo-area">
+      <div className="p-4 space-y-4 print-fluxo-area max-w-full overflow-hidden">
       {/* Tab buttons + Toolbar on same line */}
       <div className="flex items-center gap-2 overflow-x-auto">
         <div className="flex items-center gap-1.5 shrink-0">
@@ -1864,13 +1916,13 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
         <Card className="bg-card">
           <CardContent className="p-3">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
               <TrendingUp className="h-4 w-4" /> Contas a Receber
             </p>
-            <p className="text-lg font-bold text-[#10b981]">{brl(kpiData.totalRevenue)}</p>
+            <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(kpiData.totalRevenue)}</p>
           </CardContent>
         </Card>
         <Card className="bg-card">
@@ -1878,7 +1930,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
               <TrendingDown className="h-4 w-4" /> Contas a Pagar
             </p>
-            <p className="text-lg font-bold text-[#ef4444]">{brl(kpiData.totalExpense)}</p>
+            <p className="text-lg font-bold text-destructive">{brl(kpiData.totalExpense)}</p>
           </CardContent>
         </Card>
         <Card className="bg-card">
@@ -1910,120 +1962,123 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
             {/* Advanced Filter Panel */}
             {advancedFilterOpen && (
-              <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <Filter className="h-3.5 w-3.5" /> Filtros Avançados
-                  </p>
-                  <button
-                    onClick={() => {
-                      setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
-                      setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
-                      setFilterIsFixed("all"); setFilterCounterpart("");
-                    }}
-                    className="text-[10px] text-muted-foreground hover:text-primary underline"
-                  >
-                    Limpar filtros
-                  </button>
+              <>
+                <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Filter className="h-3.5 w-3.5" /> Filtros Avançados
+                    </p>
+                    <button
+                      onClick={() => {
+                        setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
+                        setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
+                        setFilterIsFixed("all"); setFilterCounterpart("");
+                      }}
+                      className="text-[10px] text-muted-foreground hover:text-primary underline"
+                    >
+                      Limpar filtros
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Tipo</Label>
+                      <Select value={filterType} onValueChange={setFilterType}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="revenue">🟢 Receita</SelectItem>
+                          <SelectItem value="expense">🔴 Despesa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Categoria</Label>
+                      <Select value={filterCategoryId || "__all__"} onValueChange={(v) => setFilterCategoryId(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas</SelectItem>
+                          {sortedFinCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Centro de Custo</Label>
+                      <Select value={filterCostCenterId || "__all__"} onValueChange={(v) => setFilterCostCenterId(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todos</SelectItem>
+                          {costCenters.map((cc: any) => (
+                            <SelectItem key={cc.id} value={cc.id}>
+                              <span className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color }} />
+                                {cc.name}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Projeto</Label>
+                      <Select value={filterProjectId || "__all__"} onValueChange={(v) => setFilterProjectId(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todos</SelectItem>
+                          {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Carteira</Label>
+                      <Select value={filterAccountId || "__all__"} onValueChange={(v) => setFilterAccountId(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas</SelectItem>
+                          {accounts.filter(a => a.is_active).map(a => (
+                            <SelectItem key={a.id} value={a.id}>
+                              <span className="flex items-center gap-1.5">
+                                {ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon}
+                                {a.name}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Forma de Pagamento</Label>
+                      <Select value={filterPaymentMethod || "__all__"} onValueChange={(v) => setFilterPaymentMethod(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas</SelectItem>
+                          {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Conta Fixa</Label>
+                      <Select value={filterIsFixed} onValueChange={setFilterIsFixed}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todas</SelectItem>
+                          <SelectItem value="yes">Sim</SelectItem>
+                          <SelectItem value="no">Não</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Contraparte</Label>
+                      <Input
+                        value={filterCounterpart}
+                        onChange={(e) => setFilterCounterpart(e.target.value)}
+                        placeholder="Filtrar..."
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Tipo</Label>
-                    <Select value={filterType} onValueChange={setFilterType}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="revenue">🟢 Receita</SelectItem>
-                        <SelectItem value="expense">🔴 Despesa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Categoria</Label>
-                    <Select value={filterCategoryId || "__all__"} onValueChange={(v) => setFilterCategoryId(v === "__all__" ? "" : v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__all__">Todas</SelectItem>
-                        {sortedFinCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Centro de Custo</Label>
-                    <Select value={filterCostCenterId || "__all__"} onValueChange={(v) => setFilterCostCenterId(v === "__all__" ? "" : v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__all__">Todos</SelectItem>
-                        {costCenters.map((cc: any) => (
-                          <SelectItem key={cc.id} value={cc.id}>
-                            <span className="flex items-center gap-1.5">
-                              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color }} />
-                              {cc.name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Projeto</Label>
-                    <Select value={filterProjectId || "__all__"} onValueChange={(v) => setFilterProjectId(v === "__all__" ? "" : v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__all__">Todos</SelectItem>
-                        {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Carteira</Label>
-                    <Select value={filterAccountId || "__all__"} onValueChange={(v) => setFilterAccountId(v === "__all__" ? "" : v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__all__">Todas</SelectItem>
-                        {accounts.filter(a => a.is_active).map(a => (
-                          <SelectItem key={a.id} value={a.id}>
-                            <span className="flex items-center gap-1.5">
-                              {ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon}
-                              {a.name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Forma de Pagamento</Label>
-                    <Select value={filterPaymentMethod || "__all__"} onValueChange={(v) => setFilterPaymentMethod(v === "__all__" ? "" : v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__all__">Todas</SelectItem>
-                        {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Conta Fixa</Label>
-                    <Select value={filterIsFixed} onValueChange={setFilterIsFixed}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas</SelectItem>
-                        <SelectItem value="yes">Sim</SelectItem>
-                        <SelectItem value="no">Não</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Contraparte</Label>
-                    <Input
-                      value={filterCounterpart}
-                      onChange={(e) => setFilterCounterpart(e.target.value)}
-                      placeholder="Filtrar..."
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
+                <div className="border-t border-border/50" />
+              </>
             )}
 
             {/* Entry edit dialog */}
@@ -2175,8 +2230,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           />
                         </td>
                         <td className="py-2.5 px-3 text-xs text-muted-foreground">{fmtDate(entDate)}</td>
-                        <td className={cn("py-2.5 px-3 text-xs font-bold text-muted-foreground", e.is_paid && "line-through")}>
-                          <span className="inline-flex items-center gap-1.5">
+                        <td className={cn("py-2.5 px-3 text-xs font-bold text-muted-foreground max-w-[200px]", e.is_paid && "line-through")}>
+                          <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full">
                             {highlightMatch(e.title, searchQuery)}
                             {isRecurrent && (
                               <Tooltip delayDuration={200}>
