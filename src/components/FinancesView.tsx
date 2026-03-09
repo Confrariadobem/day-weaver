@@ -2555,7 +2555,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5 text-primary" /> Recursos por Conta</CardTitle></CardHeader>
               <CardContent>
                 {accountBalanceData.length > 0 ? (
-                  <div className="h-[200px]">
+                  <div className="w-full min-w-0" style={{ height: 200 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={accountBalanceData} layout="vertical" barSize={18}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" horizontal={false} />
