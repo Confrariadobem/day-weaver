@@ -67,7 +67,7 @@ function getCambioMeta(): number {
 export default function DashboardView() {
   const { user } = useAuth();
   const { formatCurrency: brl, currency } = useCurrency();
-  const { rates, loading: ratesLoading, convert, refetch } = useCurrencyConversion();
+  const { rates, loading: ratesLoading, convert } = useCurrencyConversion();
   const { dateFormat, formatDate, parseDate, placeholder: datePlaceholder } = useDateFormat();
   const [entries, setEntries] = useState<Tables<"financial_entries">[]>([]);
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
