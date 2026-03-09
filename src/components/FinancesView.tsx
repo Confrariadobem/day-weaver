@@ -2727,128 +2727,21 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         {viewTab === "indicadores" && (
           <div className="space-y-4" ref={reportRef}>
 
-            {/* Summary cards */}
+            {/* Paid vs Pending trend */}
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Resumo — {periodYear}</CardTitle>
-              </CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Pago × Pendente — {periodYear}</CardTitle></CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                  <div className="rounded-lg bg-success/10 p-3 text-center">
-                    <p className="text-[10px] text-muted-foreground">Total Receitas</p>
-                    <p className="text-lg font-bold text-success">{brl(periodFilteredEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0))}</p>
-                    <p className="text-[10px] text-muted-foreground">{periodFilteredEntries.filter(e => e.type === "revenue").length} lançamentos</p>
-                  </div>
-                  <div className="rounded-lg bg-destructive/10 p-3 text-center">
-                    <p className="text-[10px] text-muted-foreground">Total Despesas</p>
-                    <p className="text-lg font-bold text-destructive">{brl(periodFilteredEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0))}</p>
-                    <p className="text-[10px] text-muted-foreground">{periodFilteredEntries.filter(e => e.type === "expense").length} lançamentos</p>
-                  </div>
-                  <div className="rounded-lg bg-primary/10 p-3 text-center">
-                    <p className="text-[10px] text-muted-foreground">Resultado</p>
-                    {(() => {
-                      const rev = periodFilteredEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
-                      const exp = periodFilteredEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
-                      const result = rev - exp;
-                      return <p className={cn("text-lg font-bold", result >= 0 ? "text-success" : "text-destructive")}>{brl(result)}</p>;
-                    })()}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Account Balance - Horizontal Bar Chart */}
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5 text-primary" /> Recursos por Conta</CardTitle></CardHeader>
-              <CardContent>
-                {accountBalanceData.length > 0 ? (
-                  <div className="w-full min-w-0" style={{ height: 200 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={accountBalanceData} layout="vertical" barSize={18}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" horizontal={false} />
-                        <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => brl(v)} />
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={100} />
-                        <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                        <Bar dataKey="balance" name="Saldo" radius={[0, 4, 4, 0]}>
-                          {accountBalanceData.map((d, i) => (
-                            <Cell key={d.name} fill={d.balance >= 0 ? "#22c55e" : "#ef4444"} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : <p className="text-xs text-muted-foreground text-center py-8">Sem contas cadastradas</p>}
-              </CardContent>
-            </Card>
-
-            {/* Revenue vs Expense chart */}
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Receita × Despesa Mensal — {periodYear}</CardTitle></CardHeader>
-              <CardContent>
-                <div className="w-full min-w-0" style={{ height: 280 }}>
+                <div className="w-full min-w-0" style={{ height: 220 }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={reportChartData} barGap={0}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
+                    <BarChart data={monthlyTrendData} barGap={0}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="receita" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="despesa" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                      <Line type="monotone" dataKey="acumulado" name="Saldo Acumulado" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3, fill: "#3b82f6" }} />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Monthly balance trend */}
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Saldo Mensal — {periodYear}</CardTitle></CardHeader>
-              <CardContent>
-                <div className="w-full min-w-0" style={{ height: 220 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={reportChartData}>
-                      <defs>
-                        {(() => {
-                          const vals = reportChartData.map(d => d.saldo);
-                          const maxV = Math.max(...vals, 0);
-                          const minV = Math.min(...vals, 0);
-                          const range = maxV - minV || 1;
-                          const zeroOffset = maxV / range;
-                          return (
-                            <linearGradient id="saldoGradFill" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="hsl(217 91% 30%)" stopOpacity={0.6} />
-                              <stop offset={`${Math.max(0, zeroOffset * 100 - 5)}%`} stopColor="hsl(217 91% 55%)" stopOpacity={0.15} />
-                              <stop offset={`${zeroOffset * 100}%`} stopColor="hsl(var(--muted))" stopOpacity={0.05} />
-                              <stop offset={`${Math.min(100, zeroOffset * 100 + 5)}%`} stopColor="hsl(0 72% 51%)" stopOpacity={0.15} />
-                              <stop offset="100%" stopColor="hsl(0 72% 35%)" stopOpacity={0.6} />
-                            </linearGradient>
-                          );
-                        })()}
-                        {(() => {
-                          const vals = reportChartData.map(d => d.saldo);
-                          const maxV = Math.max(...vals, 0);
-                          const minV = Math.min(...vals, 0);
-                          const range = maxV - minV || 1;
-                          const zeroOffset = maxV / range;
-                          return (
-                            <linearGradient id="saldoGradStroke" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="hsl(217 91% 40%)" />
-                              <stop offset={`${zeroOffset * 100}%`} stopColor="hsl(var(--muted-foreground))" />
-                              <stop offset="100%" stopColor="hsl(0 72% 45%)" />
-                            </linearGradient>
-                          );
-                        })()}
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
-                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                      <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeOpacity={0.5} />
-                      <Area type="monotone" dataKey="saldo" name="Saldo" stroke="url(#saldoGradStroke)" strokeWidth={2}
-                        fill="url(#saldoGradFill)" />
-                    </AreaChart>
+                      <Bar dataKey="pago" name="Pago" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="pendente" name="Pendente" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
