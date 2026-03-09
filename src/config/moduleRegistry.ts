@@ -58,10 +58,9 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     key: "programs",
     label: "Projetos",
     tabs: [
-      { key: "projects", label: "Projetos", locked: true },
+      { key: "indicadores", label: "Indicadores", locked: true },
+      { key: "lista", label: "Lista" },
       { key: "dashboard", label: "Dashboard" },
-      { key: "programs", label: "Programas" },
-      { key: "tasks", label: "Tarefas" },
     ],
   },
   {
