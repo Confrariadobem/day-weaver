@@ -408,9 +408,9 @@ export default function DashboardView() {
               <div className="w-full min-w-0">
                 <ResponsiveContainer width="100%" height={180}>
                   <ComposedChart data={monthlyData} barGap={0}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
-                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(0 0% 40%)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                     <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
                     <Legend wrapperStyle={{ fontSize: 14, fontWeight: 500 }} />
                     <Bar dataKey="receita" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
