@@ -1881,7 +1881,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-4 print-fluxo-area">
+      <div className="p-4 space-y-4 print-fluxo-area max-w-full overflow-hidden">
       {/* Tab buttons + Toolbar on same line */}
       <div className="flex items-center gap-2 overflow-x-auto">
         <div className="flex items-center gap-1.5 shrink-0">
