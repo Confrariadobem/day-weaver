@@ -7,8 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users, Plus, Search, Pencil, Trash2, ChevronLeft, ChevronRight, X, UserPlus } from "lucide-react";
+import { Search, Pencil, Trash2, ChevronLeft, ChevronRight, X, UserPlus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -32,8 +31,8 @@ interface Team {
   name: string;
   leader: string;
   members: TeamMember[];
-  type: "familia" | "profissional";
-  allocation?: string;
+  invitedBy: string;
+  invitedAt: string;
   permissions: TeamPermission[];
 }
 
@@ -44,13 +43,6 @@ const MODULES_FOR_PERMISSIONS = [
   { key: "projects", label: "Projetos" },
   { key: "doar", label: "Doar" },
   { key: "indicators", label: "Indicadores" },
-];
-
-const ALLOCATION_OPTIONS = [
-  { value: "casa", label: "Casa" },
-  { value: "viagem", label: "Viagem" },
-  { value: "pessoal", label: "Pessoal" },
-  { value: "outros", label: "Outros" },
 ];
 
 const ITEMS_PER_PAGE = 5;
@@ -67,9 +59,8 @@ export default function TeamsSection() {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [formName, setFormName] = useState("");
   const [formLeader, setFormLeader] = useState("");
-  const [formType, setFormType] = useState<"familia" | "profissional">("profissional");
-  const [formAllocation, setFormAllocation] = useState("");
   const [formMembers, setFormMembers] = useState<TeamMember[]>([]);
+  const [formInvitedBy, setFormInvitedBy] = useState("");
   const [formPermissions, setFormPermissions] = useState<TeamPermission[]>([]);
 
   // New user quick modal
@@ -77,7 +68,7 @@ export default function TeamsSection() {
   const [newUserName, setNewUserName] = useState("");
   const [newUserRole, setNewUserRole] = useState("");
 
-  // All known users (from team members across teams + manually added)
+  // All known users
   const [knownUsers, setKnownUsers] = useState<TeamMember[]>([
     { id: "u1", name: "Você (Admin)", role: "Administrador" },
   ]);
@@ -99,9 +90,8 @@ export default function TeamsSection() {
     setEditingTeam(null);
     setFormName("");
     setFormLeader("");
-    setFormType("profissional");
-    setFormAllocation("");
     setFormMembers([]);
+    setFormInvitedBy("");
     setFormPermissions([]);
     setDialogOpen(true);
   };
@@ -110,9 +100,8 @@ export default function TeamsSection() {
     setEditingTeam(team);
     setFormName(team.name);
     setFormLeader(team.leader);
-    setFormType(team.type);
-    setFormAllocation(team.allocation || "");
     setFormMembers([...team.members]);
+    setFormInvitedBy(team.invitedBy);
     setFormPermissions([...team.permissions]);
     setDialogOpen(true);
   };
@@ -126,8 +115,8 @@ export default function TeamsSection() {
       name: formName.trim(),
       leader: formLeader,
       members: formMembers,
-      type: formType,
-      allocation: formType === "familia" ? formAllocation : undefined,
+      invitedBy: formInvitedBy,
+      invitedAt: editingTeam?.invitedAt || new Date().toISOString(),
       permissions: formPermissions,
     };
     if (editingTeam) {
@@ -151,7 +140,6 @@ export default function TeamsSection() {
       setFormPermissions(prev => prev.filter(p => p.memberId !== user.id));
     } else {
       setFormMembers(prev => [...prev, user]);
-      // Add default permissions
       const newPerms = MODULES_FOR_PERMISSIONS.map(mod => ({
         memberId: user.id,
         module: mod.key,
@@ -229,7 +217,7 @@ export default function TeamsSection() {
               <TableHead className="text-xs font-semibold">Nome da Equipe</TableHead>
               <TableHead className="text-xs font-semibold">Líder</TableHead>
               <TableHead className="text-xs font-semibold text-center">Membros</TableHead>
-              <TableHead className="text-xs font-semibold">Tipo</TableHead>
+              <TableHead className="text-xs font-semibold">Convidado por</TableHead>
               <TableHead className="text-xs font-semibold text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -245,14 +233,7 @@ export default function TeamsSection() {
                 <TableCell className="text-xs font-medium">{team.name}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{team.leader || "—"}</TableCell>
                 <TableCell className="text-xs text-center">{team.members.length}</TableCell>
-                <TableCell className="text-xs">
-                  <span className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                    team.type === "familia" ? "bg-pink-500/10 text-pink-500" : "bg-primary/10 text-primary"
-                  )}>
-                    {team.type === "familia" ? "Família" : "Equipe Profissional"}
-                  </span>
-                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">{team.invitedBy || "—"}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(team)}>
@@ -302,7 +283,7 @@ export default function TeamsSection() {
             <TabsContent value="dados" className="flex-1 overflow-auto mt-3 space-y-4 pr-1">
               <div>
                 <Label className="text-xs">Nome da Equipe</Label>
-                <Input value={formName} onChange={(e) => setFormName(e.target.value)} className="mt-1 text-sm rounded-lg" placeholder="Ex: Família Silva" />
+                <Input value={formName} onChange={(e) => setFormName(e.target.value)} className="mt-1 text-sm rounded-lg" placeholder="Ex: Operações" />
               </div>
 
               <div>
@@ -317,38 +298,12 @@ export default function TeamsSection() {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">Tipo</Label>
-                  <Select value={formType} onValueChange={(v: "familia" | "profissional") => setFormType(v)}>
-                    <SelectTrigger className="mt-1 h-9 text-sm rounded-lg"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="familia">Família</SelectItem>
-                      <SelectItem value="profissional">Equipe Profissional</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {formType === "familia" && (
-                  <div>
-                    <Label className="text-xs">Alocação</Label>
-                    <Select value={formAllocation} onValueChange={setFormAllocation}>
-                      <SelectTrigger className="mt-1 h-9 text-sm rounded-lg"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                      <SelectContent>
-                        {ALLOCATION_OPTIONS.map(a => (
-                          <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-
               {/* Members multi-select */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <Label className="text-xs">Membros</Label>
                   <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1 text-primary" onClick={() => setNewUserOpen(true)}>
-                    <UserPlus className="h-3 w-3" /> Criar novo usuário
+                    <UserPlus className="h-3 w-3" /> Novo usuário
                   </Button>
                 </div>
                 <div className="rounded-lg border border-border max-h-40 overflow-auto">
@@ -385,6 +340,26 @@ export default function TeamsSection() {
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* Convidado por */}
+              <div>
+                <Label className="text-xs">Convidado por</Label>
+                <div className="flex gap-2 mt-1">
+                  <Select value={formInvitedBy} onValueChange={setFormInvitedBy}>
+                    <SelectTrigger className="h-9 text-sm rounded-lg flex-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      {knownUsers.map(u => (
+                        <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    readOnly
+                    value={editingTeam?.invitedAt ? new Date(editingTeam.invitedAt).toLocaleDateString("pt-BR") : new Date().toLocaleDateString("pt-BR")}
+                    className="h-9 text-sm rounded-lg w-28 text-muted-foreground"
+                  />
+                </div>
               </div>
             </TabsContent>
 
@@ -476,7 +451,7 @@ export default function TeamsSection() {
             </div>
             <div>
               <Label className="text-xs">Cargo</Label>
-              <Input value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)} className="mt-1 text-sm rounded-lg" placeholder="Ex: Gerente, Membro..." />
+              <Input value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)} className="mt-1 text-sm rounded-lg" placeholder="Ex: Gerente, Analista..." />
             </div>
           </div>
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-border/20">

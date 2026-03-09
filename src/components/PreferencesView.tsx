@@ -584,6 +584,18 @@ export default function PreferencesView() {
               </AccordionItem>
             )}
 
+            {/* ═══════════ EQUIPES ═══════════ */}
+            {(
+              <AccordionItem value="teams" className="border-none">
+                <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
+                  <span className="flex items-center gap-2"><Users className="h-4 w-4 text-pink-500" /> Equipes</span>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pt-6 pb-16 space-y-4">
+                  <TeamsSection />
+                </AccordionContent>
+              </AccordionItem>
+            )}
+
             {/* ═══════════ CALENDÁRIO ═══════════ */}
             {(
               <AccordionItem value="calendar" className="border-none">
@@ -759,18 +771,6 @@ export default function PreferencesView() {
                       <div className="flex items-center justify-between"><Label className="text-xs">Exibir valores em múltiplas moedas</Label><Switch defaultChecked /></div>
                     </CardContent>
                   </Card>
-                </AccordionContent>
-              </AccordionItem>
-            )}
-
-            {/* ═══════════ EQUIPES ═══════════ */}
-            {(
-              <AccordionItem value="teams" className="border-none">
-                <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
-                  <span className="flex items-center gap-2"><Users className="h-4 w-4 text-pink-500" /> Equipes</span>
-                </AccordionTrigger>
-                <AccordionContent className="px-4 pt-6 pb-16 space-y-4">
-                  <TeamsSection />
                 </AccordionContent>
               </AccordionItem>
             )}
