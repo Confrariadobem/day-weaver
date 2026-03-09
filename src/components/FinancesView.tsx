@@ -23,7 +23,9 @@ import {
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
   CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
   Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign, Pencil, X, CalendarRange,
+  MoreHorizontal,
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   addMonths, addWeeks, addDays, startOfYear, endOfYear, eachMonthOfInterval, differenceInDays,
@@ -1828,36 +1830,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         {viewTab === "previsao" && (
           <>
 
-            {/* Batch actions */}
-            {selectedIds.size > 0 && (
-              <div className="mb-3 flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">{selectedIds.size} selecionados</span>
-                <Button size="sm" variant="ghost"
-                  className="h-7 px-2.5 text-xs gap-1 text-[hsl(var(--success))] hover:text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] rounded-full"
-                  onClick={async () => {
-                    const ids = Array.from(selectedIds);
-                    await supabase.from("financial_entries").update({
-                      is_paid: true, payment_date: format(new Date(), "yyyy-MM-dd"),
-                    }).in("id", ids);
-                    setSelectedIds(new Set());
-                    fetchData();
-                  }}
-                ><Check className="h-3 w-3" /> Baixar</Button>
-                <Button size="sm" variant="ghost"
-                  className="h-7 px-2.5 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10 rounded-full"
-                  onClick={handleBatchCopy}
-                ><Copy className="h-3 w-3" /> Duplicar</Button>
-                <Button size="sm" variant="ghost"
-                  className="h-7 px-2.5 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
-                  onClick={async () => {
-                    const ids = Array.from(selectedIds);
-                    await supabase.from("financial_entries").delete().in("id", ids);
-                    setSelectedIds(new Set());
-                    fetchData();
-                  }}
-                ><Trash2 className="h-3 w-3" /> Excluir</Button>
-              </div>
-            )}
+            {/* Batch actions bar removed — icons now in table header */}
 
             {/* Entry edit dialog */}
             <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
@@ -1900,7 +1873,56 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <th className="text-center py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("is_paid")}>
                       Status <SortIcon field="is_paid" />
                     </th>
-                    <th className="w-14 py-2.5 px-1"></th>
+                    <th className="w-14 py-2.5 px-1">
+                      {selectedIds.size > 0 ? (
+                        <div className="flex items-center justify-center gap-0.5">
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="rounded p-1 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] transition-colors"
+                                onClick={async () => {
+                                  const ids = Array.from(selectedIds);
+                                  await supabase.from("financial_entries").update({
+                                    is_paid: true, payment_date: format(new Date(), "yyyy-MM-dd"),
+                                  }).in("id", ids);
+                                  setSelectedIds(new Set());
+                                  fetchData();
+                                }}
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="text-xs">Baixar selecionados</TooltipContent>
+                          </Tooltip>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="rounded p-1 text-muted-foreground hover:bg-accent transition-colors">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="min-w-[140px]">
+                              <DropdownMenuItem
+                                className="gap-2 text-xs cursor-pointer"
+                                onClick={handleBatchCopy}
+                              >
+                                <Copy className="h-3.5 w-3.5 text-muted-foreground" /> Duplicar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="gap-2 text-xs cursor-pointer text-destructive focus:text-destructive"
+                                onClick={async () => {
+                                  const ids = Array.from(selectedIds);
+                                  await supabase.from("financial_entries").delete().in("id", ids);
+                                  setSelectedIds(new Set());
+                                  fetchData();
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ) : null}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2025,6 +2047,17 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     );
                   })}
                 </tbody>
+                {selectedIds.size > 0 && (
+                  <tfoot className="sticky bottom-0 bg-card border-t border-border">
+                    <tr>
+                      <td colSpan={9} className="py-2 px-4">
+                        <span className="text-xs text-muted-foreground">
+                          Selecionados: {selectedIds.size.toLocaleString("pt-BR")}
+                        </span>
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </>
