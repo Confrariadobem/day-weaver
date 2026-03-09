@@ -15,7 +15,7 @@ import {
   Wallet, TrendingUp, TrendingDown, Landmark, CreditCard, PiggyBank,
   BarChart3, AlertTriangle, Lock, ArrowUpRight, ArrowDownRight,
   Banknote, WalletCards, Bitcoin, Star, Save, Trash2, Eye, EyeOff,
-  ExternalLink,
+  ExternalLink, PieChart as PieChartIcon,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area,
@@ -62,6 +62,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
   const [profileFilter, setProfileFilter] = useState<ProfileFilter>("pessoal");
   const [hasUpgrade] = useState(true);
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<"indicadores" | "carteiras">("indicadores");
 
   // Account edit dialog
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -299,40 +300,55 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
   return (
     <>
     <div className="p-4 max-w-full overflow-hidden space-y-4">
-        {/* Profile filter (balance indicator moved to sticky header in Dashboard) */}
-        <div className="flex items-center gap-2 overflow-x-auto">
-          <Button
-            variant={profileFilter === "pessoal" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setProfileFilter("pessoal")}
-            className={cn("h-7 text-xs px-3 rounded-full shrink-0", profileFilter !== "pessoal" && "text-muted-foreground")}
-          >
-            Pessoal
-          </Button>
-          <Button
-            variant={profileFilter === "profissional" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => {
-              if (!hasUpgrade) return;
-              setProfileFilter("profissional");
-            }}
-            className={cn("h-7 text-xs px-3 rounded-full gap-1.5 shrink-0", profileFilter !== "profissional" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
-            disabled={!hasUpgrade}
-          >
-            <Lock className="h-3 w-3" /> Profissional
-          </Button>
-          <Button
-            variant={profileFilter === "tudo" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => {
-              if (!hasUpgrade) return;
-              setProfileFilter("tudo");
-            }}
-            className={cn("h-7 text-xs px-3 rounded-full gap-1.5 shrink-0", profileFilter !== "tudo" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
-            disabled={!hasUpgrade}
-          >
-            <Lock className="h-3 w-3" /> Tudo
-          </Button>
+        {/* Sticky tab bar */}
+        <div className="sticky top-0 z-10 bg-card border-b border-border py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              size="sm"
+              variant={activeTab === "indicadores" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== "indicadores" && "text-muted-foreground")}
+              onClick={() => setActiveTab("indicadores")}
+            >
+              <PieChartIcon className="h-3 w-3" /> Indicadores
+            </Button>
+            <Button
+              size="sm"
+              variant={activeTab === "carteiras" ? "default" : "ghost"}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== "carteiras" && "text-muted-foreground")}
+              onClick={() => setActiveTab("carteiras")}
+            >
+              <Landmark className="h-3 w-3" /> Carteiras
+            </Button>
+          </div>
+          {/* Profile filter pills */}
+          <div className="ml-auto flex items-center gap-1.5">
+            <Button
+              variant={profileFilter === "pessoal" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setProfileFilter("pessoal")}
+              className={cn("h-7 text-xs px-3 rounded-full shrink-0", profileFilter !== "pessoal" && "text-muted-foreground")}
+            >
+              Pessoal
+            </Button>
+            <Button
+              variant={profileFilter === "profissional" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => { if (hasUpgrade) setProfileFilter("profissional"); }}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5 shrink-0", profileFilter !== "profissional" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
+              disabled={!hasUpgrade}
+            >
+              <Lock className="h-3 w-3" /> Profissional
+            </Button>
+            <Button
+              variant={profileFilter === "tudo" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => { if (hasUpgrade) setProfileFilter("tudo"); }}
+              className={cn("h-7 text-xs px-3 rounded-full gap-1.5 shrink-0", profileFilter !== "tudo" && "text-muted-foreground", !hasUpgrade && "opacity-50")}
+              disabled={!hasUpgrade}
+            >
+              <Lock className="h-3 w-3" /> Tudo
+            </Button>
+          </div>
         </div>
 
         {!hasUpgrade && (
@@ -350,6 +366,8 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
           </Card>
         )}
 
+        {/* ═══ INDICADORES TAB ═══ */}
+        {activeTab === "indicadores" && (<>
         {/* Main KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-card">
@@ -458,6 +476,27 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
           </Card>
         </div>
 
+        {/* Alerts in Indicadores */}
+        {metrics.alerts.length > 0 && (
+          <Card className="bg-card border-warning/30">
+            <CardContent className="p-3">
+              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-warning" /> Alertas
+              </p>
+              <div className="space-y-1.5">
+                {metrics.alerts.map((alert, i) => (
+                  <p key={i} className="text-xs text-warning flex items-center gap-1.5">
+                    ⚠️ {alert}
+                  </p>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        </>)}
+
+        {/* ═══ CARTEIRAS TAB ═══ */}
+        {activeTab === "carteiras" && (<>
         {/* Accounts overview — flat list */}
         <div>
           <p className="text-xs font-semibold mb-2 flex items-center gap-1.5 px-1">
@@ -563,24 +602,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
             </div>
           )}
         </div>
-
-        {/* Alerts */}
-        {metrics.alerts.length > 0 && (
-          <Card className="bg-card border-warning/30">
-            <CardContent className="p-3">
-              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 text-warning" /> Alertas
-              </p>
-              <div className="space-y-1.5">
-                {metrics.alerts.map((alert, i) => (
-                  <p key={i} className="text-xs text-warning flex items-center gap-1.5">
-                    ⚠️ {alert}
-                  </p>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        </>)}
       </div>
 
       {/* Account Edit Dialog */}
