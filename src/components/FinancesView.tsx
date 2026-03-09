@@ -221,6 +221,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [fluxoDateTo, setFluxoDateTo] = useState("");
   const [colFilterStatus, setColFilterStatus] = useState<string>("all");
   const [colFilterCounterpart, setColFilterCounterpart] = useState<string>("");
+  const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterCategoryId, setFilterCategoryId] = useState<string>("");
+  const [filterCostCenterId, setFilterCostCenterId] = useState<string>("");
+  const [filterProjectId, setFilterProjectId] = useState<string>("");
+  const [filterAccountId, setFilterAccountId] = useState<string>("");
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>("");
+  const [filterIsFixed, setFilterIsFixed] = useState<string>("all");
+  const [filterCounterpart, setFilterCounterpart] = useState<string>("");
 
   const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
   const splitTotal = splitLines.reduce((s, l) => s + parseNum(l.amount), 0);
