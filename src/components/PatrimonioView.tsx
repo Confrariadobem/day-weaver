@@ -15,8 +15,9 @@ import {
   Wallet, TrendingUp, TrendingDown, Landmark, CreditCard, PiggyBank,
   BarChart3, AlertTriangle, Lock, ArrowUpRight, ArrowDownRight,
   Banknote, WalletCards, Bitcoin, Star, Save, Trash2, Eye, EyeOff,
-  ExternalLink, PieChart as PieChartIcon,
+  ExternalLink, PieChart as PieChartIcon, Home, Car, Gem,
 } from "lucide-react";
+import AssetsTable, { type AssetType } from "@/components/patrimonio/AssetsTable";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
