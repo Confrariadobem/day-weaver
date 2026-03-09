@@ -1643,12 +1643,25 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <div className="relative" style={{ width: 400 }}>
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
               <Input placeholder="Buscar título, categoria, contraparte, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-7 pl-8 pr-7 text-xs rounded-lg" />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery("")} className="absolute right-2 top-2 text-[#9ca3af] hover:text-foreground">
-                  <X className="h-4 w-4" />
+                className="h-7 pl-8 pr-14 text-xs rounded-lg" />
+              <div className="absolute right-2 top-1 flex items-center gap-1">
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="text-muted-foreground hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
+                  className={cn(
+                    "rounded p-0.5 transition-colors",
+                    advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Filter className="h-3.5 w-3.5" />
                 </button>
-              )}
+              </div>
             </div>
             
             <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
