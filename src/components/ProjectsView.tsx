@@ -18,9 +18,8 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Plus, Pencil, CheckCircle2, Trash2, CalendarDays, Search, X,
-  FolderKanban, Sparkles, Archive, ChevronDown, ChevronUp, ChevronRight,
-  FileUp, FileDown, Printer, CalendarRange, Filter, Save, Layers,
-  Star, Users, BarChart3, TrendingUp, Clock, AlertTriangle,
+  FolderKanban, Sparkles, ChevronDown, ChevronUp,
+  Filter, Save, Layers, Star, Users,
 } from "lucide-react";
 import { format, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
