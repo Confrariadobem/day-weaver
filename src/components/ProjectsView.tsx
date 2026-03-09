@@ -71,7 +71,7 @@ const WEEK_PRIORITY_LABELS: Record<string, { label: string; className: string }>
 const PRIORITY_ORDER: Record<Priority, number> = { alta: 0, media: 1, baixa: 2 };
 const WEEK_PRIORITY_ORDER: Record<string, number> = { hoje: 0, essa_semana: 1, proxima: 2, adiar: 3 };
 
-const PIE_COLORS = ["hsl(var(--primary))", "hsl(var(--destructive))", "hsl(var(--success))", "#f59e0b", "#8b5cf6", "#06b6d4"];
+
 
 function mapStatus(dbStatus: string | null): ProjectStatus {
   if (!dbStatus) return "pendente";
