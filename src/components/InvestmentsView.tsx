@@ -322,7 +322,7 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <ScrollArea className="flex-1">
-      <div className="p-4 max-w-full overflow-hidden space-y-4">
+      <div className="p-4 max-w-full overflow-hidden space-y-4 module-container">
       {/* Tab buttons - Finance pattern */}
       <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto">
         <Button size="sm" variant={activeTab === "dashboard" ? "default" : "ghost"}
