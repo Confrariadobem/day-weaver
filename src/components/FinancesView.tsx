@@ -1650,18 +1650,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </button>
               )}
             </div>
-            <button
-              onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
-              className={cn(
-                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
-                advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border hover:border-primary/80 hover:bg-primary/5"
-              )}
-            >
-              <Filter className="size-4" />
-              <span className="text-xs font-medium">Filtros</span>
-            </button>
+            
             <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
               <PopoverTrigger asChild>
                 <button
