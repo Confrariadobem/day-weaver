@@ -1615,24 +1615,35 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       </Popover>
     );
 
-    const renderSharedHoje = () => (
-      <button
-        onClick={() => {
-          const today = new Date();
-          const todayStr = format(today, "dd/MM/yyyy");
-          setSharedCustomFrom(today); setSharedCustomTo(today);
-          setSharedDateFrom(todayStr); setSharedDateTo(todayStr);
-          setPeriodStart(format(today, "yyyy-MM-dd")); setPeriodEnd(format(today, "yyyy-MM-dd"));
-        }}
-        className={cn(
-          "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
-          "border-border hover:border-primary/80 hover:bg-primary/5"
-        )}
-      >
-        <CalendarDays className="size-4" />
-        <span className="text-xs font-medium">Hoje</span>
-      </button>
-    );
+  const renderSharedHoje = () => {
+      const today = new Date();
+      const todayYmd = format(today, "yyyy-MM-dd");
+      const isActive = periodStart === todayYmd && periodEnd === todayYmd;
+      return (
+        <button
+          onClick={() => {
+            if (isActive) {
+              // Reset to default year
+              handleClearSharedInterval();
+            } else {
+              const todayStr = format(today, "dd/MM/yyyy");
+              setSharedCustomFrom(today); setSharedCustomTo(today);
+              setSharedDateFrom(todayStr); setSharedDateTo(todayStr);
+              setPeriodStart(todayYmd); setPeriodEnd(todayYmd);
+            }
+          }}
+          className={cn(
+            "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+            isActive
+              ? "bg-primary text-primary-foreground border-primary"
+              : "border-border hover:border-primary/80 hover:bg-primary/5"
+          )}
+        >
+          <CalendarDays className="size-4" />
+          <span className="text-xs font-medium">Hoje</span>
+        </button>
+      );
+    };
 
     return (
       <div className="flex items-center gap-3">
