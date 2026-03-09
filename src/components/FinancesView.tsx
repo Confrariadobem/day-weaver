@@ -1875,13 +1875,13 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <th className="text-center py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("is_paid")}>
                       Status <SortIcon field="is_paid" />
                     </th>
-                    <th className="w-14 py-2.5 px-1">
+                    <th className="w-24 py-2.5 px-1">
                       {selectedIds.size > 0 ? (
-                        <div className="flex items-center justify-center gap-0.5">
+                        <div className="flex items-center justify-center gap-1">
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
                               <button
-                                className="rounded p-1 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] transition-colors"
+                                className="rounded p-0.5 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] transition-colors"
                                 onClick={async () => {
                                   const ids = Array.from(selectedIds);
                                   await supabase.from("financial_entries").update({
@@ -1891,26 +1891,24 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                   fetchData();
                                 }}
                               >
-                                <Check className="h-4 w-4" />
+                                <Check className="h-5 w-5" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent className="text-xs">Baixar selecionados</TooltipContent>
+                            <TooltipContent className="text-xs">Baixar</TooltipContent>
                           </Tooltip>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="rounded p-1 text-muted-foreground hover:bg-accent transition-colors">
-                                <MoreHorizontal className="h-4 w-4" />
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <button onClick={handleBatchCopy}
+                                className="rounded p-0.5 text-muted-foreground hover:text-foreground transition-colors">
+                                <Copy className="h-5 w-5" />
                               </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="min-w-[140px]">
-                              <DropdownMenuItem
-                                className="gap-2 text-xs cursor-pointer"
-                                onClick={handleBatchCopy}
-                              >
-                                <Copy className="h-3.5 w-3.5 text-muted-foreground" /> Duplicar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="gap-2 text-xs cursor-pointer text-destructive focus:text-destructive"
+                            </TooltipTrigger>
+                            <TooltipContent className="text-xs">Duplicar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="rounded p-0.5 text-destructive hover:text-destructive/80 transition-colors"
                                 onClick={async () => {
                                   const ids = Array.from(selectedIds);
                                   await supabase.from("financial_entries").delete().in("id", ids);
@@ -1918,10 +1916,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                   fetchData();
                                 }}
                               >
-                                <Trash2 className="h-3.5 w-3.5" /> Excluir
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                <Trash2 className="h-5 w-5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="text-xs">Excluir</TooltipContent>
+                          </Tooltip>
                         </div>
                       ) : null}
                     </th>
