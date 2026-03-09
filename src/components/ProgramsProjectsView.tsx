@@ -68,6 +68,7 @@ const CHART_COLORS = ["#3b82f6", "#22c55e", "#ef4444", "#f59e0b", "#8b5cf6", "#e
 export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { user } = useAuth();
   const { formatCurrency: brl } = useCurrency();
+  const { formatDate: fmtDate, dateFormat } = useDateFormat();
   const [activeTab, setActiveTab] = useState<ProjectTab>("indicadores");
   const { visibleTabs } = useModulePreferences("programs");
 
@@ -82,6 +83,51 @@ export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (t
   const [filterPriority, setFilterPriority] = useState<"all" | Priority>("all");
   const [filterOverdue, setFilterOverdue] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+
+  // Interval filter
+  const [intervalOpen, setIntervalOpen] = useState(false);
+  const [customFrom, setCustomFrom] = useState<Date | undefined>(undefined);
+  const [customTo, setCustomTo] = useState<Date | undefined>(undefined);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const normalizeDateInput = (val: string) => {
+    const digits = val.replace(/\D/g, "");
+    let out = "";
+    for (let i = 0; i < digits.length && i < 8; i++) {
+      if (i === 2 || i === 4) out += "/";
+      out += digits[i];
+    }
+    return out;
+  };
+  const parseDMY = (val: string): Date | null => {
+    const parts = val.split("/");
+    if (parts.length !== 3) return null;
+    const d = parseInt(parts[0]), m = parseInt(parts[1]) - 1, y = parseInt(parts[2]);
+    if (isNaN(d) || isNaN(m) || isNaN(y) || y < 1900) return null;
+    return new Date(y, m, d);
+  };
+  const handleIntervalSelect = (range: any) => {
+    if (range?.from) { setCustomFrom(range.from); setDateFrom(format(range.from, "dd/MM/yyyy")); }
+    if (range?.to) { setCustomTo(range.to); setDateTo(format(range.to, "dd/MM/yyyy")); }
+  };
+  const handleClearInterval = () => {
+    setCustomFrom(undefined); setCustomTo(undefined);
+    setDateFrom(""); setDateTo(""); setIntervalOpen(false);
+  };
+  const handleExportCSV = () => {
+    const rows = [["Tarefa", "Projeto", "Prioridade", "Status", "Custo", "Data"]];
+    filteredTasks.forEach(t => {
+      rows.push([t.title, getProjectName(t.project_id), t.priority || "media", t.taskStatus || "pendente", String(getTaskCost(t)), t.scheduled_date || ""]);
+    });
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `projetos-tarefas-${format(new Date(), "yyyy-MM-dd")}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+  const handlePrint = () => window.print();
   
   // Edit dialog
   const [editDialogOpen, setEditDialogOpen] = useState(false);
