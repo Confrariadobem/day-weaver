@@ -12,7 +12,7 @@ import {
   TrendingUp,
   Building2,
   CircleDollarSign,
-  FolderHeart,
+  
   X,
 } from "lucide-react";
 import type { ModuleKey } from "@/components/NavSidebar";

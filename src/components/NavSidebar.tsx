@@ -12,7 +12,7 @@ import {
   TrendingUp,
   Building2,
   CircleDollarSign,
-  FolderHeart,
+  
 } from "lucide-react";
 
 export type ModuleKey = "calendar" | "finances" | "dashboard" | "profile" | "preferences" | "programs" | "investments" | "patrimonio";
