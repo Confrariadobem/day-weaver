@@ -467,10 +467,8 @@ export default function ProjectsView() {
   }, [allItems]);
 
   const tabConfig: { key: ProjectTab; label: string; icon: React.ReactNode }[] = [
-    { key: "indicadores", label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
     { key: "andamento", label: "Em Andamento", icon: <FolderKanban className="h-3 w-3" /> },
-    { key: "desejos", label: "Desejos", icon: <Sparkles className="h-3 w-3" /> },
-    { key: "concluidos", label: "Concluídos", icon: <Archive className="h-3 w-3" /> },
+    { key: "backlog", label: "Backlog", icon: <Sparkles className="h-3 w-3" /> },
   ];
 
   const highlightMatch = (text: string, query: string) => {
