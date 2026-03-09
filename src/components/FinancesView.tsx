@@ -627,6 +627,19 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           if (e.is_paid || ed >= today) return false;
         }
         if (colFilterCounterpart && !(e.counterpart || "").toLowerCase().includes(colFilterCounterpart.toLowerCase())) return false;
+        // Advanced filter fields
+        if (filterType !== "all") {
+          if (filterType === "revenue" && e.type !== "revenue") return false;
+          if (filterType === "expense" && e.type !== "expense") return false;
+        }
+        if (filterCategoryId && e.category_id !== filterCategoryId) return false;
+        if (filterCostCenterId && e.cost_center_id !== filterCostCenterId) return false;
+        if (filterProjectId && e.project_id !== filterProjectId) return false;
+        if (filterAccountId && e.account_id !== filterAccountId) return false;
+        if (filterPaymentMethod && e.payment_method !== filterPaymentMethod) return false;
+        if (filterIsFixed === "yes" && !e.is_fixed) return false;
+        if (filterIsFixed === "no" && e.is_fixed) return false;
+        if (filterCounterpart && !(e.counterpart || "").toLowerCase().includes(filterCounterpart.toLowerCase())) return false;
         return true;
       })
       .filter((e) => {
