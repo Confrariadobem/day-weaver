@@ -1928,7 +1928,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={9} className="text-center text-muted-foreground/40 py-12">
+                    <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">
                       Sem lançamentos no período
                     </td></tr>
                   )}
@@ -1985,11 +1985,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             className="h-3.5 w-3.5"
                           />
                         </td>
-                        <td className="py-2.5 px-3 text-muted-foreground text-xs">{format(entDate, "dd/MM/yy")}</td>
-                        <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[140px]">
-                          {categories.find(c => c.id === e.category_id)?.name || "—"}
-                        </td>
-                        <td className={cn("py-2.5 px-3 text-[#F8F9FA] font-bold", e.is_paid && "line-through")}>
+                        <td className="py-2.5 px-3 font-bold text-xs">{fmtDate(entDate)}</td>
+                        <td className={cn("py-2.5 px-3 font-bold", e.is_paid && "line-through")}>
                           <span className="inline-flex items-center gap-1.5">
                             {highlightMatch(e.title, searchQuery)}
                             {isRecurrent && (
@@ -2005,20 +2002,26 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             )}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[140px]">{e.counterpart || "—"}</td>
-                        <td className={cn("py-2.5 px-3 text-right font-semibold tabular-nums",
+                        <td className="py-2.5 px-3 font-bold truncate max-w-[140px]">{e.counterpart || "—"}</td>
+                        <td className={cn("py-2.5 px-3 text-right font-bold tabular-nums",
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
                         </td>
-                        <td className={cn("py-2.5 px-3 text-center",
+                        <td className={cn("py-2.5 px-3 text-center font-bold",
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {e.type === "expense" ? "Despesa" : "Receita"}
                         </td>
-                        <td className={cn("py-2.5 px-3 text-center font-normal", statusColor)}>
+                        <td className={cn("py-2.5 px-3 text-center font-bold", statusColor)}>
                           {statusText}
                         </td>
-                        <td className="py-2.5 px-1 w-14 no-print">
+                        <td className="py-2.5 px-1 w-24 no-print">
                           <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
+                            {!e.is_paid && (
+                              <button onClick={async (ev) => { ev.stopPropagation(); await togglePaid(e); }}
+                                className="rounded p-0.5 text-[hsl(var(--success))] hover:bg-[hsl(var(--success)/0.1)] transition-colors">
+                                <Check className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                             <button onClick={(ev) => { ev.stopPropagation(); openEditDialog(e); }}
                               className="rounded p-0.5 text-foreground hover:text-foreground/80 transition-colors">
                               <Pencil className="h-3.5 w-3.5" />
@@ -2048,17 +2051,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     );
                   })}
                 </tbody>
-                {selectedIds.size > 0 && (
-                  <tfoot className="sticky bottom-0 bg-card border-t border-border">
-                    <tr>
-                      <td colSpan={9} className="py-2 px-4">
-                        <span className="text-xs text-muted-foreground">
-                          Selecionados: {selectedIds.size.toLocaleString("pt-BR")}
-                        </span>
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
+                <tfoot className="sticky bottom-0 bg-card border-t border-border">
+                  <tr>
+                    <td colSpan={8} className="py-2 px-4">
+                      <span className="text-xs text-muted-foreground">
+                        Selecionados: {selectedIds.size.toLocaleString("pt-BR")}
+                      </span>
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </>
