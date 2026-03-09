@@ -248,10 +248,9 @@ export default function Dashboard() {
             {activeModule === "dashboard" && <DashboardView />}
             {activeModule === "calendar" && <CalendarView onTabChange={setCalendarTab} />}
             {activeModule === "finances" && <FinancesView onTabChange={setFinanceTab} walletFilter={walletFilter} onClearWalletFilter={() => setWalletFilter(null)} onNavigateToPatrimonio={() => { setWalletFilter(null); setActiveModule("patrimonio"); }} />}
-            {activeModule === "programs" && <ProgramsProjectsView onTabChange={setProjectTab} />}
+            {activeModule === "programs" && <ProjectsView />}
             {activeModule === "investments" && <InvestmentsView onTabChange={setInvestmentTab} />}
             {activeModule === "patrimonio" && <PatrimonioView onNavigateToFluxo={(acc) => { setWalletFilter(acc); setActiveModule("finances"); }} />}
-            {activeModule === "desejos" && <ProjectsDesejosView />}
             {activeModule === "profile" && <ProfileView />}
             {activeModule === "preferences" && <PreferencesView />}
           </div>
