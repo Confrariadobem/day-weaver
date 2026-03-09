@@ -731,7 +731,7 @@ export default function ProjectsView() {
 
         {/* Advanced Filter Panel */}
         {advancedFilterOpen && (
-          <>
+          <div className="my-4 space-y-4">
             <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
