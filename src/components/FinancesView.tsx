@@ -1745,6 +1745,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               )}
             </div>
             {renderSharedInterval()}
+            {renderSharedHoje()}
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button onClick={isDoar ? handlePrintDOAR : handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
