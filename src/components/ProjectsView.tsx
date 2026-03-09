@@ -345,8 +345,11 @@ export default function ProjectsView() {
 
   const handleBatchDelete = async () => {
     const ids = Array.from(selectedIds);
+    // Delete children of selected parents
+    const { data: allProj } = await supabase.from("projects").select("id").eq("user_id", user!.id);
+    const childIdsToDelete = (allProj || []).filter((c: any) => ids.includes(c.parent_id)).map((c: any) => c.id);
+    if (childIdsToDelete.length > 0) await supabase.from("projects").delete().in("id", childIdsToDelete);
     for (const id of ids) {
-      await supabase.from("projects").delete().eq("parent_id" as any, id);
       await supabase.from("tasks").delete().eq("project_id", id);
     }
     await supabase.from("projects").delete().in("id", ids);
