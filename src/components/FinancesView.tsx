@@ -1653,7 +1653,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <Input value={fluxoDateFrom}
                       onChange={(e) => setFluxoDateFrom(normalizeDateInput(e.target.value))}
                       onBlur={() => { const d = parseDMY(fluxoDateFrom); if (d) { setFluxoCustomFrom(d); setFluxoDateFrom(format(d, "dd/MM/yyyy")); } }}
-                      placeholder="DD/MM/AAAA" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
+                      placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold w-8 shrink-0">Até:</span>
