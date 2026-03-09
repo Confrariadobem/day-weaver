@@ -149,7 +149,7 @@ function CounterpartAutocomplete({ value, onChange, entries }: { value: string; 
 export default function FinancesView({ onTabChange, walletFilter, onClearWalletFilter, onNavigateToPatrimonio }: { onTabChange?: (tab: string) => void; walletFilter?: { id: string; name: string } | null; onClearWalletFilter?: () => void; onNavigateToPatrimonio?: () => void }) {
   const { user } = useAuth();
   const { formatCurrency: brl } = useCurrency();
-  const { formatDate: fmtDate } = useDateFormat();
+  const { formatDate: fmtDate, dateFormat } = useDateFormat();
   const fmtCurrency = (v: number, _cur?: CurrencyType) => brl(v);
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<DBTables<"projects">[]>([]);
