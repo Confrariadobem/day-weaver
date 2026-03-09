@@ -1,771 +1,465 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
-  Plus, Star, ChevronDown, ChevronUp, Check, Trash2, FolderOpen, Save,
-  CalendarDays, DollarSign, User, Tag, GripVertical, Search,
-  Filter, PanelLeftClose, PanelLeft, X, Users,
+  Plus, Pencil, CheckCircle2, Trash2, CalendarDays, Filter,
+  FolderKanban, Sparkles, Archive,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import type { Tables } from "@/integrations/supabase/types";
-import EventEditDialog, { type CalendarItem } from "@/components/calendar/EventEditDialog";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { toast } from "@/hooks/use-toast";
 
-const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+type ProjectTab = "andamento" | "desejos" | "concluidos";
+type ProjectStatus = "pendente" | "em_andamento" | "feito";
+type Priority = "alta" | "media" | "baixa";
 
-type SortField = "title" | "scheduled_date" | "assignee" | "category" | "status";
-type SortDir = "asc" | "desc";
+interface ProjectItem {
+  id: string;
+  name: string;
+  status: ProjectStatus;
+  priority: Priority;
+  date: string | null;
+  observation: string | null;
+  user_id: string;
+  isTask?: boolean;
+}
+
+const STATUS_LABELS: Record<ProjectStatus, { label: string; className: string }> = {
+  pendente: { label: "Pendente", className: "text-amber-500" },
+  em_andamento: { label: "Em andamento", className: "text-primary" },
+  feito: { label: "Feito", className: "text-[hsl(var(--success))]" },
+};
+
+const PRIORITY_LABELS: Record<Priority, { label: string; className: string }> = {
+  alta: { label: "Alta", className: "text-destructive" },
+  media: { label: "Média", className: "text-amber-500" },
+  baixa: { label: "Baixa", className: "text-[hsl(var(--success))]" },
+};
+
+const PRIORITY_ORDER: Record<Priority, number> = { alta: 0, media: 1, baixa: 2 };
+
+function mapStatus(dbStatus: string | null): ProjectStatus {
+  if (!dbStatus) return "pendente";
+  if (dbStatus === "completed" || dbStatus === "feito") return "feito";
+  if (dbStatus === "in_progress" || dbStatus === "active" || dbStatus === "em_andamento") return "em_andamento";
+  return "pendente";
+}
+
+function toDbStatus(s: ProjectStatus): string {
+  if (s === "feito") return "completed";
+  if (s === "em_andamento") return "in_progress";
+  return "pending";
+}
+
+function parsePriority(desc: string | null): Priority {
+  const match = (desc || "").match(/\[prioridade:(\w+)\]/);
+  if (match) {
+    if (["alta", "high", "urgent"].includes(match[1])) return "alta";
+    if (["baixa", "low"].includes(match[1])) return "baixa";
+  }
+  return "media";
+}
+
+function parseObservation(desc: string | null): string {
+  return (desc || "")
+    .replace(/\[prioridade:\w+\]/g, "")
+    .replace(/\[status:\w+\]/g, "")
+    .replace(/\[marco\]/g, "")
+    .replace(/\[links\][\s\S]*/g, "")
+    .replace(/\[anotacoes\][\s\S]*/g, "")
+    .trim();
+}
 
 export default function ProjectsView() {
   const { user } = useAuth();
-  const [projects, setProjects] = useState<Tables<"projects">[]>([]);
-  const [tasks, setTasks] = useState<Tables<"tasks">[]>([]);
-  const [categories, setCategories] = useState<Tables<"categories">[]>([]);
-  const [entries, setEntries] = useState<any[]>([]);
-  const [resources, setResources] = useState<any[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Tables<"projects"> | null>(null);
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [showCompletedProjects, setShowCompletedProjects] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<string | null>(null);
+  const isMobile = useIsMobile();
+  const [activeTab, setActiveTab] = useState<ProjectTab>("andamento");
+  const [projects, setProjects] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
 
-  // Unified task dialog via EventEditDialog
-  const [taskEditDialogOpen, setTaskEditDialogOpen] = useState(false);
-  const [editingTaskItem, setEditingTaskItem] = useState<CalendarItem | null>(null);
-  const [taskEditDefaultDate, setTaskEditDefaultDate] = useState<Date>(new Date());
+  const [filterStatus, setFilterStatus] = useState<"all" | ProjectStatus>("all");
+  const [filterPriority, setFilterPriority] = useState<"all" | Priority>("all");
 
-  // Task toolbar state
-  const [taskSearch, setTaskSearch] = useState("");
-  const [taskFilterCategory, setTaskFilterCategory] = useState<string>("all");
-  const [taskFilterStatus, setTaskFilterStatus] = useState<string>("all");
-  const [sortField, setSortField] = useState<SortField>("title");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [showTaskFilters, setShowTaskFilters] = useState(false);
-
-  // Drag reorder
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
-
-  // Project form
-  const [projName, setProjName] = useState("");
-  const [projDescription, setProjDescription] = useState("");
-  const [projBudget, setProjBudget] = useState("");
-  const [projStatus, setProjStatus] = useState("active");
-  const [projCategoryId, setProjCategoryId] = useState("");
-  const [projResponsible, setProjResponsible] = useState("");
-  const [projDialogTab, setProjDialogTab] = useState("details");
-
-  // Resource form
-  const [resName, setResName] = useState("");
-  const [resRole, setResRole] = useState("");
-
-  // Double-click refs
-  const lastProjClickRef = useRef<{ id: string; time: number } | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<ProjectItem | null>(null);
+  const [formName, setFormName] = useState("");
+  const [formStatus, setFormStatus] = useState<ProjectStatus>("pendente");
+  const [formPriority, setFormPriority] = useState<Priority>("media");
+  const [formDate, setFormDate] = useState<Date | undefined>();
+  const [formObs, setFormObs] = useState("");
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteIsTask, setDeleteIsTask] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [projRes, taskRes, catRes, entRes, resourceRes] = await Promise.all([
-      supabase.from("projects").select("*").eq("user_id", user.id).order("created_at"),
-      supabase.from("tasks").select("*").eq("user_id", user.id).order("sort_order"),
-      supabase.from("categories").select("*").eq("user_id", user.id),
-      supabase.from("financial_entries").select("*").eq("user_id", user.id),
-      supabase.from("project_resources").select("*"),
+    const [pRes, tRes] = await Promise.all([
+      supabase.from("projects").select("*").eq("user_id", user.id).order("name"),
+      supabase.from("tasks").select("*").eq("user_id", user.id),
     ]);
-    if (projRes.data) setProjects(projRes.data);
-    if (taskRes.data) setTasks(taskRes.data);
-    if (catRes.data) setCategories(catRes.data);
-    if (entRes.data) setEntries(entRes.data);
-    if (resourceRes.data) setResources(resourceRes.data);
+    if (pRes.data) setProjects(pRes.data);
+    if (tRes.data) setTasks(tRes.data);
   }, [user]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+    const handler = () => fetchData();
+    window.addEventListener("lovable:data-changed", handler);
+    return () => window.removeEventListener("lovable:data-changed", handler);
+  }, [fetchData]);
 
-  const getProjectCosts = useCallback((projectId: string) => {
-    const projEntries = entries.filter(e => e.project_id === projectId);
-    const totalCost = projEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
-    const totalRevenue = projEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
-    const paidCost = projEntries.filter(e => e.type === "expense" && e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
-    return { totalCost, totalRevenue, paidCost, pendingCost: totalCost - paidCost };
-  }, [entries]);
+  const allItems: ProjectItem[] = useMemo(() => {
+    const fromProjects: ProjectItem[] = projects.map(p => ({
+      id: p.id,
+      name: p.name,
+      status: mapStatus(p.status),
+      priority: parsePriority(p.description),
+      date: p.created_at ? p.created_at.slice(0, 10) : null,
+      observation: parseObservation(p.description),
+      user_id: p.user_id,
+    }));
 
-  // Sorted categories alphabetically
-  const sortedCategories = useMemo(() => {
-    return [...categories].sort((a, b) => {
-      const aIsOutros = a.name.toLowerCase().includes("outro");
-      const bIsOutros = b.name.toLowerCase().includes("outro");
-      if (aIsOutros && !bIsOutros) return 1;
-      if (!aIsOutros && bIsOutros) return -1;
-      return a.name.localeCompare(b.name, "pt-BR");
-    });
-  }, [categories]);
+    const orphanTasks: ProjectItem[] = tasks
+      .filter(t => !t.project_id)
+      .map(t => ({
+        id: t.id,
+        name: t.title,
+        status: t.is_completed ? "feito" as ProjectStatus : mapStatus(null),
+        priority: parsePriority(t.description),
+        date: t.scheduled_date || t.created_at?.slice(0, 10) || null,
+        observation: parseObservation(t.description),
+        user_id: t.user_id,
+        isTask: true,
+      }));
 
-  const projectCategories = sortedCategories.filter(c => c.is_project);
+    return [...fromProjects, ...orphanTasks];
+  }, [projects, tasks]);
 
-  // Separate active and completed projects
-  const activeProjects = projects.filter(p => p.status !== "completed");
-  const completedProjects = projects.filter(p => p.status === "completed");
+  const tabItems = useMemo(() => {
+    let list = allItems;
 
-  // Project form handlers
-  const resetProjectForm = () => {
-    setProjName(""); setProjDescription(""); setProjBudget(""); setProjStatus("active");
-    setProjCategoryId(""); setProjResponsible(""); setEditingProject(null); setProjDialogTab("details");
-  };
-
-  const openEditProject = (p: Tables<"projects">) => {
-    setEditingProject(p);
-    setProjName(p.name);
-    setProjDescription(p.description || "");
-    setProjBudget(p.budget ? String(p.budget) : "");
-    setProjStatus(p.status || "active");
-    setProjCategoryId(p.category_id || "");
-    setProjResponsible((p as any).responsible || "");
-    setProjDialogTab("details");
-    setProjectDialogOpen(true);
-  };
-
-  const handleProjectClick = (p: Tables<"projects">) => {
-    const now = Date.now();
-    if (lastProjClickRef.current?.id === p.id && now - lastProjClickRef.current.time < 400) {
-      openEditProject(p);
-      lastProjClickRef.current = null;
+    if (activeTab === "andamento") {
+      list = list.filter(p => p.status === "pendente" || p.status === "em_andamento");
+    } else if (activeTab === "desejos") {
+      list = list.filter(p => p.status === "pendente");
     } else {
-      setSelectedProject(p.id);
-      lastProjClickRef.current = { id: p.id, time: now };
+      list = list.filter(p => p.status === "feito");
     }
+
+    if (filterStatus !== "all") list = list.filter(p => p.status === filterStatus);
+    if (filterPriority !== "all") list = list.filter(p => p.priority === filterPriority);
+
+    return list.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
+  }, [allItems, activeTab, filterStatus, filterPriority]);
+
+  const resetForm = () => {
+    setFormName(""); setFormStatus("pendente"); setFormPriority("media");
+    setFormDate(undefined); setFormObs(""); setEditing(null);
+  };
+
+  const openDialog = (item?: ProjectItem) => {
+    if (item) {
+      setEditing(item);
+      setFormName(item.name);
+      setFormStatus(item.status);
+      setFormPriority(item.priority);
+      setFormDate(item.date ? new Date(item.date) : undefined);
+      setFormObs(item.observation || "");
+    } else {
+      resetForm();
+    }
+    setDialogOpen(true);
   };
 
   const saveProject = async () => {
-    if (!projName.trim() || !user) return;
+    if (!user || !formName.trim()) return;
+    let desc = formObs.trim();
+    desc += ` [prioridade:${formPriority}]`;
+    const dateStr = formDate ? format(formDate, "yyyy-MM-dd") : null;
 
-    // If marking as completed, check all tasks are completed
-    if (projStatus === "completed" && editingProject) {
-      const projTasks = tasks.filter(t => t.project_id === editingProject.id);
-      const incompleteTasks = projTasks.filter(t => !t.is_completed);
-      if (incompleteTasks.length > 0) {
-        alert(`Não é possível concluir o projeto. Existem ${incompleteTasks.length} tarefa(s) pendente(s).`);
-        return;
-      }
-    }
-
-    const data: any = {
-      name: projName.trim(),
-      description: projDescription || null,
-      budget: projBudget ? parseFloat(projBudget.replace(/\./g, "").replace(",", ".")) : 0,
-      status: projStatus,
-      category_id: projCategoryId || null,
-      responsible: projResponsible || null,
-      user_id: user.id,
-    };
-    if (editingProject) {
-      await supabase.from("projects").update(data).eq("id", editingProject.id);
+    if (editing?.isTask) {
+      await supabase.from("tasks").update({
+        title: formName.trim(),
+        description: desc,
+        is_completed: formStatus === "feito",
+        scheduled_date: dateStr,
+      }).eq("id", editing.id);
+    } else if (editing) {
+      await supabase.from("projects").update({
+        name: formName.trim(),
+        description: desc,
+        status: toDbStatus(formStatus),
+      }).eq("id", editing.id);
     } else {
-      await supabase.from("projects").insert(data);
+      await supabase.from("projects").insert({
+        name: formName.trim(),
+        description: desc,
+        status: toDbStatus(formStatus),
+        user_id: user.id,
+      });
     }
-    resetProjectForm();
-    setProjectDialogOpen(false);
+
+    setDialogOpen(false);
+    resetForm();
     fetchData();
+    window.dispatchEvent(new Event("lovable:data-changed"));
+    toast({ title: editing ? "Projeto atualizado!" : "Projeto criado!" });
   };
 
-  const deleteProject = async (id: string) => {
-    // Check for associated tasks
-    const projTasks = tasks.filter(t => t.project_id === id);
-    if (projTasks.length > 0) {
-      alert(`Não é possível excluir o projeto. Existem ${projTasks.length} tarefa(s) associada(s). Remova as tarefas primeiro.`);
-      setDeleteProjectConfirm(null);
-      return;
+  const markComplete = async (item: ProjectItem) => {
+    if (item.isTask) {
+      await supabase.from("tasks").update({ is_completed: true }).eq("id", item.id);
+    } else {
+      await supabase.from("projects").update({ status: "completed" }).eq("id", item.id);
     }
-    await supabase.from("projects").delete().eq("id", id);
-    if (selectedProject === id) setSelectedProject(null);
-    setDeleteProjectConfirm(null);
-    setProjectDialogOpen(false);
-    resetProjectForm();
     fetchData();
+    window.dispatchEvent(new Event("lovable:data-changed"));
+    toast({ title: "Marcado como concluído!" });
   };
 
-  // Resource handlers
-  const addResource = async () => {
-    if (!resName.trim() || !editingProject || !user) return;
-    await supabase.from("project_resources").insert({
-      project_id: editingProject.id,
-      user_id: user.id,
-      name: resName.trim(),
-      role: resRole || null,
-    });
-    setResName(""); setResRole("");
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    if (deleteIsTask) {
+      await supabase.from("tasks").delete().eq("id", deleteId);
+    } else {
+      await supabase.from("tasks").delete().eq("project_id", deleteId);
+      await supabase.from("projects").delete().eq("id", deleteId);
+    }
+    setDeleteId(null);
     fetchData();
+    window.dispatchEvent(new Event("lovable:data-changed"));
+    toast({ title: "Projeto excluído!" });
   };
 
-  const removeResource = async (id: string) => {
-    await supabase.from("project_resources").delete().eq("id", id);
-    fetchData();
+  const formatDateDisplay = (d: string | null) => {
+    if (!d) return "—";
+    try { return format(new Date(d), "dd/MM/yyyy"); } catch { return d; }
   };
 
-  const projectResources = useMemo(() => {
-    if (!editingProject) return [];
-    return resources.filter((r: any) => r.project_id === editingProject.id);
-  }, [resources, editingProject]);
-
-  // Task handlers via unified EventEditDialog
-  const openNewTask = () => {
-    setEditingTaskItem(null);
-    setTaskEditDefaultDate(new Date());
-    setTaskEditDialogOpen(true);
-  };
-
-  const openEditTask = (t: Tables<"tasks">) => {
-    // Convert task to CalendarItem for the unified dialog
-    const item: CalendarItem = {
-      id: `task-proj-${t.id}`,
-      title: t.title,
-      start_time: t.scheduled_date ? new Date(`${t.scheduled_date}T00:00:00`).toISOString() : new Date().toISOString(),
-      all_day: true,
-      color: "#8b5cf6",
-      description: t.description,
-      task_id: t.id,
-      user_id: t.user_id,
-      is_task: true,
-      is_completed: t.is_completed,
-    };
-    setEditingTaskItem(item);
-    setTaskEditDialogOpen(true);
-  };
-
-  const toggleComplete = async (task: Tables<"tasks">) => {
-    await supabase.from("tasks").update({ is_completed: !task.is_completed }).eq("id", task.id);
-    fetchData();
-  };
-
-  // Drag reorder
-  const handleDragEnd = async (fromIdx: number, toIdx: number, taskList: Tables<"tasks">[]) => {
-    if (fromIdx === toIdx) return;
-    const reordered = [...taskList];
-    const [moved] = reordered.splice(fromIdx, 1);
-    reordered.splice(toIdx, 0, moved);
-    const updates = reordered.map((t, i) => supabase.from("tasks").update({ sort_order: i }).eq("id", t.id));
-    await Promise.all(updates);
-    setDragIdx(null);
-    setDragOverIdx(null);
-    fetchData();
-  };
-
-  const selectedTasks = tasks.filter((t) => t.project_id === selectedProject);
-
-  // Filter & sort
-  const filteredTasks = useMemo(() => {
-    let list = selectedTasks;
-    if (taskSearch) list = list.filter(t => t.title.toLowerCase().includes(taskSearch.toLowerCase()));
-    if (taskFilterCategory !== "all") list = list.filter(t => (t.category_id || "none") === taskFilterCategory);
-    if (taskFilterStatus === "active") list = list.filter(t => !t.is_completed);
-    else if (taskFilterStatus === "completed") list = list.filter(t => t.is_completed);
-    return list;
-  }, [selectedTasks, taskSearch, taskFilterCategory, taskFilterStatus]);
-
-  const sortedActive = useMemo(() => {
-    const active = filteredTasks.filter(t => !t.is_completed);
-    return [...active].sort((a, b) => {
-      let cmp = 0;
-      if (sortField === "title") cmp = a.title.localeCompare(b.title);
-      else if (sortField === "scheduled_date") cmp = (a.scheduled_date || "").localeCompare(b.scheduled_date || "");
-      else if (sortField === "assignee") cmp = (a.assignee || "").localeCompare(b.assignee || "");
-      else if (sortField === "category") cmp = (a.category_id || "").localeCompare(b.category_id || "");
-      else if (sortField === "status") cmp = (a.is_completed ? 1 : 0) - (b.is_completed ? 1 : 0);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [filteredTasks, sortField, sortDir]);
-
-  const completedTasks = filteredTasks.filter(t => t.is_completed);
-  const allSelectedTasks = selectedTasks;
-  const allCompleted = allSelectedTasks.filter(t => t.is_completed);
-  const progress = allSelectedTasks.length > 0 ? (allCompleted.length / allSelectedTasks.length) * 100 : 0;
-  const currentProject = projects.find(p => p.id === selectedProject);
-  const projectCosts = selectedProject ? getProjectCosts(selectedProject) : null;
-
-  const toggleSort = (field: SortField) => {
-    if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortField(field); setSortDir("asc"); }
-  };
-
-  // Sort icon matching finances style (dual arrow)
-  const SortIcon = ({ field }: { field: SortField }) => (
-    <span className="ml-1 inline-flex flex-col leading-none">
-      <ChevronUp className={cn("h-2.5 w-2.5", sortField === field && sortDir === "asc" ? "text-foreground" : "text-muted-foreground/40")} />
-      <ChevronDown className={cn("h-2.5 w-2.5 -mt-0.5", sortField === field && sortDir === "desc" ? "text-foreground" : "text-muted-foreground/40")} />
-    </span>
-  );
-
-  const hasActiveTaskFilters = taskSearch || taskFilterCategory !== "all" || taskFilterStatus !== "all";
-
-  const renderProjectItem = (p: Tables<"projects">, isCompleted = false) => {
-    const costs = getProjectCosts(p.id);
-    const pTasks = tasks.filter(t => t.project_id === p.id);
-    const pDone = pTasks.filter(t => t.is_completed).length;
-    const pTotal = pTasks.length;
-    return (
-      <div
-        key={p.id}
-        onClick={() => handleProjectClick(p)}
-        className={cn(
-          "group flex items-center gap-3 rounded-lg px-3 py-2.5 cursor-pointer transition-colors",
-          selectedProject === p.id ? "bg-primary/10 text-primary" : "hover:bg-accent/50",
-          isCompleted && "opacity-60"
-        )}
-      >
-        <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <div className="flex-1 min-w-0">
-          <p className={cn("text-sm font-medium truncate", isCompleted && "line-through")}>{p.name}</p>
-          <p className="text-xs text-muted-foreground">
-            {pDone}/{pTotal} tarefas
-            {costs.totalCost > 0 && ` • ${brl(costs.totalCost)}`}
-          </p>
-        </div>
-      </div>
-    );
-  };
+  const tabConfig: { key: ProjectTab; label: string; icon: React.ReactNode }[] = [
+    { key: "andamento", label: "Em Andamento", icon: <FolderKanban className="h-3.5 w-3.5" /> },
+    { key: "desejos", label: "Desejos", icon: <Sparkles className="h-3.5 w-3.5" /> },
+    { key: "concluidos", label: "Concluídos", icon: <Archive className="h-3.5 w-3.5" /> },
+  ];
 
   return (
-    <div className="flex h-full">
-      {/* Project list sidebar - collapsible */}
-      {sidebarCollapsed ? (
-        <div className="flex h-full w-12 shrink-0 flex-col items-center border-r border-border/30 py-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSidebarCollapsed(false)}>
-            <PanelLeft className="h-4 w-4" />
-          </Button>
-        </div>
-      ) : (
-        <div className="w-72 shrink-0 border-r border-border/30 flex flex-col">
-          <div className="flex items-center justify-between p-4 pb-2">
-            <h3 className="text-sm font-bold">Projetos</h3>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8"
-                onClick={() => { resetProjectForm(); setProjectDialogOpen(true); }}>
-                <Plus className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSidebarCollapsed(true)}>
-                <PanelLeftClose className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 pt-0 space-y-1">
-            {activeProjects.map((p) => renderProjectItem(p))}
-            {activeProjects.length === 0 && completedProjects.length === 0 && (
-              <p className="py-8 text-center text-sm text-muted-foreground">Nenhum projeto</p>
-            )}
-
-            {/* Completed projects group */}
-            {completedProjects.length > 0 && (
-              <Collapsible open={showCompletedProjects} onOpenChange={setShowCompletedProjects} className="mt-4">
-                <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full px-2 py-1.5">
-                  <ChevronDown className={cn("h-4 w-4 transition-transform", !showCompletedProjects && "-rotate-90")} />
-                  <Check className="h-3.5 w-3.5" />
-                  Concluídos ({completedProjects.length})
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-1 mt-1">
-                  {completedProjects.map((p) => renderProjectItem(p, true))}
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Task area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {selectedProject && currentProject ? (
-          <>
-            {/* Project header */}
-            <div className="p-5 pb-0">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h2 className="text-lg font-bold">{currentProject.name}</h2>
-                  {currentProject.description && (
-                    <p className="text-sm text-muted-foreground mt-0.5">{currentProject.description}</p>
-                  )}
-                  {(currentProject as any).responsible && (
-                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                      <User className="h-3 w-3" /> {(currentProject as any).responsible}
-                    </p>
-                  )}
-                </div>
-                <span className={cn(
-                  "text-xs px-2.5 py-1 rounded-full font-medium",
-                  currentProject.status === "active" ? "bg-success/10 text-success" :
-                  currentProject.status === "completed" ? "bg-primary/10 text-primary" :
-                  "bg-muted text-muted-foreground"
-                )}>
-                  {currentProject.status === "active" ? "Ativo" : currentProject.status === "completed" ? "Concluído" : "Pausado"}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3 mb-4">
-                <Progress value={progress} className="h-2.5 flex-1" />
-                <span className="text-sm font-semibold text-muted-foreground">{Math.round(progress)}%</span>
-              </div>
-
-              {projectCosts && (currentProject.budget || projectCosts.totalCost > 0) && (
-                <div className="grid grid-cols-4 gap-3 mb-4">
-                  {currentProject.budget ? (
-                    <Card><CardContent className="p-3">
-                      <p className="text-xs text-muted-foreground">Orçamento</p>
-                      <p className="text-base font-bold text-primary">{brl(Number(currentProject.budget))}</p>
-                    </CardContent></Card>
-                  ) : null}
-                  <Card><CardContent className="p-3">
-                    <p className="text-xs text-muted-foreground">Custo Total</p>
-                    <p className="text-base font-bold text-destructive">{brl(projectCosts.totalCost)}</p>
-                  </CardContent></Card>
-                  <Card><CardContent className="p-3">
-                    <p className="text-xs text-muted-foreground">Pago</p>
-                    <p className="text-base font-bold text-success">{brl(projectCosts.paidCost)}</p>
-                  </CardContent></Card>
-                  <Card><CardContent className="p-3">
-                    <p className="text-xs text-muted-foreground">Pendente</p>
-                    <p className={cn("text-base font-bold", projectCosts.pendingCost > 0 ? "text-warning" : "text-success")}>
-                      {projectCosts.pendingCost > 0 ? brl(projectCosts.pendingCost) : "✓ Quitado"}
-                    </p>
-                  </CardContent></Card>
-                  {currentProject.budget && Number(currentProject.budget) > 0 && (
-                    <Card><CardContent className="p-3">
-                      <p className="text-xs text-muted-foreground">Orçamento Restante</p>
-                      <p className={cn("text-base font-bold", Number(currentProject.budget) - projectCosts.totalCost >= 0 ? "text-success" : "text-destructive")}>
-                        {brl(Number(currentProject.budget) - projectCosts.totalCost)}
-                      </p>
-                    </CardContent></Card>
-                  )}
-                </div>
-              )}
-
-              {/* Task toolbar - filters & search like finances */}
-              <div className="flex items-center gap-2 mb-3 border-b border-border/20 pb-3">
-                <div className="relative flex-1 max-w-xs">
-                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar tarefas..."
-                    value={taskSearch}
-                    onChange={(e) => setTaskSearch(e.target.value)}
-                    className="h-8 pl-8 text-xs"
-                  />
-                </div>
-                <Button
-                  variant="ghost" size="sm"
-                  className={cn("h-8 text-xs gap-1", hasActiveTaskFilters && "text-primary")}
-                  onClick={() => setShowTaskFilters(!showTaskFilters)}
-                >
-                  <Filter className="h-3.5 w-3.5" /> Filtros
-                </Button>
-                {hasActiveTaskFilters && (
-                  <button onClick={() => { setTaskSearch(""); setTaskFilterCategory("all"); setTaskFilterStatus("all"); }}
-                    className="text-xs text-primary hover:underline flex items-center gap-0.5">
-                    <X className="h-3 w-3" /> Limpar
-                  </button>
+    <ScrollArea className="h-full">
+      <div className="p-4 space-y-4">
+        {/* Tabs + Filters */}
+        <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-row items-center")}>
+          <div className="flex gap-2 overflow-x-auto">
+            {tabConfig.map(({ key, label, icon }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all shrink-0",
+                  activeTab === key
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border hover:border-primary/80 hover:bg-primary/5"
                 )}
-              </div>
-
-              {showTaskFilters && (
-                <div className="flex items-center gap-3 mb-3">
-                  <Select value={taskFilterCategory} onValueChange={setTaskFilterCategory}>
-                    <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Categoria" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas categorias</SelectItem>
-                      <SelectItem value="none">Sem categoria</SelectItem>
-                      {sortedCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Select value={taskFilterStatus} onValueChange={setTaskFilterStatus}>
-                    <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos status</SelectItem>
-                      <SelectItem value="active">Pendentes</SelectItem>
-                      <SelectItem value="completed">Concluídas</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-
-            {/* EAP Task Table with drag reorder */}
-            <div className="flex-1 overflow-auto px-5 pb-5">
-              <div className="rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-xs text-muted-foreground/60 uppercase tracking-wider border-b border-border/20">
-                      <th className="text-left py-2.5 px-3 w-8"></th>
-                      <th className="text-left py-2.5 px-3 w-8">#</th>
-                      <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("title")}>
-                        <span className="inline-flex items-center">Tarefa <SortIcon field="title" /></span>
-                      </th>
-                      <th className="text-left py-2.5 px-3 w-28 cursor-pointer select-none" onClick={() => toggleSort("assignee")}>
-                        <span className="inline-flex items-center">Responsável <SortIcon field="assignee" /></span>
-                      </th>
-                      <th className="text-left py-2.5 px-3 w-28 cursor-pointer select-none" onClick={() => toggleSort("scheduled_date")}>
-                        <span className="inline-flex items-center">Data <SortIcon field="scheduled_date" /></span>
-                      </th>
-                      <th className="text-left py-2.5 px-3 w-24 cursor-pointer select-none" onClick={() => toggleSort("category")}>
-                        <span className="inline-flex items-center">Categoria <SortIcon field="category" /></span>
-                      </th>
-                      <th className="text-center py-2.5 px-3 w-16 cursor-pointer select-none" onClick={() => toggleSort("status")}>
-                        <span className="inline-flex items-center">Status <SortIcon field="status" /></span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedActive.map((task, idx) => (
-                      <tr
-                        key={task.id}
-                        draggable
-                        onDragStart={() => setDragIdx(idx)}
-                        onDragOver={(e) => { e.preventDefault(); setDragOverIdx(idx); }}
-                        onDragEnd={() => { if (dragIdx !== null && dragOverIdx !== null) handleDragEnd(dragIdx, dragOverIdx, sortedActive); }}
-                        className={cn(
-                          "group cursor-pointer transition-colors hover:bg-muted/20 border-t border-border/10",
-                          dragOverIdx === idx && "border-t-2 border-t-primary"
-                        )}
-                        onClick={() => openEditTask(task)}
-                      >
-                        <td className="py-2.5 px-3">
-                          <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <button onClick={(e) => { e.stopPropagation(); toggleComplete(task); }} className={cn(
-                            "flex h-5 w-5 items-center justify-center rounded border-2 transition-colors",
-                            task.is_completed ? "border-primary bg-primary" : "border-muted-foreground/40 hover:border-primary"
-                          )}>
-                            {task.is_completed && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
-                          </button>
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <div className="flex items-center gap-2">
-                            {task.is_favorite && <Star className="h-3.5 w-3.5 fill-warning text-warning shrink-0" />}
-                            <span className="text-sm">{task.title}</span>
-                          </div>
-                          {task.description && <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[300px]">{task.description}</p>}
-                        </td>
-                        <td className="py-2.5 px-3 text-sm text-muted-foreground">{task.assignee || "—"}</td>
-                        <td className="py-2.5 px-3 text-sm text-muted-foreground">
-                          {task.scheduled_date ? format(new Date(task.scheduled_date), "dd/MM/yy") : "—"}
-                        </td>
-                        <td className="py-2.5 px-3">
-                          {(() => {
-                            const cat = categories.find(c => c.id === task.category_id);
-                            return cat ? (
-                              <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: `${cat.color}20`, color: cat.color || undefined }}>
-                                {cat.icon} {cat.name}
-                              </span>
-                            ) : <span className="text-sm text-muted-foreground">—</span>;
-                          })()}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className={cn("text-xs px-2 py-0.5 rounded-full", "bg-warning/10 text-warning")}>
-                            Pendente
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <Button
-                variant="ghost" size="sm"
-                className="mt-3 text-sm text-muted-foreground hover:text-foreground gap-1.5"
-                onClick={openNewTask}
               >
-                <Plus className="h-4 w-4" /> Nova Tarefa
-              </Button>
-
-              {completedTasks.length > 0 && (
-                <Collapsible open={showCompleted} onOpenChange={setShowCompleted} className="mt-5">
-                  <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    <ChevronDown className={cn("h-4 w-4 transition-transform", !showCompleted && "-rotate-90")} />
-                    Concluídas ({completedTasks.length})
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2">
-                    <table className="w-full">
-                      <tbody>
-                        {completedTasks.map((task) => (
-                          <tr key={task.id}
-                            className="group cursor-pointer transition-colors hover:bg-muted/20 border-t border-border/10 opacity-50"
-                            onClick={() => openEditTask(task)}>
-                            <td className="py-2.5 px-3 w-8"></td>
-                            <td className="py-2.5 px-3 w-8">
-                              <button onClick={(e) => { e.stopPropagation(); toggleComplete(task); }} className="flex h-5 w-5 items-center justify-center rounded border-2 border-primary bg-primary">
-                                <Check className="h-3.5 w-3.5 text-primary-foreground" />
-                              </button>
-                            </td>
-                            <td className="py-2.5 px-3"><span className="text-sm line-through">{task.title}</span></td>
-                            <td className="py-2.5 px-3 text-sm text-muted-foreground">{task.assignee || "—"}</td>
-                            <td className="py-2.5 px-3 text-sm text-muted-foreground">
-                              {task.scheduled_date ? format(new Date(task.scheduled_date), "dd/MM/yy") : "—"}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              {(() => {
-                                const cat = categories.find(c => c.id === task.category_id);
-                                return cat ? <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: `${cat.color}20`, color: cat.color || undefined }}>{cat.icon} {cat.name}</span> : "—";
-                              })()}
-                            </td>
-                            <td className="py-2.5 px-3 text-center">
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success">Feito</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex h-full items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <FolderOpen className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
-              <p className="text-base font-medium">Selecione um projeto</p>
-              <p className="text-sm text-muted-foreground/60 mt-1">Clique duas vezes em um projeto para editar</p>
-            </div>
+                {icon}
+                {label}
+              </button>
+            ))}
           </div>
-        )}
+
+          <div className={cn("flex gap-2 items-center", !isMobile && "ml-auto")}>
+            <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
+              <SelectTrigger className="h-8 w-32 text-xs">
+                <Filter className="h-3 w-3 mr-1" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="em_andamento">Em andamento</SelectItem>
+                <SelectItem value="feito">Feito</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterPriority} onValueChange={(v) => setFilterPriority(v as any)}>
+              <SelectTrigger className="h-8 w-32 text-xs">
+                <Filter className="h-3 w-3 mr-1" />
+                <SelectValue placeholder="Prioridade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="alta">Alta</SelectItem>
+                <SelectItem value="media">Média</SelectItem>
+                <SelectItem value="baixa">Baixa</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button size="sm" onClick={() => openDialog()} className="gap-1.5 shrink-0">
+              <Plus className="h-3.5 w-3.5" />
+              Adicionar Projeto
+            </Button>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="rounded-lg border border-border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/30 border-b border-border">
+                  <th className="text-left py-2.5 px-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Nome</th>
+                  <th className="text-left py-2.5 px-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider w-32">Status</th>
+                  <th className="text-left py-2.5 px-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider w-28">Prioridade</th>
+                  <th className="text-left py-2.5 px-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider w-28">Data</th>
+                  <th className="text-left py-2.5 px-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Observação</th>
+                  <th className="text-center py-2.5 px-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider w-24">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tabItems.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-muted-foreground/50 text-sm">
+                      Nenhum projeto nesta aba
+                    </td>
+                  </tr>
+                )}
+                {tabItems.map(item => (
+                  <tr key={item.id} className="border-b border-border/30 hover:bg-muted/10 transition-colors">
+                    <td className="py-2.5 px-3 font-medium text-foreground">{item.name}</td>
+                    <td className="py-2.5 px-3">
+                      <span className={cn("text-xs font-medium", STATUS_LABELS[item.status].className)}>
+                        {STATUS_LABELS[item.status].label}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={cn("text-xs font-medium", PRIORITY_LABELS[item.priority].className)}>
+                        {PRIORITY_LABELS[item.priority].label}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-xs text-muted-foreground tabular-nums">
+                      {formatDateDisplay(item.date)}
+                    </td>
+                    <td className="py-2.5 px-3 text-xs text-muted-foreground max-w-[200px] truncate">
+                      {item.observation || "—"}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => openDialog(item)}
+                          className="p-1.5 rounded-md hover:bg-muted/30 text-muted-foreground hover:text-foreground transition-colors"
+                          title="Editar"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        {item.status !== "feito" && (
+                          <button
+                            onClick={() => markComplete(item)}
+                            className="p-1.5 rounded-md hover:bg-[hsl(var(--success))]/10 text-muted-foreground hover:text-[hsl(var(--success))] transition-colors"
+                            title="Concluir"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => { setDeleteId(item.id); setDeleteIsTask(!!item.isTask); }}
+                          className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
-      {/* Project Dialog with Tabs */}
-      <Dialog open={projectDialogOpen} onOpenChange={(o) => { setProjectDialogOpen(o); if (!o) resetProjectForm(); }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      {/* Add/Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) { setDialogOpen(false); resetForm(); } }}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base">{editingProject ? "Editar Projeto" : "Novo Projeto"}</DialogTitle>
+            <DialogTitle>{editing ? "Editar Projeto" : "Adicionar Projeto"}</DialogTitle>
           </DialogHeader>
-
-          <Tabs value={projDialogTab} onValueChange={setProjDialogTab}>
-            <TabsList className="w-full">
-              <TabsTrigger value="details" className="flex-1 text-xs">Detalhes</TabsTrigger>
-              {editingProject && <TabsTrigger value="resources" className="flex-1 text-xs">Recursos ({projectResources.length})</TabsTrigger>}
-            </TabsList>
-
-            <TabsContent value="details" className="space-y-4 mt-4">
-              <div>
-                <Label className="text-sm">Nome do Projeto</Label>
-                <Input value={projName} onChange={(e) => setProjName(e.target.value)} className="mt-1" placeholder="Ex: Reforma do escritório" />
-              </div>
-              <div>
-                <Label className="text-sm">Descrição</Label>
-                <Textarea value={projDescription} onChange={(e) => setProjDescription(e.target.value)} className="mt-1" placeholder="Descrição do projeto (opcional)" rows={3} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-sm">Orçamento</Label>
-                  <div className="relative mt-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">R$</span>
-                    <Input type="text" inputMode="decimal" placeholder="0,00" value={projBudget} onChange={(e) => setProjBudget(e.target.value.replace(/[^0-9.,]/g, ""))} className="pl-10" />
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm">Status</Label>
-                  <Select value={projStatus} onValueChange={setProjStatus}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Ativo</SelectItem>
-                      <SelectItem value="paused">Pausado</SelectItem>
-                      <SelectItem value="completed">Concluído</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label className="text-sm flex items-center gap-1.5"><User className="h-3.5 w-3.5" /> Responsável</Label>
-                <Input value={projResponsible} onChange={(e) => setProjResponsible(e.target.value)} className="mt-1" placeholder="Nome do responsável" />
-              </div>
-              <div>
-                <Label className="text-sm">Categoria</Label>
-                <Select value={projCategoryId} onValueChange={setProjCategoryId}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Selecionar categoria" /></SelectTrigger>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Nome *</Label>
+              <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="Nome do projeto" className="h-9" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Status</Label>
+                <Select value={formStatus} onValueChange={(v) => setFormStatus(v as ProjectStatus)}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {projectCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                    <SelectItem value="em_andamento">Em andamento</SelectItem>
+                    <SelectItem value="feito">Feito</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            </TabsContent>
-
-            {editingProject && (
-              <TabsContent value="resources" className="mt-4">
-                <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <Input placeholder="Nome" value={resName} onChange={(e) => setResName(e.target.value)} className="flex-1 text-sm" />
-                    <Input placeholder="Função" value={resRole} onChange={(e) => setResRole(e.target.value)} className="w-32 text-sm" />
-                    <Button size="sm" onClick={addResource} className="shrink-0"><Plus className="h-3.5 w-3.5" /></Button>
-                  </div>
-                  <div className="space-y-2">
-                    {projectResources.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-4">Nenhum recurso alocado</p>
-                    )}
-                    {projectResources.map((r: any) => (
-                      <div key={r.id} className="flex items-center gap-3 rounded-lg border border-border/30 p-2.5">
-                        <Users className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{r.name}</p>
-                          {r.role && <p className="text-xs text-muted-foreground">{r.role}</p>}
-                        </div>
-                        <button onClick={() => removeResource(r.id)} className="rounded p-1 hover:bg-destructive/10">
-                          <Trash2 className="h-3.5 w-3.5 text-destructive/60" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </TabsContent>
-            )}
-          </Tabs>
-
-          {/* Standardized footer */}
-          <div className="flex items-center gap-2 pt-4 border-t border-border/20">
-            {editingProject && (
-              <Button variant="destructive" size="sm" className="gap-1.5"
-                onClick={() => setDeleteProjectConfirm(editingProject.id)}>
-                <Trash2 className="h-3.5 w-3.5" /> Excluir
-              </Button>
-            )}
-            <div className="flex gap-2 ml-auto">
-              <Button variant="outline" size="sm" onClick={() => { setProjectDialogOpen(false); resetProjectForm(); }}>Cancelar</Button>
-              <Button size="sm" onClick={saveProject} className="gap-1.5">
-                <Save className="h-3.5 w-3.5" /> Salvar
-              </Button>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Prioridade</Label>
+                <Select value={formPriority} onValueChange={(v) => setFormPriority(v as Priority)}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="alta">Alta</SelectItem>
+                    <SelectItem value="media">Média</SelectItem>
+                    <SelectItem value="baixa">Baixa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Data</Label>
+              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full h-9 justify-start text-xs font-normal gap-2">
+                    <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                    {formDate ? format(formDate, "dd/MM/yyyy") : "Selecionar data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" locale={ptBR} selected={formDate} onSelect={(d) => { setFormDate(d); setDatePickerOpen(false); }} />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Observação</Label>
+              <Textarea value={formObs} onChange={(e) => setFormObs(e.target.value)} placeholder="Notas, links, detalhes..." className="min-h-[80px] text-xs" />
             </div>
           </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="text-xs">Cancelar</Button>
+            <Button onClick={saveProject} disabled={!formName.trim()} className="text-xs">Salvar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete project confirmation */}
-      <Dialog open={!!deleteProjectConfirm} onOpenChange={(o) => { if (!o) setDeleteProjectConfirm(null); }}>
-        <DialogContent className="max-w-sm">
+      {/* Delete confirm */}
+      <Dialog open={!!deleteId} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Confirmar Exclusão</DialogTitle>
-            <DialogDescription>Tem certeza que deseja excluir este projeto? Esta ação não pode ser desfeita.</DialogDescription>
+            <DialogTitle>Excluir projeto?</DialogTitle>
           </DialogHeader>
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" size="sm" onClick={() => setDeleteProjectConfirm(null)}>Cancelar</Button>
-            <Button variant="destructive" size="sm" onClick={() => deleteProjectConfirm && deleteProject(deleteProjectConfirm)}>Excluir</Button>
-          </div>
+          <p className="text-sm text-muted-foreground">Esta ação não pode ser desfeita.</p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteId(null)} className="text-xs">Cancelar</Button>
+            <Button variant="destructive" onClick={handleDelete} className="text-xs">Excluir</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Unified Task Dialog via EventEditDialog */}
-      <EventEditDialog
-        open={taskEditDialogOpen}
-        onOpenChange={setTaskEditDialogOpen}
-        item={editingTaskItem}
-        defaultDate={taskEditDefaultDate}
-        userId={user?.id || ""}
-        onSaved={fetchData}
-      />
-    </div>
+    </ScrollArea>
   );
 }
