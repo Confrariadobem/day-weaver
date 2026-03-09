@@ -293,96 +293,97 @@ export default function DashboardView() {
           ))}
         </div>
 
-        {/* KPI Cards Grid + Câmbio */}
-        <div className="flex gap-4 flex-wrap lg:flex-nowrap">
-          {/* Main KPI grid */}
-          <div className="flex-1 min-w-0 grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(243px, 1fr))" }}>
-            {/* Receita */}
-            <Card className="bg-card">
-              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
-                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <TrendingUp className="size-6 mr-1 text-muted-foreground" /> Receita
-                </p>
-                <p className="text-[1.2rem] font-semibold text-[hsl(var(--success))] mt-2 overflow-hidden truncate">{brl(totalRevenue)}</p>
-              </CardContent>
-            </Card>
-            {/* Despesa */}
-            <Card className="bg-card">
-              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
-                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <TrendingDown className="size-6 mr-1 text-muted-foreground" /> Despesa
-                </p>
-                <p className="text-[1.2rem] font-semibold text-destructive mt-2 overflow-hidden truncate">{brl(totalExpense)}</p>
-              </CardContent>
-            </Card>
-            {/* Caixa */}
-            <Card className="bg-card">
-              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
-                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <Wallet className="size-6 mr-1 text-muted-foreground" /> Caixa
-                </p>
-                <p className={cn("text-[1.2rem] font-semibold mt-2 overflow-hidden truncate", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
-                  {brl(totalCash)}
-                </p>
-              </CardContent>
-            </Card>
-            {/* Investimentos */}
-            <Card className="bg-card">
-              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
-                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <PiggyBank className="size-6 mr-1 text-muted-foreground" /> Investimentos
-                </p>
-                <p className="text-[1.2rem] font-semibold text-foreground mt-2 overflow-hidden truncate">{brl(totalInvestments)}</p>
-              </CardContent>
-            </Card>
-            {/* Patrimônio */}
-            <Card className="bg-card">
-              <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
-                <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <Building2 className="size-6 mr-1 text-muted-foreground" strokeWidth={1.5} /> Patrimônio
-                </p>
-                <p className="text-[1.2rem] font-semibold text-foreground mt-2 overflow-hidden truncate">{brl(totalPatrimony)}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Câmbio widget – fixed right */}
-          <Card className="bg-card shrink-0 transition-all duration-300" style={{ width: 243 }}>
-            <CardContent className={cn("p-3 flex flex-col", !showConversion && "min-h-[80px] justify-center")}>
+        {/* KPI Cards Grid */}
+        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(243px, 1fr))" }}>
+          {/* Receita */}
+          <Card className="bg-card">
+            <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
               <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <ArrowRightLeft className="size-6 mr-1 text-muted-foreground" /> Câmbio
-                <Switch
-                  checked={showConversion}
-                  onCheckedChange={handleToggleConversion}
-                  className="ml-auto"
-                />
+                <TrendingUp className="size-6 mr-1 text-muted-foreground" /> Receita
               </p>
-              {showConversion && (
-                <div className="space-y-3 mt-3 animate-in fade-in duration-300">
-                  {ratesLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Carregando...</span>}
-                  {otherCurrencies.map(cur => {
-                    const val = cur === "BRL"
-                      ? totalPatrimony
-                      : convert(totalPatrimony, cur as "USD" | "EUR" | "BTC");
-                    const rate = cur === "BRL"
-                      ? 1
-                      : rates[cur as "USD" | "EUR" | "BTC"];
-                    return (
-                      <div key={cur} className="space-y-0">
-                        <p className="text-[0.8rem] text-foreground">
-                          {cur}: ≈ {fmtOther(val, cur)}
-                        </p>
-                        <p className="text-[0.7rem] text-muted-foreground">
-                          ({cur === "BRL" ? "moeda base" : fmtRate(cur, rate)})
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <p className="text-[1.2rem] font-semibold text-[hsl(var(--success))] mt-2 overflow-hidden truncate">{brl(totalRevenue)}</p>
+            </CardContent>
+          </Card>
+          {/* Despesa */}
+          <Card className="bg-card">
+            <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+              <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <TrendingDown className="size-6 mr-1 text-muted-foreground" /> Despesa
+              </p>
+              <p className="text-[1.2rem] font-semibold text-destructive mt-2 overflow-hidden truncate">{brl(totalExpense)}</p>
+            </CardContent>
+          </Card>
+          {/* Caixa */}
+          <Card className="bg-card">
+            <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+              <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <Wallet className="size-6 mr-1 text-muted-foreground" /> Caixa
+              </p>
+              <p className={cn("text-[1.2rem] font-semibold mt-2 overflow-hidden truncate", totalCash >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                {brl(totalCash)}
+              </p>
+            </CardContent>
+          </Card>
+          {/* Investimentos */}
+          <Card className="bg-card">
+            <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+              <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <PiggyBank className="size-6 mr-1 text-muted-foreground" /> Investimentos
+              </p>
+              <p className={cn("text-[1.2rem] font-semibold mt-2 overflow-hidden truncate", totalInvestments >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                {brl(totalInvestments)}
+              </p>
+            </CardContent>
+          </Card>
+          {/* Patrimônio */}
+          <Card className="bg-card">
+            <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">
+              <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <Building2 className="size-6 mr-1 text-muted-foreground" strokeWidth={1.5} /> Patrimônio
+              </p>
+              <p className={cn("text-[1.2rem] font-semibold mt-2 overflow-hidden truncate", totalPatrimony >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                {brl(totalPatrimony)}
+              </p>
             </CardContent>
           </Card>
         </div>
+
+        {/* Câmbio widget – full width above charts */}
+        <Card className="bg-card transition-all duration-300">
+          <CardContent className={cn("p-3 flex flex-col", !showConversion && "min-h-[60px] justify-center")}>
+            <p className="text-[0.9rem] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              <ArrowRightLeft className="size-6 mr-1 text-muted-foreground" /> Câmbio
+              <Switch
+                checked={showConversion}
+                onCheckedChange={handleToggleConversion}
+                className="ml-auto"
+              />
+            </p>
+            {showConversion && (
+              <div className="flex flex-wrap gap-6 mt-3 animate-in fade-in duration-300">
+                {ratesLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Carregando...</span>}
+                {otherCurrencies.map(cur => {
+                  const val = cur === "BRL"
+                    ? totalPatrimony
+                    : convert(totalPatrimony, cur as "USD" | "EUR" | "BTC");
+                  const rate = cur === "BRL"
+                    ? 1
+                    : rates[cur as "USD" | "EUR" | "BTC"];
+                  return (
+                    <div key={cur} className="space-y-0">
+                      <p className="text-[0.8rem] text-foreground">
+                        {cur}: ≈ {fmtOther(val, cur)}
+                      </p>
+                      <p className="text-[0.7rem] text-muted-foreground">
+                        ({cur === "BRL" ? "moeda base" : fmtRate(cur, rate)})
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
