@@ -2747,25 +2747,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               </CardContent>
             </Card>
 
-            {/* Paid vs Pending trend */}
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Pago × Pendente — {periodYear}</CardTitle></CardHeader>
-              <CardContent>
-                <div className="w-full min-w-0" style={{ height: 220 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyTrendData} barGap={0}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
-                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="pago" name="Pago" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="pendente" name="Pendente" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+
+
 
             {/* Cost Center Breakdown */}
             {costCenterData.length > 0 && (
