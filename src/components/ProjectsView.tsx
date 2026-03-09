@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Plus, Pencil, CheckCircle2, Trash2, CalendarDays, Search, X,
   FolderKanban, Sparkles, Archive, ChevronDown, ChevronUp, ChevronRight,
-  FileUp, FileDown, Printer, CalendarRange, Filter, Save,
+  FileUp, FileDown, Printer, CalendarRange, Filter, Save, Layers,
 } from "lucide-react";
 import { format, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
