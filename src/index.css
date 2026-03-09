@@ -286,4 +286,15 @@
     border-radius: var(--radius);
     box-shadow: none;
   }
+
+  /* Prevent card/chart clipping in grids */
+  .module-container .grid > * {
+    min-width: 0;
+    flex-shrink: 0;
+    box-sizing: border-box;
+  }
+  .module-container .recharts-responsive-container {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
 }
