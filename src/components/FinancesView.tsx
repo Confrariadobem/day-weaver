@@ -2075,6 +2075,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         className="h-8 text-xs"
                       />
                     </div>
+                  </div>
                 </div>
                 <div className="border-t border-border/50" />
               </div>
