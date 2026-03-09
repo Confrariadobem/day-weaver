@@ -115,7 +115,7 @@ export default function ProjectsView() {
   const { user } = useAuth();
   const { formatDate: fmtDate, dateFormat } = useDateFormat();
   const isMobile = useIsMobile();
-  const [activeTab, setActiveTab] = useState<ProjectTab>("indicadores");
+  const [activeTab, setActiveTab] = useState<ProjectTab>("andamento");
   const [rawProjects, setRawProjects] = useState<any[]>([]);
 
   // Local week_priority state (not persisted to DB yet, stored in memory)
