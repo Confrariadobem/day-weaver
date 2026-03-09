@@ -565,9 +565,12 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          parent_id: string | null
+          priority: string | null
           program_id: string | null
           responsible: string | null
           status: string | null
+          target_date: string | null
           updated_at: string
           user_id: string
         }
@@ -579,9 +582,12 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          parent_id?: string | null
+          priority?: string | null
           program_id?: string | null
           responsible?: string | null
           status?: string | null
+          target_date?: string | null
           updated_at?: string
           user_id: string
         }
@@ -593,9 +599,12 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          parent_id?: string | null
+          priority?: string | null
           program_id?: string | null
           responsible?: string | null
           status?: string | null
+          target_date?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -612,6 +621,13 @@ export type Database = {
             columns: ["cost_center_id"]
             isOneToOne: false
             referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
