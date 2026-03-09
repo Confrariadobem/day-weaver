@@ -466,7 +466,7 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
         </div>
 
           {/* Investment Cards Grid - all types when dashboard, filtered when specific tab */}
-          {activeTab !== "dashboard" && (
+          {activeTab !== "dashboard" && INVESTMENT_TYPES.some(t => t.value === activeTab) && (
             <>
               <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                 {tabFilteredInvestments.map(inv => {
@@ -524,6 +524,14 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
                   <p className="text-xs mt-1">Use o botão + para adicionar seu primeiro ativo.</p>
                 </div>
               )}
+
+              {/* Trades table for this type */}
+              <div className="mt-6">
+                <p className="text-xs font-semibold mb-3 flex items-center gap-1.5 px-1">
+                  <ListChecks className="h-3.5 w-3.5 text-primary" /> Histórico de Trades
+                </p>
+                <TradesTable investmentType={activeTab as InvestmentTypeFilter} />
+              </div>
             </>
           )}
         </div>
