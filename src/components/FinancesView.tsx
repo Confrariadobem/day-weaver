@@ -1734,7 +1734,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             setFilterIsFixed("all"); setShowSettled(false);
             setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
             setFluxoDateFrom(""); setFluxoDateTo("");
-            setAdvancedFilterOpen(false);
+            // Keep advanced filter panel open — only clear fields
           };
 
           const showAllFilters = () => {
