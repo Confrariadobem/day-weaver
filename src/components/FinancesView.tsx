@@ -2415,7 +2415,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                     <Check className="h-3.5 w-3.5" />
                                   </button>
                                 </TooltipTrigger>
-                                <TooltipContent className="z-[100] text-xs text-muted-foreground">Baixar</TooltipContent>
+                                <TooltipContent className="z-[100] text-xs text-muted-foreground">Baixar lançamento</TooltipContent>
                               </Tooltip>
                             )}
                             {/* 1.4: Reverter action for paid entries */}
