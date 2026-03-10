@@ -1431,7 +1431,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 </div>
               )}
 
-              {recurrence !== "none" && !item && (
+              {recurrence !== "none" && (
                 <>
                   <div className="flex items-center gap-2">
                     <Checkbox

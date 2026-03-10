@@ -1485,7 +1485,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           )}
 
           {/* Recorrente vs Parcelado */}
-          {!editingEntry && (
+          {(
             <div className="pt-2 border-t border-border/20 space-y-2">
               <div className="flex items-center gap-3">
                 <Button size="sm" variant={recurrence !== "none" ? "default" : "outline"}
