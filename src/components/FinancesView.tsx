@@ -3011,6 +3011,42 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         </DialogContent>
       </Dialog>
 
+      {/* 1.4: Revert confirmation dialog */}
+      <Dialog open={!!revertConfirmId} onOpenChange={(o) => { if (!o) setRevertConfirmId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reverter pagamento</DialogTitle>
+            <DialogDescription>O status voltará para "Pendente", a data de pagamento será zerada e o saldo da carteira será atualizado. Confirma?</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2 pt-4 border-t border-border/20">
+            <div className="flex gap-2 ml-auto">
+              <Button variant="ghost" size="sm" onClick={() => setRevertConfirmId(null)}>Cancelar</Button>
+              <Button variant="default" size="sm" onClick={async () => {
+                if (!revertConfirmId) return;
+                const entry = entries.find(e => e.id === revertConfirmId);
+                if (entry) {
+                  await supabase.from("financial_entries").update({
+                    is_paid: false, payment_date: null,
+                  }).eq("id", revertConfirmId);
+                  // Revert account balance
+                  if (entry.account_id) {
+                    const account = accounts.find(a => a.id === entry.account_id);
+                    if (account) {
+                      const delta = entry.type === "revenue" ? -Number(entry.amount) : Number(entry.amount);
+                      await supabase.from("financial_accounts").update({
+                        current_balance: account.current_balance + delta,
+                      }).eq("id", entry.account_id);
+                    }
+                  }
+                }
+                setRevertConfirmId(null);
+                fetchData();
+              }}>Reverter</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Recurrence edit dialog */}
       <Dialog open={!!recurrenceEditDialog.entry && !recurrenceEditDialog.mode} onOpenChange={(o) => { if (!o) setRecurrenceEditDialog({ entry: null, mode: null }); }}>
         <DialogContent className="max-w-sm">
