@@ -2374,7 +2374,19 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                     <Check className="h-3.5 w-3.5" />
                                   </button>
                                 </TooltipTrigger>
-                                <TooltipContent className="text-xs text-muted-foreground">Baixar</TooltipContent>
+                                <TooltipContent className="z-[100] text-xs text-muted-foreground">Baixar</TooltipContent>
+                              </Tooltip>
+                            )}
+                            {/* 1.4: Reverter action for paid entries */}
+                            {e.is_paid && (
+                              <Tooltip delayDuration={200}>
+                                <TooltipTrigger asChild>
+                                  <button onClick={(ev) => { ev.stopPropagation(); setRevertConfirmId(e.id); }}
+                                    className="rounded p-0.5 text-warning hover:bg-warning/10 transition-colors">
+                                    <Undo className="h-3.5 w-3.5" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="z-[100] text-xs text-muted-foreground">Reverter</TooltipContent>
                               </Tooltip>
                             )}
                             <Tooltip delayDuration={200}>
