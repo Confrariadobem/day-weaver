@@ -1790,7 +1790,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       onClick={showAllFilters}
                       className="rounded p-0.5 transition-colors text-muted-foreground hover:text-foreground"
                     >
-                      <Eye className="h-3.5 w-3.5" />
+                      <Eye className="h-4 w-4" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent className="z-[100] text-xs">Mostrar todos</TooltipContent>
