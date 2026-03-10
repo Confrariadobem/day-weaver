@@ -720,12 +720,27 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterCostCenterId, filterProjectId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart, showSettled]);
 
   // KPI totals based on current filter
+  // 1.1: KPI always shows only pending/overdue entries (never paid)
   const kpiData = useMemo(() => {
-    const totalRevenue = filtered.filter((e) => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
-    const totalExpense = filtered.filter((e) => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
-    const balance = totalRevenue - totalExpense;
-    return { totalRevenue, totalExpense, balance };
-  }, [filtered]);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    // Compute from all entries with date/wallet filters, but always only pending
+    let base = entries;
+    if (walletFilter) base = base.filter(e => e.account_id === walletFilter.id);
+    const fromDate = parseDMY(fluxoDateFrom);
+    const toDate = parseDMY(fluxoDateTo);
+    if (fromDate || toDate) {
+      base = base.filter(e => {
+        const d = parseEntryDate(e.entry_date);
+        if (fromDate && d < fromDate) return false;
+        if (toDate) { const endD = new Date(toDate); endD.setHours(23, 59, 59, 999); if (d > endD) return false; }
+        return true;
+      });
+    }
+    const pending = base.filter(e => !e.is_paid);
+    const totalRevenue = pending.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
+    const totalExpense = pending.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
+    return { totalRevenue, totalExpense, balance: totalRevenue - totalExpense };
+  }, [entries, fluxoDateFrom, fluxoDateTo, walletFilter]);
 
   const totalAvailable = accounts.reduce((s, a) => {
     if (a.type === "credit_card") return s;
