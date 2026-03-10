@@ -2249,6 +2249,24 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
                               <button
+                                className="rounded p-0.5 text-amber-500 hover:bg-amber-500/10 transition-colors"
+                                onClick={async () => {
+                                  const ids = Array.from(selectedIds);
+                                  await supabase.from("financial_entries").update({
+                                    is_paid: false, payment_date: null,
+                                  }).in("id", ids);
+                                  setSelectedIds(new Set());
+                                  fetchData();
+                                }}
+                              >
+                                <Undo className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="text-xs text-muted-foreground">Reverter</TooltipContent>
+                          </Tooltip>
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <button
                                 className="rounded p-0.5 text-destructive hover:text-destructive/80 transition-colors"
                                 onClick={async () => {
                                   const ids = Array.from(selectedIds);
