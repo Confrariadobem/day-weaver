@@ -1777,10 +1777,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               </TooltipTrigger>
               <TooltipContent className="z-[100] text-xs">Mostrar todos</TooltipContent>
             </Tooltip>
-          </>;
-        })()}
-            
-            <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
+          <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
               <PopoverTrigger asChild>
                 <button
                   onClick={() => setFluxoIntervalOpen(true)}
@@ -1808,49 +1805,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       onChange={(e) => setFluxoDateFrom(normalizeDateInput(e.target.value))}
                       onBlur={() => { const d = parseDMY(fluxoDateFrom); if (d) { setFluxoCustomFrom(d); setFluxoDateFrom(format(d, "dd/MM/yyyy")); } }}
                       placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
-            </div>
-            {/* 1.10: Reset filters (eraser) */}
-            {(() => {
-              const hasActiveFilters = searchQuery || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart || colFilterStatus !== "pending" || showSettled || fluxoDateFrom || fluxoDateTo;
-              return (
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => {
-                        setSearchQuery(""); setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
-                        setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
-                        setFilterIsFixed("all"); setFilterCounterpart(""); setColFilterStatus("pending");
-                        setShowSettled(false); setFluxoDateFrom(""); setFluxoDateTo("");
-                        setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
-                      }}
-                      className={cn("relative rounded p-1 transition-colors", hasActiveFilters ? "text-primary" : "text-muted-foreground hover:text-foreground")}
-                    >
-                      <Eraser className="h-4 w-4" />
-                      {hasActiveFilters && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary" />}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="z-[100] text-xs">Limpar tudo</TooltipContent>
-                </Tooltip>
-              );
-            })()}
-            {/* 1.10: Show all (eye) */}
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => {
-                    setSearchQuery(""); setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
-                    setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
-                    setFilterIsFixed("all"); setFilterCounterpart(""); setColFilterStatus("all");
-                    setShowSettled(true); setFluxoDateFrom(""); setFluxoDateTo("");
-                    setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
-                  }}
-                  className="text-muted-foreground hover:text-foreground transition-colors rounded p-1"
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="z-[100] text-xs">Mostrar tudo</TooltipContent>
-            </Tooltip>
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold w-8 shrink-0">Até:</span>
                     <Input value={fluxoDateTo}
@@ -1866,9 +1821,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </div>
               </PopoverContent>
             </Popover>
+
             <button
               onClick={() => {
-                // Toggle: if already filtering today, reset
                 const today = new Date();
                 const todayStr = format(today, "dd/MM/yyyy");
                 if (fluxoDateFrom === todayStr && fluxoDateTo === todayStr) {
@@ -1931,8 +1886,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               </TooltipTrigger>
               <TooltipContent className="z-[100] text-xs">Imprimir relatório</TooltipContent>
             </Tooltip>
-          </>
-        )}
+          </>;
+        })()}
 
         {(isDoar || isCentro) && (
           <>
