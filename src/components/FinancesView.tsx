@@ -1998,6 +1998,16 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                     <div>
+                      <Label className="text-[10px] text-muted-foreground">Mostrar Quitados</Label>
+                      <Select value={showSettled ? "yes" : "no"} onValueChange={(v) => setShowSettled(v === "yes")}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="no">Não</SelectItem>
+                          <SelectItem value="yes">Sim</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
                       <Label className="text-[10px] text-muted-foreground">Tipo</Label>
                       <Select value={filterType} onValueChange={setFilterType}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -2005,6 +2015,19 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           <SelectItem value="all">Todos</SelectItem>
                           <SelectItem value="revenue">🟢 Receita</SelectItem>
                           <SelectItem value="expense">🔴 Despesa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Status</Label>
+                      <Select value={colFilterStatus} onValueChange={setColFilterStatus}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="overdue">Atrasados</SelectItem>
+                          <SelectItem value="paid">Pagos</SelectItem>
+                          <SelectItem value="pending">Pendentes</SelectItem>
+                          <SelectItem value="recebido">Recebidos</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
