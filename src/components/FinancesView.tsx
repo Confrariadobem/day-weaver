@@ -2249,7 +2249,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
                               <button
-                                className="rounded p-0.5 text-amber-500 hover:bg-amber-500/10 transition-colors"
+                                className="rounded p-0.5 text-warning hover:bg-warning/10 transition-colors"
                                 onClick={async () => {
                                   const ids = Array.from(selectedIds);
                                   await supabase.from("financial_entries").update({
