@@ -24,7 +24,7 @@ import {
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
   CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
   Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign, Pencil, X, CalendarRange,
-  MoreHorizontal,
+  MoreHorizontal, Undo,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
@@ -185,6 +185,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   const [deleteEntryConfirm, setDeleteEntryConfirm] = useState<string | null>(null);
+  const [revertConfirmId, setRevertConfirmId] = useState<string | null>(null);
+  const [showSettled, setShowSettled] = useState(false);
   const [_doarShowPaid, _setDoarShowPaid] = useState(false); // deprecated — now showing both sections
   const [doarHideCarryOver, setDoarHideCarryOver] = useState(false);
   const [ccReportSearch, setCcReportSearch] = useState("");
@@ -219,7 +221,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [previsaoFilterDate, setPrevisaoFilterDate] = useState<Date | undefined>(undefined);
   const [fluxoDateFrom, setFluxoDateFrom] = useState("");
   const [fluxoDateTo, setFluxoDateTo] = useState("");
-  const [colFilterStatus, setColFilterStatus] = useState<string>("all");
+  const [colFilterStatus, setColFilterStatus] = useState<string>("pending");
   const [colFilterCounterpart, setColFilterCounterpart] = useState<string>("");
   const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
@@ -278,7 +280,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     setTitle(""); setAmount(""); setInstallments("1"); setCategoryId(""); setProjectId("");
     setEntryDate(format(new Date(), "yyyy-MM-dd")); setType("expense");
     setRecurrence("none"); setRecurrenceCount("12"); setRecurrenceDateMode("same_date");
-    setEditingEntry(null); setAccountId(""); setPaymentMethod(""); setIsPaid(false);
+    setEditingEntry(null); setAccountId(""); setPaymentMethod(""); setIsPaid(false); // 1.3: default is always Pendente
     setCounterpart(""); setIsFixed(false); setAllDay(true); setCostCenterId("");
     setSplitEnabled(false); setSplitLines([]); setCurrency("BRL"); setDescription("");
     setJuros(""); setMulta(""); setDesconto(""); setRealPaymentDate("");
@@ -641,22 +643,19 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           if (fromDate && d < fromDate) return false;
           if (toDate) { const endD = new Date(toDate); endD.setHours(23,59,59,999); if (d > endD) return false; }
         }
-        // Filter by cash flow type
-        if (cashFlowFilter === "paid") return e.is_paid;
-        if (cashFlowFilter === "payable") return !e.is_paid;
-        if (cashFlowFilter === "receivable") return e.is_paid;
-        if (cashFlowFilter === "overdue") { const ed = parseEntryDate(e.entry_date); return !e.is_paid && ed < today; }
-        // "all" filter: show everything
+        // Cash flow type filter removed — now using colFilterStatus
         return true;
       })
       .filter((e) => {
-        // Column filters
-        if (colFilterStatus === "paid" && !e.is_paid) return false;
-        if (colFilterStatus === "pending" && e.is_paid) return false;
-        if (colFilterStatus === "overdue") {
-          const ed = parseEntryDate(e.entry_date);
-          if (e.is_paid || ed >= today) return false;
-        }
+        // Status filter (1.2)
+        let passStatus = true;
+        if (colFilterStatus === "pending") passStatus = !e.is_paid;
+        if (colFilterStatus === "overdue") { const ed = parseEntryDate(e.entry_date); passStatus = !e.is_paid && ed < today; }
+        if (colFilterStatus === "paid") passStatus = e.is_paid && e.type === "expense";
+        if (colFilterStatus === "recebido") passStatus = e.is_paid && e.type === "revenue";
+        // showSettled override: include settled entries even if filter would hide them
+        if (!passStatus && showSettled && e.is_paid) passStatus = true;
+        if (!passStatus) return false;
         if (colFilterCounterpart && !(e.counterpart || "").toLowerCase().includes(colFilterCounterpart.toLowerCase())) return false;
         // Advanced filter fields
         if (filterType !== "all") {
@@ -718,15 +717,30 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterCostCenterId, filterProjectId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart]);
+  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterCostCenterId, filterProjectId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart, showSettled]);
 
   // KPI totals based on current filter
+  // 1.1: KPI always shows only pending/overdue entries (never paid)
   const kpiData = useMemo(() => {
-    const totalRevenue = filtered.filter((e) => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
-    const totalExpense = filtered.filter((e) => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
-    const balance = totalRevenue - totalExpense;
-    return { totalRevenue, totalExpense, balance };
-  }, [filtered]);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    // Compute from all entries with date/wallet filters, but always only pending
+    let base = entries;
+    if (walletFilter) base = base.filter(e => e.account_id === walletFilter.id);
+    const fromDate = parseDMY(fluxoDateFrom);
+    const toDate = parseDMY(fluxoDateTo);
+    if (fromDate || toDate) {
+      base = base.filter(e => {
+        const d = parseEntryDate(e.entry_date);
+        if (fromDate && d < fromDate) return false;
+        if (toDate) { const endD = new Date(toDate); endD.setHours(23, 59, 59, 999); if (d > endD) return false; }
+        return true;
+      });
+    }
+    const pending = base.filter(e => !e.is_paid);
+    const totalRevenue = pending.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
+    const totalExpense = pending.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
+    return { totalRevenue, totalExpense, balance: totalRevenue - totalExpense };
+  }, [entries, fluxoDateFrom, fluxoDateTo, walletFilter]);
 
   const totalAvailable = accounts.reduce((s, a) => {
     if (a.type === "credit_card") return s;
@@ -1685,6 +1699,37 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
         {isPrevisao && (
           <>
+            {/* 1.2: Status select filter */}
+            <Select value={colFilterStatus} onValueChange={setColFilterStatus}>
+              <SelectTrigger className="h-7 w-[130px] text-xs shrink-0">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pendentes</SelectItem>
+                <SelectItem value="overdue">Atrasados</SelectItem>
+                <SelectItem value="paid">Pagos</SelectItem>
+                <SelectItem value="recebido">Recebidos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
+              </SelectContent>
+            </Select>
+            {/* 1.6: Toggle show settled */}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setShowSettled(!showSettled)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-xl border px-2.5 py-1 transition-all duration-200 shrink-0",
+                    showSettled
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:border-primary/80 hover:bg-primary/5"
+                  )}
+                >
+                  {showSettled ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                  <span className="text-xs font-medium hidden sm:inline">Quitados</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="z-[100]">Mostrar quitados</TooltipContent>
+            </Tooltip>
             <div className="relative" style={{ width: 400 }}>
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
               <Input placeholder="Buscar título, categoria, contraparte, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
@@ -1796,27 +1841,27 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     if (rows.length > 0) { await supabase.from("financial_entries").insert(rows); fetchData(); }
                   };
                   input.click();
-                }} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                }} className="text-muted-foreground hover:text-primary transition-colors">
                   <FileDown className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Importar CSV</TooltipContent>
+              <TooltipContent className="z-[100]">Importar CSV</TooltipContent>
             </Tooltip>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
-                <button onClick={handleExportCSV} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                <button onClick={handleExportCSV} className="text-muted-foreground hover:text-primary transition-colors">
                   <FileUp className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Exportar CSV</TooltipContent>
+              <TooltipContent className="z-[100]">Exportar CSV</TooltipContent>
             </Tooltip>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
-                <button onClick={handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors">
                   <Printer className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Imprimir</TooltipContent>
+              <TooltipContent className="z-[100]">Imprimir</TooltipContent>
             </Tooltip>
           </>
         )}
@@ -2090,7 +2135,63 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             </Dialog>
 
             {/* Table */}
-            <div className="rounded-lg overflow-auto max-h-[calc(100vh-256px)] border border-border/30">
+            {/* 1.7: Mobile card layout */}
+            <div className="md:hidden space-y-2">
+              {filtered.length === 0 && (
+                <p className="text-center text-muted-foreground/40 py-12 text-sm">Sem lançamentos no período</p>
+              )}
+              {filtered.map((e) => {
+                const today = new Date(); today.setHours(0,0,0,0);
+                const entDate = parseEntryDate(e.entry_date);
+                const isOverdue = !e.is_paid && entDate < today;
+                const isSettledOverlay = showSettled && e.is_paid && (colFilterStatus === "pending" || colFilterStatus === "overdue");
+                const getStatusText = () => {
+                  if (e.is_paid && e.type === "revenue") return "Recebido";
+                  if (e.is_paid && e.type === "expense") return "Pago";
+                  if (isOverdue) return "Atrasado";
+                  return "Pendente";
+                };
+                const statusText = getStatusText();
+                return (
+                  <div
+                    key={e.id}
+                    className={cn(
+                      "rounded-lg border border-border/30 p-3 space-y-1.5 transition-colors",
+                      isOverdue && e.type === "expense" && "bg-destructive/10",
+                      isOverdue && e.type === "revenue" && "bg-[hsl(var(--success)/0.08)]",
+                      (e.is_paid || isSettledOverlay) && "opacity-50",
+                    )}
+                    onClick={() => openEditDialog(e)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={cn("text-sm font-bold truncate flex-1", e.is_paid && "line-through text-muted-foreground")}>{e.title}</span>
+                      <span className={cn("text-sm font-bold tabular-nums ml-2",
+                        e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                        {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{fmtDate(entDate)}</span>
+                      <span className={cn(statusText === "Atrasado" ? "text-[#E74C3C] font-semibold" : "")}>{statusText}</span>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      {!e.is_paid && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 flex-1" onClick={(ev) => { ev.stopPropagation(); togglePaid(e); }}>
+                          <Check className="h-3 w-3" /> {e.type === "expense" ? "Pagar" : "Receber"}
+                        </Button>
+                      )}
+                      {e.is_paid && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 flex-1" onClick={(ev) => { ev.stopPropagation(); setRevertConfirmId(e.id); }}>
+                          <Undo className="h-3 w-3" /> Reverter
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Desktop table */}
+            <div className="hidden md:block rounded-lg overflow-auto max-h-[calc(100vh-256px)] border border-border/30">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-card border-b border-border">
                   <tr className="text-xs text-muted-foreground uppercase tracking-wider">
@@ -2202,14 +2303,16 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     const statusColor = statusText === "Atrasado" ? "text-[#E74C3C] font-semibold"
                       : "text-muted-foreground";
 
-                    return (
+                      const isSettledOverlay = showSettled && e.is_paid && (colFilterStatus === "pending" || colFilterStatus === "overdue");
+                      return (
                       <tr key={e.id}
                         className={cn(
                           "group transition-colors hover:bg-primary/5",
                           idx > 0 && "border-t border-border/10",
                           isOverdue && e.type === "expense" && "bg-destructive/10",
                           isOverdue && e.type === "revenue" && "bg-[hsl(var(--success)/0.08)]",
-                          e.is_paid && "opacity-60",
+                          (e.is_paid && !isSettledOverlay) && "opacity-60",
+                          isSettledOverlay && "opacity-50",
                         )}
                         onDoubleClick={() => {
                           if ((e.installment_group && e.total_installments > 1) || e.recurrence_type) {
@@ -2271,7 +2374,19 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                     <Check className="h-3.5 w-3.5" />
                                   </button>
                                 </TooltipTrigger>
-                                <TooltipContent className="text-xs text-muted-foreground">Baixar</TooltipContent>
+                                <TooltipContent className="z-[100] text-xs text-muted-foreground">Baixar</TooltipContent>
+                              </Tooltip>
+                            )}
+                            {/* 1.4: Reverter action for paid entries */}
+                            {e.is_paid && (
+                              <Tooltip delayDuration={200}>
+                                <TooltipTrigger asChild>
+                                  <button onClick={(ev) => { ev.stopPropagation(); setRevertConfirmId(e.id); }}
+                                    className="rounded p-0.5 text-warning hover:bg-warning/10 transition-colors">
+                                    <Undo className="h-3.5 w-3.5" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="z-[100] text-xs text-muted-foreground">Reverter</TooltipContent>
                               </Tooltip>
                             )}
                             <Tooltip delayDuration={200}>
@@ -2891,6 +3006,42 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   resetForm();
                 }
               }}>Excluir</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 1.4: Revert confirmation dialog */}
+      <Dialog open={!!revertConfirmId} onOpenChange={(o) => { if (!o) setRevertConfirmId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reverter pagamento</DialogTitle>
+            <DialogDescription>O status voltará para "Pendente", a data de pagamento será zerada e o saldo da carteira será atualizado. Confirma?</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2 pt-4 border-t border-border/20">
+            <div className="flex gap-2 ml-auto">
+              <Button variant="ghost" size="sm" onClick={() => setRevertConfirmId(null)}>Cancelar</Button>
+              <Button variant="default" size="sm" onClick={async () => {
+                if (!revertConfirmId) return;
+                const entry = entries.find(e => e.id === revertConfirmId);
+                if (entry) {
+                  await supabase.from("financial_entries").update({
+                    is_paid: false, payment_date: null,
+                  }).eq("id", revertConfirmId);
+                  // Revert account balance
+                  if (entry.account_id) {
+                    const account = accounts.find(a => a.id === entry.account_id);
+                    if (account) {
+                      const delta = entry.type === "revenue" ? -Number(entry.amount) : Number(entry.amount);
+                      await supabase.from("financial_accounts").update({
+                        current_balance: account.current_balance + delta,
+                      }).eq("id", entry.account_id);
+                    }
+                  }
+                }
+                setRevertConfirmId(null);
+                fetchData();
+              }}>Reverter</Button>
             </div>
           </div>
         </DialogContent>
