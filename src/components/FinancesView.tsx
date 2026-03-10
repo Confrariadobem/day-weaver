@@ -2558,7 +2558,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 const pctOfCat = rowTotal > 0 ? ((entryTotal / rowTotal) * 100).toFixed(1) : "0.0";
                 return (
                   <tr key={`${keyPrefix}-${g.title}`} className="entry-row bg-muted/10 text-xs">
-                    <td className="p-1.5 border-b border-border/50 pl-14 text-muted-foreground uppercase">{g.title}</td>
+                    <td className="p-1.5 border-b border-border/50 pl-14 text-muted-foreground">{g.title}</td>
                     <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground/60">{pctOfCat}%</td>
                     {g.monthAmounts.map((v, mi) => (
                       <td key={mi} className="text-right p-1.5 border-b border-border/50 text-muted-foreground">
