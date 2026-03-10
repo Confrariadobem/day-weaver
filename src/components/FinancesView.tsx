@@ -1743,9 +1743,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
             setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
             setFilterIsFixed("all"); setShowSettled(true);
-            const yr = new Date().getFullYear();
-            setFluxoCustomFrom(new Date(yr, 0, 1)); setFluxoCustomTo(new Date(yr, 11, 31));
-            setFluxoDateFrom(format(new Date(yr, 0, 1), "dd/MM/yyyy")); setFluxoDateTo(format(new Date(yr, 11, 31), "dd/MM/yyyy"));
+            // Keep current interval — only set year-wide if no interval is set
+            if (!fluxoDateFrom && !fluxoDateTo) {
+              const yr = new Date().getFullYear();
+              setFluxoCustomFrom(new Date(yr, 0, 1)); setFluxoCustomTo(new Date(yr, 11, 31));
+              setFluxoDateFrom(format(new Date(yr, 0, 1), "dd/MM/yyyy")); setFluxoDateTo(format(new Date(yr, 11, 31), "dd/MM/yyyy"));
+            }
             setAdvancedFilterOpen(false);
           };
 
@@ -1776,16 +1779,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       )}
                     >
                       <RotateCcw className="h-4 w-4" />
-                      {activeFilterCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground">
-                          {activeFilterCount}
-                        </span>
-                      )}
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent className="z-[100] text-xs">Limpar tudo</TooltipContent>
+                  <TooltipContent className="text-xs">Limpar tudo</TooltipContent>
                 </Tooltip>
-                {/* Eye — show all year */}
+                {/* Eye — show all keeping current interval */}
                 <Tooltip delayDuration={200}>
                   <TooltipTrigger asChild>
                     <button
@@ -1795,20 +1793,30 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       <Eye className="h-4 w-4" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent className="z-[100] text-xs">Mostrar todos</TooltipContent>
+                  <TooltipContent className="text-xs">Mostrar todos</TooltipContent>
                 </Tooltip>
                 {/* Advanced filter toggle */}
-                <button
-                  onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
-                  className={cn(
-                    "rounded p-0.5 transition-colors",
-                    advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || colFilterStatus !== "pending" || showSettled
-                      ? "text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Filter className="h-4 w-4" />
-                </button>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
+                      className={cn(
+                        "relative rounded p-0.5 transition-colors",
+                        advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || colFilterStatus !== "pending" || showSettled
+                          ? "text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Filter className="h-4 w-4" />
+                      {activeFilterCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[7px] font-bold text-primary-foreground">
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs">Filtros avançados</TooltipContent>
+                </Tooltip>
               </div>
             </div>
           <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
@@ -2073,7 +2081,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <Filter className="h-3.5 w-3.5" /> Filtros Avançados
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                    <div>
+                    <div className="col-span-full">
                       <Label className="text-[10px] text-muted-foreground">Status</Label>
                       <Select value={colFilterStatus} onValueChange={(v) => {
                         setColFilterStatus(v);
@@ -2081,11 +2089,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       }}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="pending">Pendente</SelectItem>
-                          <SelectItem value="paid">Quitado</SelectItem>
                           <SelectItem value="all">Todos</SelectItem>
-                          <SelectItem value="overdue">Atrasados</SelectItem>
-                          <SelectItem value="recebido">Recebidos</SelectItem>
+                          <SelectItem value="overdue">Atrasado</SelectItem>
+                          <SelectItem value="paid">Pago</SelectItem>
+                          <SelectItem value="recebido">Recebido</SelectItem>
+                          <SelectItem value="pending">Pendente</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -2294,7 +2302,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 <Check className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent className="text-xs text-muted-foreground">Baixar</TooltipContent>
+                            <TooltipContent className="text-xs">Baixar lançamento</TooltipContent>
                           </Tooltip>
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
@@ -2303,7 +2311,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 <Copy className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent className="text-xs text-muted-foreground">Duplicar</TooltipContent>
+                            <TooltipContent className="text-xs">Duplicar lançamento</TooltipContent>
                           </Tooltip>
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
@@ -2321,7 +2329,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 <Undo className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent className="text-xs text-muted-foreground">Reverter</TooltipContent>
+                            <TooltipContent className="text-xs">Reverter pagamento</TooltipContent>
                           </Tooltip>
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
@@ -2337,7 +2345,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent className="text-xs text-muted-foreground">Excluir</TooltipContent>
+                            <TooltipContent className="text-xs">Excluir lançamento</TooltipContent>
                           </Tooltip>
                         </div>
                       ) : null}
