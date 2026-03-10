@@ -1375,7 +1375,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
               <div className="flex items-center gap-3">
                 <div className="flex-1">
                   <Label className="text-sm flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> Vencimento</Label>
-                  <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  <SimpleDatePicker value={startDate} onChange={setStartDate} placeholder="Selecionar data" />
                 </div>
                 <div className="flex items-center gap-1.5 pt-5">
                   <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
