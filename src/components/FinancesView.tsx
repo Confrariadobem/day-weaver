@@ -647,13 +647,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         return true;
       })
       .filter((e) => {
-        // Column filters
-        if (colFilterStatus === "paid" && !e.is_paid) return false;
-        if (colFilterStatus === "pending" && e.is_paid) return false;
-        if (colFilterStatus === "overdue") {
-          const ed = parseEntryDate(e.entry_date);
-          if (e.is_paid || ed >= today) return false;
-        }
+        // Status filter (1.2)
+        let passStatus = true;
+        if (colFilterStatus === "pending") passStatus = !e.is_paid;
+        if (colFilterStatus === "overdue") { const ed = parseEntryDate(e.entry_date); passStatus = !e.is_paid && ed < today; }
+        if (colFilterStatus === "paid") passStatus = e.is_paid && e.type === "expense";
+        if (colFilterStatus === "recebido") passStatus = e.is_paid && e.type === "revenue";
+        // showSettled override: include settled entries even if filter would hide them
+        if (!passStatus && showSettled && e.is_paid) passStatus = true;
+        if (!passStatus) return false;
         if (colFilterCounterpart && !(e.counterpart || "").toLowerCase().includes(colFilterCounterpart.toLowerCase())) return false;
         // Advanced filter fields
         if (filterType !== "all") {
