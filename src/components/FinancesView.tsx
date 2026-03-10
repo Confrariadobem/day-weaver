@@ -1737,20 +1737,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             // Keep advanced filter panel open — only clear fields
           };
 
-          const showAllFilters = () => {
-            setSearchQuery("");
-            setColFilterStatus("all");
-            setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
-            setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
-            setFilterIsFixed("all"); setShowSettled(true);
-            // Keep current interval — only set year-wide if no interval is set
-            if (!fluxoDateFrom && !fluxoDateTo) {
-              const yr = new Date().getFullYear();
-              setFluxoCustomFrom(new Date(yr, 0, 1)); setFluxoCustomTo(new Date(yr, 11, 31));
-              setFluxoDateFrom(format(new Date(yr, 0, 1), "dd/MM/yyyy")); setFluxoDateTo(format(new Date(yr, 11, 31), "dd/MM/yyyy"));
-            }
-            setAdvancedFilterOpen(false);
-          };
 
           return <>
             <div className="relative" style={{ width: 360 }}>
