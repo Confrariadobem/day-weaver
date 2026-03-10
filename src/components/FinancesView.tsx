@@ -1805,7 +1805,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <Filter className="h-3.5 w-3.5" />
+                  <Filter className="h-4 w-4" />
                 </button>
               </div>
             </div>
