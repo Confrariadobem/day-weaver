@@ -1844,7 +1844,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <FileDown className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent className="z-[100]">Importar CSV</TooltipContent>
+              <TooltipContent className="z-[100] text-xs">Importar CSV</TooltipContent>
             </Tooltip>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
