@@ -2427,7 +2427,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                     <Undo className="h-3.5 w-3.5" />
                                   </button>
                                 </TooltipTrigger>
-                                <TooltipContent className="z-[100] text-xs text-muted-foreground">Reverter</TooltipContent>
+                                <TooltipContent className="z-[100] text-xs text-muted-foreground">Reverter pagamento</TooltipContent>
                               </Tooltip>
                             )}
                             <Tooltip delayDuration={200}>
