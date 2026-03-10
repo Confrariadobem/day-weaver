@@ -1699,37 +1699,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
         {isPrevisao && (
           <>
-            {/* 1.2: Status select filter */}
-            <Select value={colFilterStatus} onValueChange={setColFilterStatus}>
-              <SelectTrigger className="h-7 w-[130px] text-xs shrink-0">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">Pendentes</SelectItem>
-                <SelectItem value="overdue">Atrasados</SelectItem>
-                <SelectItem value="paid">Pagos</SelectItem>
-                <SelectItem value="recebido">Recebidos</SelectItem>
-                <SelectItem value="all">Todos</SelectItem>
-              </SelectContent>
-            </Select>
-            {/* 1.6: Toggle show settled */}
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => setShowSettled(!showSettled)}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-xl border px-2.5 py-1 transition-all duration-200 shrink-0",
-                    showSettled
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "border-border hover:border-primary/80 hover:bg-primary/5"
-                  )}
-                >
-                  {showSettled ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
-                  <span className="text-xs font-medium hidden sm:inline">Quitados</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="z-[100]">Mostrar quitados</TooltipContent>
-            </Tooltip>
             <div className="relative" style={{ width: 400 }}>
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
               <Input placeholder="Buscar título, categoria, contraparte, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
@@ -1744,7 +1713,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
                   className={cn(
                     "rounded p-0.5 transition-colors",
-                    advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart
+                    advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart || colFilterStatus !== "pending" || showSettled
                       ? "text-primary"
                       : "text-muted-foreground hover:text-foreground"
                   )}
@@ -2020,7 +1989,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       onClick={() => {
                         setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
                         setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
-                        setFilterIsFixed("all"); setFilterCounterpart("");
+                        setFilterIsFixed("all"); setFilterCounterpart(""); setColFilterStatus("pending");
+                        setShowSettled(false);
                       }}
                       className="text-[10px] text-muted-foreground hover:text-primary underline"
                     >
@@ -2029,6 +1999,16 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                     <div>
+                      <Label className="text-[10px] text-muted-foreground">Mostrar Quitados</Label>
+                      <Select value={showSettled ? "yes" : "no"} onValueChange={(v) => setShowSettled(v === "yes")}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="no">Não</SelectItem>
+                          <SelectItem value="yes">Sim</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
                       <Label className="text-[10px] text-muted-foreground">Tipo</Label>
                       <Select value={filterType} onValueChange={setFilterType}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -2036,6 +2016,19 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           <SelectItem value="all">Todos</SelectItem>
                           <SelectItem value="revenue">🟢 Receita</SelectItem>
                           <SelectItem value="expense">🔴 Despesa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Status</Label>
+                      <Select value={colFilterStatus} onValueChange={setColFilterStatus}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="overdue">Atrasados</SelectItem>
+                          <SelectItem value="paid">Pagos</SelectItem>
+                          <SelectItem value="pending">Pendentes</SelectItem>
+                          <SelectItem value="recebido">Recebidos</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -2252,6 +2245,24 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                               </button>
                             </TooltipTrigger>
                             <TooltipContent className="text-xs text-muted-foreground">Duplicar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="rounded p-0.5 text-warning hover:bg-warning/10 transition-colors"
+                                onClick={async () => {
+                                  const ids = Array.from(selectedIds);
+                                  await supabase.from("financial_entries").update({
+                                    is_paid: false, payment_date: null,
+                                  }).in("id", ids);
+                                  setSelectedIds(new Set());
+                                  fetchData();
+                                }}
+                              >
+                                <Undo className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="text-xs text-muted-foreground">Reverter</TooltipContent>
                           </Tooltip>
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
