@@ -2345,7 +2345,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent className="text-xs text-muted-foreground">Excluir</TooltipContent>
+                            <TooltipContent className="text-xs">Excluir lançamento</TooltipContent>
                           </Tooltip>
                         </div>
                       ) : null}
