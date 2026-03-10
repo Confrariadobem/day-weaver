@@ -1699,6 +1699,37 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
         {isPrevisao && (
           <>
+            {/* 1.2: Status select filter */}
+            <Select value={colFilterStatus} onValueChange={setColFilterStatus}>
+              <SelectTrigger className="h-7 w-[130px] text-xs shrink-0">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pendentes</SelectItem>
+                <SelectItem value="overdue">Atrasados</SelectItem>
+                <SelectItem value="paid">Pagos</SelectItem>
+                <SelectItem value="recebido">Recebidos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
+              </SelectContent>
+            </Select>
+            {/* 1.6: Toggle show settled */}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setShowSettled(!showSettled)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-xl border px-2.5 py-1 transition-all duration-200 shrink-0",
+                    showSettled
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:border-primary/80 hover:bg-primary/5"
+                  )}
+                >
+                  {showSettled ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                  <span className="text-xs font-medium hidden sm:inline">Quitados</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="z-[100]">Mostrar quitados</TooltipContent>
+            </Tooltip>
             <div className="relative" style={{ width: 400 }}>
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
               <Input placeholder="Buscar título, categoria, contraparte, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
