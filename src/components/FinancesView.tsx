@@ -25,7 +25,7 @@ import {
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Save,
   Printer, FileDown, FileUp, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
-  CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
+  CircleDollarSign, AlertTriangle, Search, EyeOff, ChevronsUpDown,
   Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign, Pencil, X, CalendarRange,
   MoreHorizontal, Undo, RotateCcw,
 } from "lucide-react";
