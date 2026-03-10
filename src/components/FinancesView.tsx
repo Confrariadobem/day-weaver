@@ -1860,7 +1860,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <Printer className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent className="z-[100]">Imprimir</TooltipContent>
+              <TooltipContent className="z-[100] text-xs">Imprimir relatório</TooltipContent>
             </Tooltip>
           </>
         )}
