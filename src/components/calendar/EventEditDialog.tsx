@@ -1138,7 +1138,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                   <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
                     onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
                 </div>
-                {!item && recurrence === "none" && (
+                {recurrence === "none" && (
                   <div className="w-[100px]">
                     <Label className="text-sm">Parcelas</Label>
                     <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="text-xs" />
