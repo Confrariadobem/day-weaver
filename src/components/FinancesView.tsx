@@ -1689,7 +1689,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           <>
             <div className="relative" style={{ width: 400 }}>
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input placeholder="Buscar título, categoria, contraparte, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              <Input placeholder="Busca: descrição, status, tipo, valor... (ex: pendente, 500, luz)" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-7 pl-8 pr-14 text-xs rounded-lg" />
               <div className="absolute right-2 top-1 flex items-center gap-1">
                 {searchQuery && (
