@@ -303,6 +303,69 @@ export type Database = {
           },
         ]
       }
+      investment_trades: {
+        Row: {
+          asset_name: string | null
+          broker: string | null
+          created_at: string
+          fee: number | null
+          id: string
+          investment_type: string
+          notes: string | null
+          profit_loss: number | null
+          profit_pct: number | null
+          quantity: number
+          status: string | null
+          ticker: string
+          total_value: number | null
+          trade_date: string
+          trade_type: string
+          unit_price: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_name?: string | null
+          broker?: string | null
+          created_at?: string
+          fee?: number | null
+          id?: string
+          investment_type?: string
+          notes?: string | null
+          profit_loss?: number | null
+          profit_pct?: number | null
+          quantity?: number
+          status?: string | null
+          ticker: string
+          total_value?: number | null
+          trade_date?: string
+          trade_type?: string
+          unit_price?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_name?: string | null
+          broker?: string | null
+          created_at?: string
+          fee?: number | null
+          id?: string
+          investment_type?: string
+          notes?: string | null
+          profit_loss?: number | null
+          profit_pct?: number | null
+          quantity?: number
+          status?: string | null
+          ticker?: string
+          total_value?: number | null
+          trade_date?: string
+          trade_type?: string
+          unit_price?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       investments: {
         Row: {
           created_at: string
