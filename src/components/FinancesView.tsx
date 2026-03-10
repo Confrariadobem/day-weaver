@@ -1566,10 +1566,16 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     if (range?.from) {
       setFluxoCustomFrom(range.from);
       setFluxoDateFrom(format(range.from, "dd/MM/yyyy"));
+    } else {
+      setFluxoCustomFrom(undefined);
+      setFluxoDateFrom("");
     }
     if (range?.to) {
       setFluxoCustomTo(range.to);
       setFluxoDateTo(format(range.to, "dd/MM/yyyy"));
+    } else {
+      setFluxoCustomTo(undefined);
+      setFluxoDateTo("");
     }
   };
 
@@ -1767,7 +1773,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         activeFilterCount > 0 ? "text-primary" : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      <RotateCcw className="h-3.5 w-3.5" />
+                      <RotateCcw className="h-4 w-4" />
                       {activeFilterCount > 0 && (
                         <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground">
                           {activeFilterCount}
@@ -1784,7 +1790,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       onClick={showAllFilters}
                       className="rounded p-0.5 transition-colors text-muted-foreground hover:text-foreground"
                     >
-                      <Eye className="h-3.5 w-3.5" />
+                      <Eye className="h-4 w-4" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent className="z-[100] text-xs">Mostrar todos</TooltipContent>
@@ -1799,7 +1805,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <Filter className="h-3.5 w-3.5" />
+                  <Filter className="h-4 w-4" />
                 </button>
               </div>
             </div>
