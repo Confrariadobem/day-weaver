@@ -27,7 +27,7 @@ import {
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
   CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
   Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign, Pencil, X, CalendarRange,
-  MoreHorizontal, Undo, Eraser,
+  MoreHorizontal, Undo, RotateCcw,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
