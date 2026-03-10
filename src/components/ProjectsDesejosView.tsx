@@ -327,8 +327,8 @@ export default function ProjectsDesejosView() {
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
         {/* Header bar */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1" style={{ maxWidth: 400 }}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="relative flex-1 w-full" style={{ maxWidth: 400 }}>
             <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Buscar projetos ou tarefas..."
