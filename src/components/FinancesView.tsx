@@ -2463,7 +2463,23 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         )}
 
         {/* ============ DOAR ============ */}
-        {viewTab === "doar" && (() => {
+        {viewTab === "doar" && isMobile && (
+          <DoarMobileView
+            dreData={dreData}
+            brl={brl}
+            availableYears={(() => {
+              const years = new Set<number>();
+              entries.forEach(e => years.add(new Date(e.entry_date).getFullYear()));
+              return Array.from(years).sort();
+            })()}
+            periodYear={periodYear}
+            onYearChange={(year) => {
+              setPeriodStart(format(startOfYear(new Date(year, 0)), "yyyy-MM-dd"));
+              setPeriodEnd(format(endOfYear(new Date(year, 0)), "yyyy-MM-dd"));
+            }}
+          />
+        )}
+        {viewTab === "doar" && !isMobile && (() => {
           const dQuery = doarSearchQuery.toLowerCase().trim();
           const filterDoarRow = (row: { name: string; months: number[] }) => {
             return !dQuery || row.name.toLowerCase().includes(dQuery);
