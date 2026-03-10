@@ -1566,10 +1566,16 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     if (range?.from) {
       setFluxoCustomFrom(range.from);
       setFluxoDateFrom(format(range.from, "dd/MM/yyyy"));
+    } else {
+      setFluxoCustomFrom(undefined);
+      setFluxoDateFrom("");
     }
     if (range?.to) {
       setFluxoCustomTo(range.to);
       setFluxoDateTo(format(range.to, "dd/MM/yyyy"));
+    } else {
+      setFluxoCustomTo(undefined);
+      setFluxoDateTo("");
     }
   };
 
