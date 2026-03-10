@@ -221,7 +221,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [previsaoFilterDate, setPrevisaoFilterDate] = useState<Date | undefined>(undefined);
   const [fluxoDateFrom, setFluxoDateFrom] = useState("");
   const [fluxoDateTo, setFluxoDateTo] = useState("");
-  const [colFilterStatus, setColFilterStatus] = useState<string>("all");
+  const [colFilterStatus, setColFilterStatus] = useState<string>("pending");
   const [colFilterCounterpart, setColFilterCounterpart] = useState<string>("");
   const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
