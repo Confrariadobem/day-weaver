@@ -185,6 +185,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   const [deleteEntryConfirm, setDeleteEntryConfirm] = useState<string | null>(null);
+  const [revertConfirmId, setRevertConfirmId] = useState<string | null>(null);
+  const [showSettled, setShowSettled] = useState(false);
   const [_doarShowPaid, _setDoarShowPaid] = useState(false); // deprecated — now showing both sections
   const [doarHideCarryOver, setDoarHideCarryOver] = useState(false);
   const [ccReportSearch, setCcReportSearch] = useState("");
