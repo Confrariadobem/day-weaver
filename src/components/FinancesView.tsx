@@ -325,8 +325,10 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     setRealPaymentDate(entry.payment_date || "");
     setCounterpart(entry.counterpart || "");
     setIsFixed(entry.is_fixed || false);
-    setInstallments("1");
-    setRecurrence("none");
+    setInstallments(entry.total_installments > 1 ? String(entry.total_installments) : "1");
+    setRecurrence(entry.recurrence_type || "none");
+    setRecurrenceCount("12");
+    setRecurrenceDateMode("same_date");
     setCurrency((entry.currency as CurrencyType) || "BRL");
     setDescription(entry.description || "");
     // Load existing splits
