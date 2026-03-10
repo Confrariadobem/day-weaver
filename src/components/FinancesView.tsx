@@ -150,6 +150,7 @@ function CounterpartAutocomplete({ value, onChange, entries }: { value: string; 
 }
 
 export default function FinancesView({ onTabChange, walletFilter, onClearWalletFilter, onNavigateToPatrimonio }: { onTabChange?: (tab: string) => void; walletFilter?: { id: string; name: string } | null; onClearWalletFilter?: () => void; onNavigateToPatrimonio?: () => void }) {
+  const isMobile = useIsMobile();
   const { user } = useAuth();
   const { formatCurrency: brl } = useCurrency();
   const { formatDate: fmtDate, dateFormat } = useDateFormat();
