@@ -1989,7 +1989,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       onClick={() => {
                         setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
                         setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
-                        setFilterIsFixed("all"); setFilterCounterpart("");
+                        setFilterIsFixed("all"); setFilterCounterpart(""); setColFilterStatus("pending");
+                        setShowSettled(false);
                       }}
                       className="text-[10px] text-muted-foreground hover:text-primary underline"
                     >
