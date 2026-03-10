@@ -280,7 +280,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     setTitle(""); setAmount(""); setInstallments("1"); setCategoryId(""); setProjectId("");
     setEntryDate(format(new Date(), "yyyy-MM-dd")); setType("expense");
     setRecurrence("none"); setRecurrenceCount("12"); setRecurrenceDateMode("same_date");
-    setEditingEntry(null); setAccountId(""); setPaymentMethod(""); setIsPaid(false);
+    setEditingEntry(null); setAccountId(""); setPaymentMethod(""); setIsPaid(false); // 1.3: default is always Pendente
     setCounterpart(""); setIsFixed(false); setAllDay(true); setCostCenterId("");
     setSplitEnabled(false); setSplitLines([]); setCurrency("BRL"); setDescription("");
     setJuros(""); setMulta(""); setDesconto(""); setRealPaymentDate("");
