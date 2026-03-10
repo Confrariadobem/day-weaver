@@ -2080,30 +2080,23 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             {advancedFilterOpen && (
               <div className="my-4 space-y-4">
                 <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Filter className="h-3.5 w-3.5" /> Filtros Avançados
-                    </p>
-                    <button
-                      onClick={() => {
-                        setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
-                        setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
-                        setFilterIsFixed("all"); setFilterCounterpart(""); setColFilterStatus("pending");
-                        setShowSettled(false);
-                      }}
-                      className="text-[10px] text-muted-foreground hover:text-primary underline"
-                    >
-                      Limpar filtros
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Filter className="h-3.5 w-3.5" /> Filtros Avançados
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                     <div>
-                      <Label className="text-[10px] text-muted-foreground">Mostrar Quitados</Label>
-                      <Select value={showSettled ? "yes" : "no"} onValueChange={(v) => setShowSettled(v === "yes")}>
+                      <Label className="text-[10px] text-muted-foreground">Status</Label>
+                      <Select value={colFilterStatus} onValueChange={(v) => {
+                        setColFilterStatus(v);
+                        setShowSettled(v === "paid" || v === "recebido" || v === "all");
+                      }}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="no">Não</SelectItem>
-                          <SelectItem value="yes">Sim</SelectItem>
+                          <SelectItem value="pending">Pendente</SelectItem>
+                          <SelectItem value="paid">Quitado</SelectItem>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="overdue">Atrasados</SelectItem>
+                          <SelectItem value="recebido">Recebidos</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -2115,19 +2108,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           <SelectItem value="all">Todos</SelectItem>
                           <SelectItem value="revenue">🟢 Receita</SelectItem>
                           <SelectItem value="expense">🔴 Despesa</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Status</Label>
-                      <Select value={colFilterStatus} onValueChange={setColFilterStatus}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos</SelectItem>
-                          <SelectItem value="overdue">Atrasados</SelectItem>
-                          <SelectItem value="paid">Pagos</SelectItem>
-                          <SelectItem value="pending">Pendentes</SelectItem>
-                          <SelectItem value="recebido">Recebidos</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -2205,15 +2185,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           <SelectItem value="no">Não</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Contraparte</Label>
-                      <Input
-                        value={filterCounterpart}
-                        onChange={(e) => setFilterCounterpart(e.target.value)}
-                        placeholder="Filtrar..."
-                        className="h-8 text-xs"
-                      />
                     </div>
                   </div>
                 </div>
