@@ -464,9 +464,10 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
                         ))}
                       </Pie>
                       <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                    </PieChart>
+                  </PieChart>
                   </ResponsiveContainer>
-                  <div className="space-y-1.5 flex-1">
+                  </div>
+                  <div className="space-y-1.5 flex-1 min-w-0">
                     {metrics.allocation.filter(a => a.value > 0).map((a, i) => {
                       const pct = metrics.totalPatrimony > 0 ? ((a.value / metrics.totalPatrimony) * 100).toFixed(1) : "0";
                       return (

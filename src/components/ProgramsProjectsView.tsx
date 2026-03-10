@@ -741,9 +741,9 @@ export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (t
                     <CircleDollarSign className="h-4 w-4 text-primary" /> Previsto vs Realizado por Categoria
                   </h3>
                   {budgetChartData.length > 0 ? (
-                    <div className="h-48">
+                  <div className="h-48 w-full min-w-0 overflow-hidden">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={budgetChartData} layout="vertical" margin={{ left: 80, right: 20 }}>
+                        <BarChart data={budgetChartData} layout="vertical" margin={{ left: 60, right: 10 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                           <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => brl(v)} />
                           <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} width={80} />

@@ -298,3 +298,41 @@
     max-width: 100% !important;
   }
 }
+
+/* ═══ Mobile responsive fixes for cards, charts, grids ═══ */
+@media (max-width: 768px) {
+  /* Force all grids inside module-container to single column on mobile unless explicitly set */
+  .module-container .recharts-wrapper {
+    max-width: 100% !important;
+  }
+  .module-container .recharts-surface {
+    max-width: 100% !important;
+  }
+  /* Prevent any card from overflowing */
+  .module-container .bg-card,
+  .module-container [class*="rounded-lg"][class*="border"] {
+    max-width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  /* Tables inside module-container should scroll horizontally */
+  .module-container table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .module-container thead,
+  .module-container tbody,
+  .module-container tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+  /* Ensure flex items don't overflow */
+  .module-container .flex {
+    min-width: 0;
+  }
+  .module-container .flex > * {
+    min-width: 0;
+  }
+}
