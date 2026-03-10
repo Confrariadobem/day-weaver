@@ -33,12 +33,12 @@ export default function SimpleDatePicker({ value, onChange, placeholder = "Selec
         <Button
           variant="outline"
           className={cn(
-            "w-full justify-start text-left font-normal h-10",
+            "w-full justify-start text-left font-normal h-9 text-sm",
             !value && "text-muted-foreground",
             className
           )}
         >
-          <CalendarDays className="mr-2 h-4 w-4" />
+          <CalendarDays className="mr-2 h-3.5 w-3.5" />
           {date ? format(date, "dd/MM/yyyy") : <span>{placeholder}</span>}
         </Button>
       </PopoverTrigger>
@@ -48,7 +48,7 @@ export default function SimpleDatePicker({ value, onChange, placeholder = "Selec
           selected={date}
           onSelect={handleSelect}
           locale={ptBR}
-          className={cn("p-3 pointer-events-auto")}
+          className={cn("p-2 pointer-events-auto text-xs [&_table]:text-xs [&_button]:h-7 [&_button]:w-7 [&_th]:w-7 [&_caption]:text-xs")}
           formatters={{
             formatCaption: (d) => {
               const m = format(d, "LLLL", { locale: ptBR });

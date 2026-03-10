@@ -27,7 +27,7 @@ import {
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
   CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
   Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign, Pencil, X, CalendarRange,
-  MoreHorizontal, Undo,
+  MoreHorizontal, Undo, Eraser,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
@@ -723,28 +723,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       });
   }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterCostCenterId, filterProjectId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart, showSettled]);
 
-  // KPI totals based on current filter
-  // 1.1: KPI always shows only pending/overdue entries (never paid)
+  // KPI totals — now derived from filtered entries so they respond to search/filters in real-time (1.8)
   const kpiData = useMemo(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    // Compute from all entries with date/wallet filters, but always only pending
-    let base = entries;
-    if (walletFilter) base = base.filter(e => e.account_id === walletFilter.id);
-    const fromDate = parseDMY(fluxoDateFrom);
-    const toDate = parseDMY(fluxoDateTo);
-    if (fromDate || toDate) {
-      base = base.filter(e => {
-        const d = parseEntryDate(e.entry_date);
-        if (fromDate && d < fromDate) return false;
-        if (toDate) { const endD = new Date(toDate); endD.setHours(23, 59, 59, 999); if (d > endD) return false; }
-        return true;
-      });
-    }
-    const pending = base.filter(e => !e.is_paid);
-    const totalRevenue = pending.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
-    const totalExpense = pending.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
+    const totalRevenue = filtered.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
+    const totalExpense = filtered.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
     return { totalRevenue, totalExpense, balance: totalRevenue - totalExpense };
-  }, [entries, fluxoDateFrom, fluxoDateTo, walletFilter]);
+  }, [filtered]);
 
   const totalAvailable = accounts.reduce((s, a) => {
     if (a.type === "credit_card") return s;
@@ -1705,7 +1689,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           <>
             <div className="relative" style={{ width: 400 }}>
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input placeholder="Buscar título, categoria, contraparte, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              <Input placeholder="Busca: descrição, status, tipo, valor... (ex: pendente, 500, luz)" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-7 pl-8 pr-14 text-xs rounded-lg" />
               <div className="absolute right-2 top-1 flex items-center gap-1">
                 {searchQuery && (
@@ -1755,7 +1739,49 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       onChange={(e) => setFluxoDateFrom(normalizeDateInput(e.target.value))}
                       onBlur={() => { const d = parseDMY(fluxoDateFrom); if (d) { setFluxoCustomFrom(d); setFluxoDateFrom(format(d, "dd/MM/yyyy")); } }}
                       placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
-                  </div>
+            </div>
+            {/* 1.10: Reset filters (eraser) */}
+            {(() => {
+              const hasActiveFilters = searchQuery || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart || colFilterStatus !== "pending" || showSettled || fluxoDateFrom || fluxoDateTo;
+              return (
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => {
+                        setSearchQuery(""); setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
+                        setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
+                        setFilterIsFixed("all"); setFilterCounterpart(""); setColFilterStatus("pending");
+                        setShowSettled(false); setFluxoDateFrom(""); setFluxoDateTo("");
+                        setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
+                      }}
+                      className={cn("relative rounded p-1 transition-colors", hasActiveFilters ? "text-primary" : "text-muted-foreground hover:text-foreground")}
+                    >
+                      <Eraser className="h-4 w-4" />
+                      {hasActiveFilters && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary" />}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="z-[100] text-xs">Limpar tudo</TooltipContent>
+                </Tooltip>
+              );
+            })()}
+            {/* 1.10: Show all (eye) */}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    setSearchQuery(""); setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
+                    setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
+                    setFilterIsFixed("all"); setFilterCounterpart(""); setColFilterStatus("all");
+                    setShowSettled(true); setFluxoDateFrom(""); setFluxoDateTo("");
+                    setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
+                  }}
+                  className="text-muted-foreground hover:text-foreground transition-colors rounded p-1"
+                >
+                  <Eye className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="z-[100] text-xs">Mostrar tudo</TooltipContent>
+            </Tooltip>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold w-8 shrink-0">Até:</span>
                     <Input value={fluxoDateTo}
@@ -1818,7 +1844,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <FileDown className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent className="z-[100]">Importar CSV</TooltipContent>
+              <TooltipContent className="z-[100] text-xs">Importar CSV</TooltipContent>
             </Tooltip>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
@@ -1826,7 +1852,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <FileUp className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent className="z-[100]">Exportar CSV</TooltipContent>
+              <TooltipContent className="z-[100] text-xs">Exportar CSV</TooltipContent>
             </Tooltip>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
@@ -1834,7 +1860,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <Printer className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent className="z-[100]">Imprimir</TooltipContent>
+              <TooltipContent className="z-[100] text-xs">Imprimir relatório</TooltipContent>
             </Tooltip>
           </>
         )}
@@ -2389,7 +2415,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                     <Check className="h-3.5 w-3.5" />
                                   </button>
                                 </TooltipTrigger>
-                                <TooltipContent className="z-[100] text-xs text-muted-foreground">Baixar</TooltipContent>
+                                <TooltipContent className="z-[100] text-xs text-muted-foreground">Baixar lançamento</TooltipContent>
                               </Tooltip>
                             )}
                             {/* 1.4: Reverter action for paid entries */}
@@ -2401,7 +2427,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                     <Undo className="h-3.5 w-3.5" />
                                   </button>
                                 </TooltipTrigger>
-                                <TooltipContent className="z-[100] text-xs text-muted-foreground">Reverter</TooltipContent>
+                                <TooltipContent className="z-[100] text-xs text-muted-foreground">Reverter pagamento</TooltipContent>
                               </Tooltip>
                             )}
                             <Tooltip delayDuration={200}>
@@ -2411,7 +2437,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
                               </TooltipTrigger>
-                              <TooltipContent className="text-xs text-muted-foreground">Editar</TooltipContent>
+                              <TooltipContent className="z-[100] text-xs text-muted-foreground">Editar lançamento</TooltipContent>
                             </Tooltip>
                             <Tooltip delayDuration={200}>
                               <TooltipTrigger asChild>
@@ -2431,7 +2457,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                   <Copy className="h-3.5 w-3.5" />
                                 </button>
                               </TooltipTrigger>
-                              <TooltipContent className="text-xs text-muted-foreground">Duplicar</TooltipContent>
+                              <TooltipContent className="z-[100] text-xs text-muted-foreground">Duplicar lançamento</TooltipContent>
                             </Tooltip>
                             <Tooltip delayDuration={200}>
                               <TooltipTrigger asChild>
@@ -2440,7 +2466,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </TooltipTrigger>
-                              <TooltipContent className="text-xs text-muted-foreground">Excluir</TooltipContent>
+                              <TooltipContent className="z-[100] text-xs text-muted-foreground">Excluir lançamento</TooltipContent>
                             </Tooltip>
                           </div>
                         </td>
