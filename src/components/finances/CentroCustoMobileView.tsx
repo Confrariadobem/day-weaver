@@ -193,7 +193,7 @@ export default function CentroCustoMobileView({ ccReportData, months, brl, avail
                   </div>
                   {revRows.map(row => (
                     <div key={row.name} className="flex items-center justify-between text-[10px] pl-3">
-                      <span className="text-muted-foreground uppercase truncate flex-1">{row.name}</span>
+                      <span className="text-muted-foreground truncate flex-1">{row.name}</span>
                       <span className="text-[hsl(var(--success))] font-medium shrink-0 ml-2">{brl(row.months[mi])}</span>
                     </div>
                   ))}
@@ -209,7 +209,7 @@ export default function CentroCustoMobileView({ ccReportData, months, brl, avail
                   </div>
                   {expRows.map(row => (
                     <div key={row.name} className="flex items-center justify-between text-[10px] pl-3">
-                      <span className="text-muted-foreground uppercase truncate flex-1">{row.name}</span>
+                      <span className="text-muted-foreground truncate flex-1">{row.name}</span>
                       <span className="text-destructive font-medium shrink-0 ml-2">{brl(row.months[mi])}</span>
                     </div>
                   ))}

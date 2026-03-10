@@ -25,7 +25,7 @@ import {
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Save,
   Printer, FileDown, FileUp, Repeat, Landmark, CreditCard, PiggyBank, WalletCards,
   Banknote, Bitcoin, ChevronDown, ChevronUp, Check, CalendarDays,
-  CircleDollarSign, AlertTriangle, Search, Eye, EyeOff, ChevronsUpDown,
+  CircleDollarSign, AlertTriangle, Search, EyeOff, ChevronsUpDown,
   Filter, BarChart3, Copy, FolderKanban, ListChecks, DollarSign, Pencil, X, CalendarRange,
   MoreHorizontal, Undo, RotateCcw,
 } from "lucide-react";
@@ -1734,23 +1734,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             setFilterIsFixed("all"); setShowSettled(false);
             setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
             setFluxoDateFrom(""); setFluxoDateTo("");
-            setAdvancedFilterOpen(false);
+            // Keep advanced filter panel open — only clear fields
           };
 
-          const showAllFilters = () => {
-            setSearchQuery("");
-            setColFilterStatus("all");
-            setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
-            setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
-            setFilterIsFixed("all"); setShowSettled(true);
-            // Keep current interval — only set year-wide if no interval is set
-            if (!fluxoDateFrom && !fluxoDateTo) {
-              const yr = new Date().getFullYear();
-              setFluxoCustomFrom(new Date(yr, 0, 1)); setFluxoCustomTo(new Date(yr, 11, 31));
-              setFluxoDateFrom(format(new Date(yr, 0, 1), "dd/MM/yyyy")); setFluxoDateTo(format(new Date(yr, 11, 31), "dd/MM/yyyy"));
-            }
-            setAdvancedFilterOpen(false);
-          };
 
           return <>
             <div className="relative" style={{ width: 360 }}>
@@ -1783,18 +1769,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   </TooltipTrigger>
                   <TooltipContent className="text-xs">Limpar tudo</TooltipContent>
                 </Tooltip>
-                {/* Eye — show all keeping current interval */}
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={showAllFilters}
-                      className="rounded p-0.5 transition-colors text-muted-foreground hover:text-foreground"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="text-xs">Mostrar todos</TooltipContent>
-                </Tooltip>
+                {/* Eye removed — use "Todos" in advanced filter panel instead */}
                 {/* Advanced filter toggle */}
                 <Tooltip delayDuration={200}>
                   <TooltipTrigger asChild>
@@ -2569,7 +2544,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 const pctOfCat = rowTotal > 0 ? ((entryTotal / rowTotal) * 100).toFixed(1) : "0.0";
                 return (
                   <tr key={`${keyPrefix}-${g.title}`} className="entry-row bg-muted/10 text-xs">
-                    <td className="p-1.5 border-b border-border/50 pl-14 text-muted-foreground uppercase">{g.title}</td>
+                    <td className="p-1.5 border-b border-border/50 pl-14 text-muted-foreground">{g.title}</td>
                     <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground/60">{pctOfCat}%</td>
                     {g.monthAmounts.map((v, mi) => (
                       <td key={mi} className="text-right p-1.5 border-b border-border/50 text-muted-foreground">
@@ -2672,7 +2647,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 <span className="expand-icon">
                                   {isExpanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground rotate-90" />}
                                 </span>
-                                {row.name.toUpperCase()}
+                                {row.name}
                               </span>
                             </td>
                             <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
@@ -2722,7 +2697,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 <span className="expand-icon">
                                   {isExpanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground rotate-90" />}
                                 </span>
-                                {row.name.toUpperCase()}
+                                {row.name}
                               </span>
                             </td>
                             <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
@@ -2872,7 +2847,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             const pct = totalRev > 0 ? ((rowTotal / totalRev) * 100).toFixed(1) : "0.0";
                             return (
                               <tr key={row.name} className="hover:bg-muted/30">
-                                <td className="p-2 border-b border-border pl-6 uppercase">{row.name}</td>
+                                <td className="p-2 border-b border-border pl-6">{row.name}</td>
                                 <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
                                 {row.months.map((v, i) => (
                                   <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-success" : "text-muted-foreground")}>
@@ -2904,7 +2879,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             const pct = totalExp > 0 ? ((rowTotal / totalExp) * 100).toFixed(1) : "0.0";
                             return (
                               <tr key={row.name} className="hover:bg-muted/30">
-                                <td className="p-2 border-b border-border pl-6 uppercase">{row.name}</td>
+                                <td className="p-2 border-b border-border pl-6">{row.name}</td>
                                 <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
                                 {row.months.map((v, i) => (
                                   <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-destructive" : "text-muted-foreground")}>

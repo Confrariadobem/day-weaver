@@ -125,7 +125,7 @@ export default function DoarMobileView({ dreData, brl, availableYears, periodYea
                     >
                       <span className="flex items-center gap-1.5 min-w-0">
                         {isExpanded ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
-                        <span className="uppercase text-muted-foreground truncate">{row.name}</span>
+                        <span className="text-muted-foreground truncate">{row.name}</span>
                       </span>
                       <span className="flex items-center gap-2 shrink-0 ml-2">
                         <span className="text-muted-foreground">{pct}%</span>
@@ -168,7 +168,7 @@ export default function DoarMobileView({ dreData, brl, availableYears, periodYea
                     >
                       <span className="flex items-center gap-1.5 min-w-0">
                         {isExpanded ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
-                        <span className="uppercase text-muted-foreground truncate">{row.name}</span>
+                        <span className="text-muted-foreground truncate">{row.name}</span>
                       </span>
                       <span className="flex items-center gap-2 shrink-0 ml-2">
                         <span className="text-muted-foreground">{pct}%</span>
