@@ -1779,16 +1779,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       )}
                     >
                       <RotateCcw className="h-4 w-4" />
-                      {activeFilterCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground">
-                          {activeFilterCount}
-                        </span>
-                      )}
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent className="z-[100] text-xs">Limpar tudo</TooltipContent>
+                  <TooltipContent className="text-xs">Limpar tudo</TooltipContent>
                 </Tooltip>
-                {/* Eye — show all year */}
+                {/* Eye — show all keeping current interval */}
                 <Tooltip delayDuration={200}>
                   <TooltipTrigger asChild>
                     <button
@@ -1798,20 +1793,30 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       <Eye className="h-4 w-4" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent className="z-[100] text-xs">Mostrar todos</TooltipContent>
+                  <TooltipContent className="text-xs">Mostrar todos</TooltipContent>
                 </Tooltip>
                 {/* Advanced filter toggle */}
-                <button
-                  onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
-                  className={cn(
-                    "rounded p-0.5 transition-colors",
-                    advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || colFilterStatus !== "pending" || showSettled
-                      ? "text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Filter className="h-4 w-4" />
-                </button>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
+                      className={cn(
+                        "relative rounded p-0.5 transition-colors",
+                        advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || colFilterStatus !== "pending" || showSettled
+                          ? "text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Filter className="h-4 w-4" />
+                      {activeFilterCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[7px] font-bold text-primary-foreground">
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs">Filtros avançados</TooltipContent>
+                </Tooltip>
               </div>
             </div>
           <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
