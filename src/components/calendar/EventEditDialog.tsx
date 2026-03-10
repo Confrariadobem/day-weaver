@@ -368,13 +368,35 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setDescription(item.description || "");
       setColor(item.color || "#3b82f6");
       setRecurrence(item.recurrence_rule || "none");
+      setRecurrenceCount("12");
+      setRecurrenceIndeterminate(true);
+      setRecurrenceDateMode("same_date");
       const desc = item.description || "";
       setIsFavorite(desc.includes("[favorito:true]") || !!item.is_favorite);
+      // Parse metadata from description
+      const valMatch = desc.match(/\[valor:([\d.,]+)\]/);
+      if (valMatch) setBillAmount(valMatch[1]); else setBillAmount("");
+      const dirMatch = desc.match(/\[direcao:(\w+)\]/);
+      if (dirMatch) setCashflowDirection(dirMatch[1] as "expense" | "revenue"); else setCashflowDirection("expense");
+      const invMatch = desc.match(/\[invtype:(\w+)\]/);
+      if (invMatch) setInvestmentType(invMatch[1]); else setInvestmentType("stock");
+      const prioMatch = desc.match(/\[prioridade:(\w+)\]/);
+      if (prioMatch) setPriority(prioMatch[1]); else setPriority("medium");
+      // Parse patrimonio metadata
+      const patriTypeMatch = desc.match(/\[patri_type:(\w+)\]/);
+      if (patriTypeMatch) setPatrimonioType(patriTypeMatch[1]); else setPatrimonioType("imovel");
+      const patriValueMatch = desc.match(/\[patri_value:([\d.,]+)\]/);
+      if (patriValueMatch) setPatrimonioValue(patriValueMatch[1]); else setPatrimonioValue("");
+      // Reset other fields to defaults for edit
+      setCategoryId(""); setCostCenterId(""); setProjectId(""); setProgramId("");
+      setAccountId(""); setPaymentMethod(""); setIsPaid(false); setIsFixed(false);
+      setCounterpart(""); setInstallments("1");
+      setSplitEnabled(false); setSplitLines([]);
       if (desc.includes("[tipo:birthday]")) setEventType("birthday");
       else if (desc.includes("[tipo:cashflow]") || desc.includes("[tipo:bill]") || desc.includes("[tipo:receivable]")) setEventType("cashflow");
       else if (desc.includes("[tipo:investment]")) setEventType("investment");
       else if (desc.includes("[tipo:project]")) setEventType("project");
-      else if (desc.includes("[tipo:patrimonio]")) setEventType("patrimonio");
+      else if (desc.includes("[tipo:patrimonio]")) { setEventType("patrimonio"); setPatrimonioName(item.title); }
       else if (item.is_task) setEventType("project");
       else setEventType("event");
       setReminder("none");
