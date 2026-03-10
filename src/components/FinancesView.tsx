@@ -1852,7 +1852,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <FileUp className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent className="z-[100]">Exportar CSV</TooltipContent>
+              <TooltipContent className="z-[100] text-xs">Exportar CSV</TooltipContent>
             </Tooltip>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
