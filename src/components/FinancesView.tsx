@@ -1685,23 +1685,65 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           {renderSharedHoje()}
         </>)}
 
-        {isPrevisao && (
-          <>
-            <div className="relative" style={{ width: 400 }}>
+        {isPrevisao && (() => {
+          const activeFilterCount = [
+            searchQuery.trim() !== "",
+            colFilterStatus !== "pending",
+            filterType !== "all",
+            filterCategoryId !== "",
+            filterCostCenterId !== "",
+            filterProjectId !== "",
+            filterAccountId !== "",
+            filterPaymentMethod !== "",
+            filterIsFixed !== "all",
+            showSettled,
+            fluxoDateFrom !== "" || fluxoDateTo !== "",
+          ].filter(Boolean).length;
+
+          const resetAllFilters = () => {
+            setSearchQuery("");
+            setColFilterStatus("pending");
+            setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
+            setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
+            setFilterIsFixed("all"); setShowSettled(false);
+            setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
+            setFluxoDateFrom(""); setFluxoDateTo("");
+            setAdvancedFilterOpen(false);
+          };
+
+          const showAllFilters = () => {
+            setSearchQuery("");
+            setColFilterStatus("all");
+            setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
+            setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
+            setFilterIsFixed("all"); setShowSettled(true);
+            const yr = new Date().getFullYear();
+            setFluxoCustomFrom(new Date(yr, 0, 1)); setFluxoCustomTo(new Date(yr, 11, 31));
+            setFluxoDateFrom(format(new Date(yr, 0, 1), "dd/MM/yyyy")); setFluxoDateTo(format(new Date(yr, 11, 31), "dd/MM/yyyy"));
+            setAdvancedFilterOpen(false);
+          };
+
+          return <>
+            <div className="relative" style={{ width: 360 }}>
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input placeholder="Busca: descrição, status, tipo, valor... (ex: pendente, 500, luz)" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              <Input placeholder="Buscar por descrição, status, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-7 pl-8 pr-14 text-xs rounded-lg" />
               <div className="absolute right-2 top-1 flex items-center gap-1">
                 {searchQuery && (
-                  <button onClick={() => setSearchQuery("")} className="text-muted-foreground hover:text-foreground">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <button onClick={() => setSearchQuery("")} className="text-muted-foreground hover:text-foreground">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="z-[100] text-xs">Limpar busca</TooltipContent>
+                  </Tooltip>
                 )}
                 <button
                   onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
                   className={cn(
                     "rounded p-0.5 transition-colors",
-                    advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart || colFilterStatus !== "pending" || showSettled
+                    advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || colFilterStatus !== "pending" || showSettled
                       ? "text-primary"
                       : "text-muted-foreground hover:text-foreground"
                   )}
@@ -1710,8 +1752,32 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </button>
               </div>
             </div>
-            
-            <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
+
+            {/* Eraser — reset all to default */}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={resetAllFilters} className="relative text-muted-foreground hover:text-primary transition-colors shrink-0">
+                  <Eraser className="h-5 w-5" />
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-destructive-foreground">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="z-[100] text-xs">Limpar tudo</TooltipContent>
+            </Tooltip>
+
+            {/* Eye — show all year */}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={showAllFilters} className="text-muted-foreground hover:text-primary transition-colors shrink-0">
+                  <Eye className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="z-[100] text-xs">Mostrar todos</TooltipContent>
+            </Tooltip>
+          <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
               <PopoverTrigger asChild>
                 <button
                   onClick={() => setFluxoIntervalOpen(true)}
@@ -1739,49 +1805,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       onChange={(e) => setFluxoDateFrom(normalizeDateInput(e.target.value))}
                       onBlur={() => { const d = parseDMY(fluxoDateFrom); if (d) { setFluxoCustomFrom(d); setFluxoDateFrom(format(d, "dd/MM/yyyy")); } }}
                       placeholder="DD / MM / YYYY" className="h-10 text-sm rounded-md border-border" style={{ width: 130 }} maxLength={10} />
-            </div>
-            {/* 1.10: Reset filters (eraser) */}
-            {(() => {
-              const hasActiveFilters = searchQuery || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart || colFilterStatus !== "pending" || showSettled || fluxoDateFrom || fluxoDateTo;
-              return (
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => {
-                        setSearchQuery(""); setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
-                        setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
-                        setFilterIsFixed("all"); setFilterCounterpart(""); setColFilterStatus("pending");
-                        setShowSettled(false); setFluxoDateFrom(""); setFluxoDateTo("");
-                        setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
-                      }}
-                      className={cn("relative rounded p-1 transition-colors", hasActiveFilters ? "text-primary" : "text-muted-foreground hover:text-foreground")}
-                    >
-                      <Eraser className="h-4 w-4" />
-                      {hasActiveFilters && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary" />}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="z-[100] text-xs">Limpar tudo</TooltipContent>
-                </Tooltip>
-              );
-            })()}
-            {/* 1.10: Show all (eye) */}
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => {
-                    setSearchQuery(""); setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
-                    setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
-                    setFilterIsFixed("all"); setFilterCounterpart(""); setColFilterStatus("all");
-                    setShowSettled(true); setFluxoDateFrom(""); setFluxoDateTo("");
-                    setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
-                  }}
-                  className="text-muted-foreground hover:text-foreground transition-colors rounded p-1"
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="z-[100] text-xs">Mostrar tudo</TooltipContent>
-            </Tooltip>
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold w-8 shrink-0">Até:</span>
                     <Input value={fluxoDateTo}
@@ -1797,9 +1821,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </div>
               </PopoverContent>
             </Popover>
+
             <button
               onClick={() => {
-                // Toggle: if already filtering today, reset
                 const today = new Date();
                 const todayStr = format(today, "dd/MM/yyyy");
                 if (fluxoDateFrom === todayStr && fluxoDateTo === todayStr) {
@@ -1862,8 +1886,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               </TooltipTrigger>
               <TooltipContent className="z-[100] text-xs">Imprimir relatório</TooltipContent>
             </Tooltip>
-          </>
-        )}
+          </>;
+        })()}
 
         {(isDoar || isCentro) && (
           <>
@@ -2011,30 +2035,23 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             {advancedFilterOpen && (
               <div className="my-4 space-y-4">
                 <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Filter className="h-3.5 w-3.5" /> Filtros Avançados
-                    </p>
-                    <button
-                      onClick={() => {
-                        setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
-                        setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
-                        setFilterIsFixed("all"); setFilterCounterpart(""); setColFilterStatus("pending");
-                        setShowSettled(false);
-                      }}
-                      className="text-[10px] text-muted-foreground hover:text-primary underline"
-                    >
-                      Limpar filtros
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Filter className="h-3.5 w-3.5" /> Filtros Avançados
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                     <div>
-                      <Label className="text-[10px] text-muted-foreground">Mostrar Quitados</Label>
-                      <Select value={showSettled ? "yes" : "no"} onValueChange={(v) => setShowSettled(v === "yes")}>
+                      <Label className="text-[10px] text-muted-foreground">Status</Label>
+                      <Select value={colFilterStatus} onValueChange={(v) => {
+                        setColFilterStatus(v);
+                        setShowSettled(v === "paid" || v === "recebido" || v === "all");
+                      }}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="no">Não</SelectItem>
-                          <SelectItem value="yes">Sim</SelectItem>
+                          <SelectItem value="pending">Pendente</SelectItem>
+                          <SelectItem value="paid">Quitado</SelectItem>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="overdue">Atrasados</SelectItem>
+                          <SelectItem value="recebido">Recebidos</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -2046,19 +2063,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           <SelectItem value="all">Todos</SelectItem>
                           <SelectItem value="revenue">🟢 Receita</SelectItem>
                           <SelectItem value="expense">🔴 Despesa</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Status</Label>
-                      <Select value={colFilterStatus} onValueChange={setColFilterStatus}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos</SelectItem>
-                          <SelectItem value="overdue">Atrasados</SelectItem>
-                          <SelectItem value="paid">Pagos</SelectItem>
-                          <SelectItem value="pending">Pendentes</SelectItem>
-                          <SelectItem value="recebido">Recebidos</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -2136,15 +2140,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           <SelectItem value="no">Não</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Contraparte</Label>
-                      <Input
-                        value={filterCounterpart}
-                        onChange={(e) => setFilterCounterpart(e.target.value)}
-                        placeholder="Filtrar..."
-                        className="h-8 text-xs"
-                      />
                     </div>
                   </div>
                 </div>
