@@ -444,8 +444,9 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
                 <PiggyBank className="h-3.5 w-3.5 text-primary" /> Alocação do Patrimônio
               </p>
               {metrics.allocation.filter(a => a.value > 0).length > 0 ? (
-                <div className="flex items-center gap-4">
-                  <ResponsiveContainer width={160} height={160}>
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="w-full sm:w-auto shrink-0 flex justify-center min-w-0">
+                  <ResponsiveContainer width={140} height={140}>
                     <PieChart>
                       <Pie
                         data={metrics.allocation.filter(a => a.value > 0)}
