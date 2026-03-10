@@ -2135,7 +2135,63 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             </Dialog>
 
             {/* Table */}
-            <div className="rounded-lg overflow-auto max-h-[calc(100vh-256px)] border border-border/30">
+            {/* 1.7: Mobile card layout */}
+            <div className="md:hidden space-y-2">
+              {filtered.length === 0 && (
+                <p className="text-center text-muted-foreground/40 py-12 text-sm">Sem lançamentos no período</p>
+              )}
+              {filtered.map((e) => {
+                const today = new Date(); today.setHours(0,0,0,0);
+                const entDate = parseEntryDate(e.entry_date);
+                const isOverdue = !e.is_paid && entDate < today;
+                const isSettledOverlay = showSettled && e.is_paid && (colFilterStatus === "pending" || colFilterStatus === "overdue");
+                const getStatusText = () => {
+                  if (e.is_paid && e.type === "revenue") return "Recebido";
+                  if (e.is_paid && e.type === "expense") return "Pago";
+                  if (isOverdue) return "Atrasado";
+                  return "Pendente";
+                };
+                const statusText = getStatusText();
+                return (
+                  <div
+                    key={e.id}
+                    className={cn(
+                      "rounded-lg border border-border/30 p-3 space-y-1.5 transition-colors",
+                      isOverdue && e.type === "expense" && "bg-destructive/10",
+                      isOverdue && e.type === "revenue" && "bg-[hsl(var(--success)/0.08)]",
+                      (e.is_paid || isSettledOverlay) && "opacity-50",
+                    )}
+                    onClick={() => openEditDialog(e)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={cn("text-sm font-bold truncate flex-1", e.is_paid && "line-through text-muted-foreground")}>{e.title}</span>
+                      <span className={cn("text-sm font-bold tabular-nums ml-2",
+                        e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                        {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{fmtDate(entDate)}</span>
+                      <span className={cn(statusText === "Atrasado" ? "text-[#E74C3C] font-semibold" : "")}>{statusText}</span>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      {!e.is_paid && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 flex-1" onClick={(ev) => { ev.stopPropagation(); togglePaid(e); }}>
+                          <Check className="h-3 w-3" /> {e.type === "expense" ? "Pagar" : "Receber"}
+                        </Button>
+                      )}
+                      {e.is_paid && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 flex-1" onClick={(ev) => { ev.stopPropagation(); setRevertConfirmId(e.id); }}>
+                          <Undo className="h-3 w-3" /> Reverter
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Desktop table */}
+            <div className="hidden md:block rounded-lg overflow-auto max-h-[calc(100vh-256px)] border border-border/30">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-card border-b border-border">
                   <tr className="text-xs text-muted-foreground uppercase tracking-wider">
