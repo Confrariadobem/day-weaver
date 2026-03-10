@@ -386,16 +386,34 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         description: description || null,
       };
       if (recurrenceEditDialog.mode === "all" && editingEntry.installment_group) {
-        // Update ALL future items with ALL fields
+        // Update ALL future items in the series
         const allGroup = entries.filter(
           (e) => e.installment_group === editingEntry.installment_group &&
             e.installment_number >= editingEntry.installment_number
-        );
+        ).sort((a, b) => a.installment_number - b.installment_number);
+
+        // Determine if this is a true installment (parcelado) vs recurrence
+        const isInstallment = !editingEntry.recurrence_type && editingEntry.total_installments > 1;
+
+        // Calculate date shift: difference between new date and original date
+        const origDate = new Date(editingEntry.entry_date + "T12:00:00");
+        const newDate = new Date(entryDate + "T12:00:00");
+        const dayShift = Math.round((newDate.getTime() - origDate.getTime()) / (1000 * 60 * 60 * 24));
+
         for (const e of allGroup) {
+          // Shift each entry's date by the same delta
+          let shiftedDate = e.entry_date;
+          if (dayShift !== 0) {
+            const d = new Date(e.entry_date + "T12:00:00");
+            d.setDate(d.getDate() + dayShift);
+            shiftedDate = format(d, "yyyy-MM-dd");
+          }
+
           await supabase.from("financial_entries").update({
             ...updateData,
-            title: allGroup.length > 1 ? `${title} (${e.installment_number}/${editingEntry.total_installments})` : title,
-            entry_date: e.entry_date, // keep each item's own date
+            // Only add (X/Y) for true installments, never for recurrences
+            title: isInstallment ? `${title} (${e.installment_number}/${editingEntry.total_installments})` : title,
+            entry_date: shiftedDate,
             is_paid: e.is_paid, // keep each item's own paid status
             payment_date: e.payment_date, // keep each item's own payment date
           }).eq("id", e.id);
