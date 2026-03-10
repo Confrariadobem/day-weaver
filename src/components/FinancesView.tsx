@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import DoarMobileView from "@/components/finances/DoarMobileView";
+import CentroCustoMobileView from "@/components/finances/CentroCustoMobileView";
 import { useModulePreferences } from "@/hooks/useModulePreferences";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
