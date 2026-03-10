@@ -2748,7 +2748,24 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         })()}
 
         {/* ============ CENTRO DE CUSTO REPORT ============ */}
-        {viewTab === "centrocusto" && (
+        {viewTab === "centrocusto" && isMobile && (
+          <CentroCustoMobileView
+            ccReportData={ccReportData}
+            months={dreData.months}
+            brl={brl}
+            availableYears={(() => {
+              const years = new Set<number>();
+              entries.forEach(e => years.add(new Date(e.entry_date).getFullYear()));
+              return Array.from(years).sort();
+            })()}
+            periodYear={periodYear}
+            onYearChange={(year) => {
+              setPeriodStart(format(startOfYear(new Date(year, 0)), "yyyy-MM-dd"));
+              setPeriodEnd(format(endOfYear(new Date(year, 0)), "yyyy-MM-dd"));
+            }}
+          />
+        )}
+        {viewTab === "centrocusto" && !isMobile && (
           <div className="space-y-4">
 
             {ccReportData.length === 0 && (
