@@ -2303,14 +2303,16 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     const statusColor = statusText === "Atrasado" ? "text-[#E74C3C] font-semibold"
                       : "text-muted-foreground";
 
-                    return (
+                      const isSettledOverlay = showSettled && e.is_paid && (colFilterStatus === "pending" || colFilterStatus === "overdue");
+                      return (
                       <tr key={e.id}
                         className={cn(
                           "group transition-colors hover:bg-primary/5",
                           idx > 0 && "border-t border-border/10",
                           isOverdue && e.type === "expense" && "bg-destructive/10",
                           isOverdue && e.type === "revenue" && "bg-[hsl(var(--success)/0.08)]",
-                          e.is_paid && "opacity-60",
+                          (e.is_paid && !isSettledOverlay) && "opacity-60",
+                          isSettledOverlay && "opacity-50",
                         )}
                         onDoubleClick={() => {
                           if ((e.installment_group && e.total_installments > 1) || e.recurrence_type) {
