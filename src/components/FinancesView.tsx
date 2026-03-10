@@ -1783,18 +1783,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   </TooltipTrigger>
                   <TooltipContent className="text-xs">Limpar tudo</TooltipContent>
                 </Tooltip>
-                {/* Eye — show all keeping current interval */}
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={showAllFilters}
-                      className="rounded p-0.5 transition-colors text-muted-foreground hover:text-foreground"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="text-xs">Mostrar todos</TooltipContent>
-                </Tooltip>
+                {/* Eye removed — use "Todos" in advanced filter panel instead */}
                 {/* Advanced filter toggle */}
                 <Tooltip delayDuration={200}>
                   <TooltipTrigger asChild>
