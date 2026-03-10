@@ -918,7 +918,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
         <div className="space-y-4">
           {/* ─── TYPE SELECTOR (Dropdown) ─── */}
-          {!item && (
+          {(
             <div className="space-y-2 rounded-lg border border-border/30 p-3">
               <Label className="text-sm text-muted-foreground">Tipo de lançamento</Label>
               <Select value={eventType} onValueChange={(v) => handleTypeChange(v as EventType)}>
