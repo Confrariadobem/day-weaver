@@ -1745,18 +1745,51 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <div className="relative" style={{ width: 360 }}>
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
               <Input placeholder="Buscar por descrição, status, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-7 pl-8 pr-14 text-xs rounded-lg" />
+                className="h-7 pl-8 pr-[5.5rem] text-xs rounded-lg" />
               <div className="absolute right-2 top-1 flex items-center gap-1">
                 {searchQuery && (
                   <Tooltip delayDuration={200}>
                     <TooltipTrigger asChild>
-                      <button onClick={() => setSearchQuery("")} className="text-muted-foreground hover:text-foreground">
+                      <button onClick={() => setSearchQuery("")} className="rounded p-0.5 transition-colors text-muted-foreground hover:text-foreground">
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent className="z-[100] text-xs">Limpar busca</TooltipContent>
                   </Tooltip>
                 )}
+                {/* Eraser — reset all to default */}
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={resetAllFilters}
+                      className={cn(
+                        "relative rounded p-0.5 transition-colors",
+                        activeFilterCount > 0 ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      {activeFilterCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground">
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="z-[100] text-xs">Limpar tudo</TooltipContent>
+                </Tooltip>
+                {/* Eye — show all year */}
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={showAllFilters}
+                      className="rounded p-0.5 transition-colors text-muted-foreground hover:text-foreground"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="z-[100] text-xs">Mostrar todos</TooltipContent>
+                </Tooltip>
+                {/* Advanced filter toggle */}
                 <button
                   onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
                   className={cn(
@@ -1770,24 +1803,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </button>
               </div>
             </div>
-
-            {/* Eraser — reset all to default */}
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <button onClick={resetAllFilters} className="relative text-muted-foreground hover:text-primary transition-colors shrink-0">
-                  <Eraser className="h-5 w-5" />
-                  {activeFilterCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-destructive-foreground">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="z-[100] text-xs">Limpar tudo</TooltipContent>
-            </Tooltip>
-
-            {/* Eye — show all year */}
-            <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button onClick={showAllFilters} className="text-muted-foreground hover:text-primary transition-colors shrink-0">
                   <Eye className="h-5 w-5" />
