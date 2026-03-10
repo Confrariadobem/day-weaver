@@ -2081,7 +2081,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <Filter className="h-3.5 w-3.5" /> Filtros Avançados
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                    <div>
+                    <div className="col-span-full">
                       <Label className="text-[10px] text-muted-foreground">Status</Label>
                       <Select value={colFilterStatus} onValueChange={(v) => {
                         setColFilterStatus(v);
@@ -2089,11 +2089,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       }}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="pending">Pendente</SelectItem>
-                          <SelectItem value="paid">Quitado</SelectItem>
                           <SelectItem value="all">Todos</SelectItem>
-                          <SelectItem value="overdue">Atrasados</SelectItem>
-                          <SelectItem value="recebido">Recebidos</SelectItem>
+                          <SelectItem value="overdue">Atrasado</SelectItem>
+                          <SelectItem value="paid">Pago</SelectItem>
+                          <SelectItem value="recebido">Recebido</SelectItem>
+                          <SelectItem value="pending">Pendente</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
