@@ -339,8 +339,8 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
             {t.icon} {t.label}
           </Button>
         ))}
-        <div className="ml-auto flex items-center gap-3">
-          <div className="relative" style={{ width: 200 }}>
+          <div className="flex items-center gap-3 w-full md:w-auto md:ml-auto flex-wrap">
+            <div className="relative flex-1 md:flex-none" style={{ minWidth: 150, maxWidth: 200 }}>
             <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input placeholder="Buscar ativo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
               className="h-7 pl-8 pr-7 text-xs rounded-lg" />
