@@ -2311,7 +2311,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 <Copy className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent className="text-xs text-muted-foreground">Duplicar</TooltipContent>
+                            <TooltipContent className="text-xs">Duplicar lançamento</TooltipContent>
                           </Tooltip>
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
