@@ -1773,7 +1773,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         activeFilterCount > 0 ? "text-primary" : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      <RotateCcw className="h-3.5 w-3.5" />
+                      <RotateCcw className="h-4 w-4" />
                       {activeFilterCount > 0 && (
                         <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground">
                           {activeFilterCount}
