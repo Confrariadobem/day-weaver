@@ -2437,7 +2437,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
                               </TooltipTrigger>
-                              <TooltipContent className="text-xs text-muted-foreground">Editar</TooltipContent>
+                              <TooltipContent className="z-[100] text-xs text-muted-foreground">Editar lançamento</TooltipContent>
                             </Tooltip>
                             <Tooltip delayDuration={200}>
                               <TooltipTrigger asChild>
