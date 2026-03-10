@@ -1803,13 +1803,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </button>
               </div>
             </div>
-              <TooltipTrigger asChild>
-                <button onClick={showAllFilters} className="text-muted-foreground hover:text-primary transition-colors shrink-0">
-                  <Eye className="h-5 w-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="z-[100] text-xs">Mostrar todos</TooltipContent>
-            </Tooltip>
           <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
               <PopoverTrigger asChild>
                 <button
