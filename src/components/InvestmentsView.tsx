@@ -326,7 +326,7 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
       <ScrollArea className="flex-1">
       <div className="p-4 max-w-full overflow-hidden space-y-4 module-container">
       {/* Tab buttons - Finance pattern */}
-      <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto backdrop-blur-sm">
+      <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex flex-col md:flex-row items-start md:items-center gap-2 overflow-x-auto backdrop-blur-sm">
         <Button size="sm" variant={activeTab === "dashboard" ? "default" : "ghost"}
           className={cn("h-7 text-xs px-3 rounded-full gap-1.5", activeTab !== "dashboard" && "text-muted-foreground")}
           onClick={() => setActiveTab("dashboard")}>
@@ -339,8 +339,8 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
             {t.icon} {t.label}
           </Button>
         ))}
-        <div className="ml-auto flex items-center gap-3">
-          <div className="relative" style={{ width: 200 }}>
+          <div className="flex items-center gap-3 w-full md:w-auto md:ml-auto flex-wrap">
+            <div className="relative flex-1 md:flex-none" style={{ minWidth: 150, maxWidth: 200 }}>
             <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input placeholder="Buscar ativo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
               className="h-7 pl-8 pr-7 text-xs rounded-lg" />
@@ -468,7 +468,7 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
           {/* Investment Cards Grid - all types when dashboard, filtered when specific tab */}
           {activeTab !== "dashboard" && INVESTMENT_TYPES.some(t => t.value === activeTab) && (
             <>
-              <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                 {tabFilteredInvestments.map(inv => {
                   const totalInvested = (Number(inv.purchase_price) || 0) * (Number(inv.quantity) || 0);
                   const totalCurrent = (Number(inv.current_price) || 0) * (Number(inv.quantity) || 0);

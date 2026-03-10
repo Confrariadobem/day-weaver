@@ -288,7 +288,7 @@ export default function DashboardView() {
         </div>
 
         {/* KPI Cards Grid */}
-        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(243px, 1fr))" }}>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* Receita */}
           <Card className="bg-card">
             <CardContent className="p-3 min-h-[80px] flex flex-col justify-between">

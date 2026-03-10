@@ -481,7 +481,7 @@ export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (t
       <ScrollArea className="h-full">
         <div className="p-4 space-y-4">
           {/* Tab navigation */}
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-2 overflow-x-auto scrollbar-hide">
             {([
               { key: "indicadores" as ProjectTab, label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
               { key: "lista" as ProjectTab, label: "Lista", icon: <ListTodo className="h-3 w-3" /> },
@@ -495,8 +495,8 @@ export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (t
                 {tab.icon} {tab.label}
               </Button>
             ))}
-            <div className="ml-auto flex items-center gap-3">
-              <div className="relative" style={{ width: 200 }}>
+            <div className="flex items-center gap-3 w-full md:w-auto md:ml-auto flex-wrap">
+              <div className="relative flex-1 md:flex-none" style={{ minWidth: 150, maxWidth: 200 }}>
                 <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
                 <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)}
                   className="h-7 pl-8 pr-7 text-xs rounded-lg" />
@@ -741,9 +741,9 @@ export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (t
                     <CircleDollarSign className="h-4 w-4 text-primary" /> Previsto vs Realizado por Categoria
                   </h3>
                   {budgetChartData.length > 0 ? (
-                    <div className="h-48">
+                  <div className="h-48 w-full min-w-0 overflow-hidden">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={budgetChartData} layout="vertical" margin={{ left: 80, right: 20 }}>
+                        <BarChart data={budgetChartData} layout="vertical" margin={{ left: 60, right: 10 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                           <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => brl(v)} />
                           <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} width={80} />
