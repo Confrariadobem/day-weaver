@@ -2861,7 +2861,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             const pct = totalRev > 0 ? ((rowTotal / totalRev) * 100).toFixed(1) : "0.0";
                             return (
                               <tr key={row.name} className="hover:bg-muted/30">
-                                <td className="p-2 border-b border-border pl-6 uppercase">{row.name}</td>
+                                <td className="p-2 border-b border-border pl-6">{row.name}</td>
                                 <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
                                 {row.months.map((v, i) => (
                                   <td key={i} className={cn("text-right p-2 border-b border-border", v > 0 ? "text-success" : "text-muted-foreground")}>
