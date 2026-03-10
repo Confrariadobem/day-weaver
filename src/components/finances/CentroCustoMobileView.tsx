@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Search, Eye, EyeOff, X } from "lucide-react";
+import { Search, Eye, EyeOff, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 const MONTH_LABELS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -31,6 +31,7 @@ export default function CentroCustoMobileView({ ccReportData, months, brl, avail
   const [activeMonth, setActiveMonth] = useState(new Date().getMonth());
   const [searchQuery, setSearchQuery] = useState("");
   const [showSettled, setShowSettled] = useState(false);
+  const monthBarRef = useRef<HTMLDivElement>(null);
 
   // Find months with data
   const monthsWithData = useMemo(() => {
@@ -50,6 +51,29 @@ export default function CentroCustoMobileView({ ccReportData, months, brl, avail
     return 0;
   }, [monthsWithData]);
 
+  // Scroll month bar to center active month
+  useEffect(() => {
+    if (monthBarRef.current) {
+      const container = monthBarRef.current;
+      const btn = container.children[activeMonth] as HTMLElement;
+      if (btn) {
+        const scrollLeft = btn.offsetLeft - container.clientWidth / 2 + btn.clientWidth / 2;
+        container.scrollTo({ left: scrollLeft, behavior: "smooth" });
+      }
+    }
+  }, [activeMonth]);
+
+  const navigateMonth = (dir: -1 | 1) => {
+    const monthsArr = Array.from(monthsWithData).sort((a, b) => a - b);
+    if (monthsArr.length === 0) return;
+    const currentIdx = monthsArr.indexOf(activeMonth);
+    if (dir === -1) {
+      if (currentIdx > 0) setActiveMonth(monthsArr[currentIdx - 1]);
+    } else {
+      if (currentIdx < monthsArr.length - 1) setActiveMonth(monthsArr[currentIdx + 1]);
+    }
+  };
+
   const filteredCcs = useMemo(() => {
     if (!searchQuery) return ccReportData;
     const q = searchQuery.toLowerCase();
@@ -63,7 +87,7 @@ export default function CentroCustoMobileView({ ccReportData, months, brl, avail
   const yearsToShow = availableYears.length > 0 ? availableYears : [periodYear];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 max-w-full overflow-hidden">
       {/* Year selector */}
       <div className="flex items-center gap-2">
         <Select value={String(periodYear)} onValueChange={(v) => onYearChange(parseInt(v))}>
@@ -83,7 +107,7 @@ export default function CentroCustoMobileView({ ccReportData, months, brl, avail
       </div>
 
       {/* Search */}
-      <div className="relative" style={{ width: "80%", margin: "0 auto" }}>
+      <div className="relative mx-auto" style={{ width: "80%" }}>
         <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
         <Input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-8 pl-8 pr-7 text-xs rounded-lg" />
         {searchQuery && (
@@ -93,24 +117,33 @@ export default function CentroCustoMobileView({ ccReportData, months, brl, avail
         )}
       </div>
 
-      {/* Month preview bar */}
-      <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide" style={{ height: 40 }}>
-        {MONTH_LABELS.map((label, i) => {
-          const hasData = monthsWithData.has(i);
-          return (
-            <button
-              key={i}
-              onClick={() => hasData && setActiveMonth(i)}
-              className={cn(
-                "flex-1 min-w-[2.5rem] h-full flex items-center justify-center text-[10px] font-medium rounded transition-colors",
-                activeMonth === i ? "bg-primary text-primary-foreground" :
-                  hasData ? "text-foreground hover:bg-muted" : "text-muted-foreground/30 cursor-default"
-              )}
-            >
-              {label}
-            </button>
-          );
-        })}
+      {/* Month carousel with arrows */}
+      <div className="flex items-center gap-1">
+        <button onClick={() => navigateMonth(-1)} className="shrink-0 p-1 rounded text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <div ref={monthBarRef} className="flex-1 flex items-center gap-0.5 overflow-x-auto scrollbar-hide" style={{ height: 40, scrollSnapType: "x mandatory" }}>
+          {MONTH_LABELS.map((label, i) => {
+            const hasData = monthsWithData.has(i);
+            return (
+              <button
+                key={i}
+                onClick={() => hasData && setActiveMonth(i)}
+                style={{ scrollSnapAlign: "center" }}
+                className={cn(
+                  "shrink-0 w-[2.5rem] h-full flex items-center justify-center text-[10px] font-medium rounded transition-colors",
+                  activeMonth === i ? "bg-primary text-primary-foreground" :
+                    hasData ? "text-foreground hover:bg-muted" : "text-muted-foreground/30 cursor-default"
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <button onClick={() => navigateMonth(1)} className="shrink-0 p-1 rounded text-muted-foreground hover:text-foreground">
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Start line */}
@@ -161,7 +194,7 @@ export default function CentroCustoMobileView({ ccReportData, months, brl, avail
                   {revRows.map(row => (
                     <div key={row.name} className="flex items-center justify-between text-[10px] pl-3">
                       <span className="text-muted-foreground uppercase truncate flex-1">{row.name}</span>
-                      <span className="text-[hsl(var(--success))] font-medium">{brl(row.months[mi])}</span>
+                      <span className="text-[hsl(var(--success))] font-medium shrink-0 ml-2">{brl(row.months[mi])}</span>
                     </div>
                   ))}
                 </div>
@@ -177,7 +210,7 @@ export default function CentroCustoMobileView({ ccReportData, months, brl, avail
                   {expRows.map(row => (
                     <div key={row.name} className="flex items-center justify-between text-[10px] pl-3">
                       <span className="text-muted-foreground uppercase truncate flex-1">{row.name}</span>
-                      <span className="text-destructive font-medium">{brl(row.months[mi])}</span>
+                      <span className="text-destructive font-medium shrink-0 ml-2">{brl(row.months[mi])}</span>
                     </div>
                   ))}
                 </div>
