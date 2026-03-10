@@ -2711,7 +2711,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                                 <span className="expand-icon">
                                   {isExpanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground rotate-90" />}
                                 </span>
-                                {row.name.toUpperCase()}
+                                {row.name}
                               </span>
                             </td>
                             <td className="text-right p-2 border-b border-border text-muted-foreground">{pct}%</td>
