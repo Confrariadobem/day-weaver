@@ -643,12 +643,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           if (fromDate && d < fromDate) return false;
           if (toDate) { const endD = new Date(toDate); endD.setHours(23,59,59,999); if (d > endD) return false; }
         }
-        // Filter by cash flow type
-        if (cashFlowFilter === "paid") return e.is_paid;
-        if (cashFlowFilter === "payable") return !e.is_paid;
-        if (cashFlowFilter === "receivable") return e.is_paid;
-        if (cashFlowFilter === "overdue") { const ed = parseEntryDate(e.entry_date); return !e.is_paid && ed < today; }
-        // "all" filter: show everything
+        // Cash flow type filter removed — now using colFilterStatus
         return true;
       })
       .filter((e) => {
