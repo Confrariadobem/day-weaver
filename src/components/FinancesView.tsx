@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import DoarMobileView from "@/components/finances/DoarMobileView";
+import CentroCustoMobileView from "@/components/finances/CentroCustoMobileView";
 import { useModulePreferences } from "@/hooks/useModulePreferences";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -147,6 +150,7 @@ function CounterpartAutocomplete({ value, onChange, entries }: { value: string; 
 }
 
 export default function FinancesView({ onTabChange, walletFilter, onClearWalletFilter, onNavigateToPatrimonio }: { onTabChange?: (tab: string) => void; walletFilter?: { id: string; name: string } | null; onClearWalletFilter?: () => void; onNavigateToPatrimonio?: () => void }) {
+  const isMobile = useIsMobile();
   const { user } = useAuth();
   const { formatCurrency: brl } = useCurrency();
   const { formatDate: fmtDate, dateFormat } = useDateFormat();
@@ -2459,7 +2463,23 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         )}
 
         {/* ============ DOAR ============ */}
-        {viewTab === "doar" && (() => {
+        {viewTab === "doar" && isMobile && (
+          <DoarMobileView
+            dreData={dreData}
+            brl={brl}
+            availableYears={(() => {
+              const years = new Set<number>();
+              entries.forEach(e => years.add(new Date(e.entry_date).getFullYear()));
+              return Array.from(years).sort();
+            })()}
+            periodYear={periodYear}
+            onYearChange={(year) => {
+              setPeriodStart(format(startOfYear(new Date(year, 0)), "yyyy-MM-dd"));
+              setPeriodEnd(format(endOfYear(new Date(year, 0)), "yyyy-MM-dd"));
+            }}
+          />
+        )}
+        {viewTab === "doar" && !isMobile && (() => {
           const dQuery = doarSearchQuery.toLowerCase().trim();
           const filterDoarRow = (row: { name: string; months: number[] }) => {
             return !dQuery || row.name.toLowerCase().includes(dQuery);
@@ -2728,7 +2748,24 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         })()}
 
         {/* ============ CENTRO DE CUSTO REPORT ============ */}
-        {viewTab === "centrocusto" && (
+        {viewTab === "centrocusto" && isMobile && (
+          <CentroCustoMobileView
+            ccReportData={ccReportData}
+            months={dreData.months}
+            brl={brl}
+            availableYears={(() => {
+              const years = new Set<number>();
+              entries.forEach(e => years.add(new Date(e.entry_date).getFullYear()));
+              return Array.from(years).sort();
+            })()}
+            periodYear={periodYear}
+            onYearChange={(year) => {
+              setPeriodStart(format(startOfYear(new Date(year, 0)), "yyyy-MM-dd"));
+              setPeriodEnd(format(endOfYear(new Date(year, 0)), "yyyy-MM-dd"));
+            }}
+          />
+        )}
+        {viewTab === "centrocusto" && !isMobile && (
           <div className="space-y-4">
 
             {ccReportData.length === 0 && (
