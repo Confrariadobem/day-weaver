@@ -1713,7 +1713,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
                   className={cn(
                     "rounded p-0.5 transition-colors",
-                    advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart
+                    advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || filterCounterpart || colFilterStatus !== "pending" || showSettled
                       ? "text-primary"
                       : "text-muted-foreground hover:text-foreground"
                   )}
