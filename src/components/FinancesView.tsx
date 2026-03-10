@@ -1841,27 +1841,27 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     if (rows.length > 0) { await supabase.from("financial_entries").insert(rows); fetchData(); }
                   };
                   input.click();
-                }} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                }} className="text-muted-foreground hover:text-primary transition-colors">
                   <FileDown className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Importar CSV</TooltipContent>
+              <TooltipContent className="z-[100]">Importar CSV</TooltipContent>
             </Tooltip>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
-                <button onClick={handleExportCSV} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                <button onClick={handleExportCSV} className="text-muted-foreground hover:text-primary transition-colors">
                   <FileUp className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Exportar CSV</TooltipContent>
+              <TooltipContent className="z-[100]">Exportar CSV</TooltipContent>
             </Tooltip>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
-                <button onClick={handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors">
                   <Printer className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Imprimir</TooltipContent>
+              <TooltipContent className="z-[100]">Imprimir</TooltipContent>
             </Tooltip>
           </>
         )}
