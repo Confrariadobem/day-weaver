@@ -1191,7 +1191,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                   )}
                 </div>
               )}
-              </div>
 
               {/* Single-source payment fields (hidden when split is enabled) */}
               {!splitEnabled && (
