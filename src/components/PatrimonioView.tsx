@@ -133,7 +133,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
     }
   };
 
-  const openAccountEdit = (acc: any) => {
+  const openAccountEdit = async (acc: any) => {
     setEditingAccount(acc);
     setAccName(acc.name);
     setAccType(acc.type as AccountType);
@@ -142,6 +142,15 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
     setAccClosing(acc.closing_day ? String(acc.closing_day) : "");
     setAccDue(acc.due_day ? String(acc.due_day) : "");
     setAccIsActive(acc.is_active !== false);
+    // Load wallet-specific payment methods
+    const { data: apm } = await supabase.from("account_payment_methods" as any).select("payment_method_id").eq("account_id", acc.id);
+    if (apm && apm.length > 0) {
+      setWalletPmAll(false);
+      setWalletPaymentMethodIds(new Set((apm as any[]).map((r: any) => r.payment_method_id)));
+    } else {
+      setWalletPmAll(true);
+      setWalletPaymentMethodIds(new Set());
+    }
     setEditDialogOpen(true);
   };
 
