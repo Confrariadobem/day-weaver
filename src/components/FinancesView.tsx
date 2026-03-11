@@ -236,6 +236,17 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>("");
   const [filterIsFixed, setFilterIsFixed] = useState<string>("all");
   const [filterCounterpart, setFilterCounterpart] = useState<string>("");
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [filterProgramId, setFilterProgramId] = useState<string>("");
+  const [doarViewMode, setDoarViewMode] = useState<string>("realizado");
+  const [doarAdvancedOpen, setDoarAdvancedOpen] = useState(false);
+  const [doarFilterStatus, setDoarFilterStatus] = useState<string>("all");
+  const [doarFilterType, setDoarFilterType] = useState<string>("all");
+  const [doarFilterCategoryId, setDoarFilterCategoryId] = useState<string>("");
+  const [doarFilterAccountId, setDoarFilterAccountId] = useState<string>("");
+  const [doarFilterPaymentMethod, setDoarFilterPaymentMethod] = useState<string>("");
+  const [doarFilterIsFixed, setDoarFilterIsFixed] = useState(false);
+  const [doarFilterProgramId, setDoarFilterProgramId] = useState<string>("");
 
   const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
   const splitTotal = splitLines.reduce((s, l) => s + parseNum(l.amount), 0);
