@@ -390,13 +390,13 @@ export default function TeamsSection() {
                                   <TableRow key={mod.key}>
                                     <TableCell className="text-[11px] py-1.5">{mod.label}</TableCell>
                                     <TableCell className="text-center py-1.5">
-                                      <Checkbox checked={perm?.canView || false} onCheckedChange={() => togglePerm(member.id, mod.key, "canView")} className="h-3.5 w-3.5" />
+                                      <Switch checked={perm?.canView || false} onCheckedChange={() => togglePerm(member.id, mod.key, "canView")} />
                                     </TableCell>
                                     <TableCell className="text-center py-1.5">
-                                      <Checkbox checked={perm?.canEdit || false} onCheckedChange={() => togglePerm(member.id, mod.key, "canEdit")} className="h-3.5 w-3.5" />
+                                      <Switch checked={perm?.canEdit || false} onCheckedChange={() => togglePerm(member.id, mod.key, "canEdit")} />
                                     </TableCell>
                                     <TableCell className="text-center py-1.5">
-                                      <Checkbox checked={isNone} onCheckedChange={() => setNone(member.id, mod.key)} className="h-3.5 w-3.5" />
+                                      <Switch checked={isNone} onCheckedChange={() => setNone(member.id, mod.key)} />
                                     </TableCell>
                                   </TableRow>
                                 );
