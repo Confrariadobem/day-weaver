@@ -278,6 +278,7 @@ export default function PreferencesView() {
     });
     fetchCategories();
     fetchCostCenters();
+    fetchPaymentMethods();
   }, [user]);
 
   const fetchCategories = async () => {
