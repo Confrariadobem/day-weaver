@@ -780,7 +780,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterCostCenterId, filterProjectId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart, showSettled]);
+  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterProgramId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart, showSettled]);
 
   // KPI totals — now derived from filtered entries so they respond to search/filters in real-time (1.8)
   const kpiData = useMemo(() => {
