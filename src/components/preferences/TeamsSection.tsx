@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Pencil, Trash2, ChevronLeft, ChevronRight, X, UserPlus, Plus, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -323,7 +323,7 @@ export default function TeamsSection() {
                           <p className="text-xs font-medium truncate">{user.name}</p>
                           <p className="text-[10px] text-muted-foreground">{user.role}</p>
                         </div>
-                        <Checkbox checked={selected} className="pointer-events-none" />
+                        <Switch checked={selected} className="pointer-events-none" />
                       </button>
                     );
                   })}
@@ -390,13 +390,13 @@ export default function TeamsSection() {
                                   <TableRow key={mod.key}>
                                     <TableCell className="text-[11px] py-1.5">{mod.label}</TableCell>
                                     <TableCell className="text-center py-1.5">
-                                      <Checkbox checked={perm?.canView || false} onCheckedChange={() => togglePerm(member.id, mod.key, "canView")} className="h-3.5 w-3.5" />
+                                      <Switch checked={perm?.canView || false} onCheckedChange={() => togglePerm(member.id, mod.key, "canView")} />
                                     </TableCell>
                                     <TableCell className="text-center py-1.5">
-                                      <Checkbox checked={perm?.canEdit || false} onCheckedChange={() => togglePerm(member.id, mod.key, "canEdit")} className="h-3.5 w-3.5" />
+                                      <Switch checked={perm?.canEdit || false} onCheckedChange={() => togglePerm(member.id, mod.key, "canEdit")} />
                                     </TableCell>
                                     <TableCell className="text-center py-1.5">
-                                      <Checkbox checked={isNone} onCheckedChange={() => setNone(member.id, mod.key)} className="h-3.5 w-3.5" />
+                                      <Switch checked={isNone} onCheckedChange={() => setNone(member.id, mod.key)} />
                                     </TableCell>
                                   </TableRow>
                                 );

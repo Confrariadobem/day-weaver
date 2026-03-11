@@ -236,6 +236,17 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>("");
   const [filterIsFixed, setFilterIsFixed] = useState<string>("all");
   const [filterCounterpart, setFilterCounterpart] = useState<string>("");
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [filterProgramId, setFilterProgramId] = useState<string>("");
+  const [doarViewMode, setDoarViewMode] = useState<string>("realizado");
+  const [doarAdvancedOpen, setDoarAdvancedOpen] = useState(false);
+  const [doarFilterStatus, setDoarFilterStatus] = useState<string>("all");
+  const [doarFilterType, setDoarFilterType] = useState<string>("all");
+  const [doarFilterCategoryId, setDoarFilterCategoryId] = useState<string>("");
+  const [doarFilterAccountId, setDoarFilterAccountId] = useState<string>("");
+  const [doarFilterPaymentMethod, setDoarFilterPaymentMethod] = useState<string>("");
+  const [doarFilterIsFixed, setDoarFilterIsFixed] = useState(false);
+  const [doarFilterProgramId, setDoarFilterProgramId] = useState<string>("");
 
   const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
   const splitTotal = splitLines.reduce((s, l) => s + parseNum(l.amount), 0);
@@ -259,18 +270,20 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [entRes, projRes, catRes, accRes, ccRes] = await Promise.all([
+    const [entRes, projRes, catRes, accRes, ccRes, progRes] = await Promise.all([
       supabase.from("financial_entries").select("*").eq("user_id", user.id).order("entry_date", { ascending: false }),
       supabase.from("projects").select("*").eq("user_id", user.id),
       supabase.from("categories").select("*").eq("user_id", user.id),
       supabase.from("financial_accounts").select("*").eq("user_id", user.id).order("name"),
       supabase.from("cost_centers" as any).select("*").eq("user_id", user.id).eq("is_active", true).order("name"),
+      supabase.from("programs").select("*").eq("user_id", user.id).order("name"),
     ]);
     if (entRes.data) setEntries(entRes.data);
     if (projRes.data) setProjects(projRes.data);
     if (catRes.data) setCategories(catRes.data);
     if (accRes.data) setAccounts(accRes.data as FinancialAccount[]);
     if (ccRes.data) setCostCenters(ccRes.data as any[]);
+    if (progRes.data) setPrograms(progRes.data as any[]);
   }, [user]);
 
   useEffect(() => {
@@ -671,15 +684,19 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         return true;
       })
       .filter((e) => {
-        // Status filter (1.2)
-        let passStatus = true;
-        if (colFilterStatus === "pending") passStatus = !e.is_paid;
-        if (colFilterStatus === "overdue") { const ed = parseEntryDate(e.entry_date); passStatus = !e.is_paid && ed < today; }
-        if (colFilterStatus === "paid") passStatus = e.is_paid && e.type === "expense";
-        if (colFilterStatus === "recebido") passStatus = e.is_paid && e.type === "revenue";
-        // showSettled override: include settled entries even if filter would hide them
-        if (!passStatus && showSettled && e.is_paid) passStatus = true;
-        if (!passStatus) return false;
+        // Search ignores status filter — show all statuses when searching (5.1)
+        const hasSearch = searchQuery.trim().length > 0;
+        if (!hasSearch) {
+          // Status filter (1.2)
+          let passStatus = true;
+          if (colFilterStatus === "pending") passStatus = !e.is_paid;
+          if (colFilterStatus === "overdue") { const ed = parseEntryDate(e.entry_date); passStatus = !e.is_paid && ed < today; }
+          if (colFilterStatus === "paid") passStatus = e.is_paid && e.type === "expense";
+          if (colFilterStatus === "recebido") passStatus = e.is_paid && e.type === "revenue";
+          // showSettled override: include settled entries even if filter would hide them
+          if (!passStatus && showSettled && e.is_paid) passStatus = true;
+          if (!passStatus) return false;
+        }
         if (colFilterCounterpart && !(e.counterpart || "").toLowerCase().includes(colFilterCounterpart.toLowerCase())) return false;
         // Advanced filter fields
         if (filterType !== "all") {
@@ -1906,16 +1923,109 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           </>;
         })()}
 
-        {(isDoar || isCentro) && (
+        {isDoar && (() => {
+          const doarActiveFilterCount = [
+            doarSearchQuery.trim() !== "",
+            doarFilterStatus !== "all",
+            doarFilterType !== "all",
+            doarFilterCategoryId !== "",
+            doarFilterAccountId !== "",
+            doarFilterPaymentMethod !== "",
+            doarFilterIsFixed,
+            doarFilterProgramId !== "",
+            doarViewMode !== "realizado",
+            sharedDateFrom !== "" || sharedDateTo !== "",
+          ].filter(Boolean).length;
+
+          const resetDoarFilters = () => {
+            setDoarSearchQuery("");
+            setDoarFilterStatus("all");
+            setDoarFilterType("all");
+            setDoarFilterCategoryId("");
+            setDoarFilterAccountId("");
+            setDoarFilterPaymentMethod("");
+            setDoarFilterIsFixed(false);
+            setDoarFilterProgramId("");
+            setDoarViewMode("realizado");
+            handleClearSharedInterval();
+          };
+
+          return <>
+            <div className="relative" style={{ width: 360 }}>
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input placeholder="Buscar categorias, lançamentos..."
+                value={doarSearchQuery}
+                onChange={(e) => setDoarSearchQuery(e.target.value)}
+                className="h-7 pl-8 pr-[4rem] text-xs rounded-lg" />
+              <div className="absolute right-2 top-1 flex items-center gap-1">
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={resetDoarFilters}
+                      className={cn(
+                        "relative rounded p-0.5 transition-colors",
+                        doarActiveFilterCount > 0 ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs">Limpar tudo</TooltipContent>
+                </Tooltip>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setDoarAdvancedOpen(!doarAdvancedOpen)}
+                      className={cn(
+                        "relative rounded p-0.5 transition-colors",
+                        doarAdvancedOpen || doarActiveFilterCount > 0
+                          ? "text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Filter className="h-4 w-4" />
+                      {doarActiveFilterCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[7px] font-bold text-primary-foreground">
+                          {doarActiveFilterCount}
+                        </span>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs">Filtros avançados</TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+            {renderSharedInterval()}
+            {renderSharedHoje()}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={handleExportCSV} className="text-muted-foreground hover:text-primary transition-colors">
+                  <FileUp className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="z-[100] text-xs">Exportar CSV</TooltipContent>
+            </Tooltip>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={handlePrintDOAR} className="text-muted-foreground hover:text-primary transition-colors">
+                  <Printer className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="z-[100] text-xs">Imprimir relatório</TooltipContent>
+            </Tooltip>
+          </>;
+        })()}
+
+        {isCentro && (
           <>
             <div className="relative" style={{ width: 300 }}>
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input placeholder={isDoar ? "Pesquisar categorias..." : "Pesquisar centros..."} 
-                value={isDoar ? doarSearchQuery : ccReportSearch} 
-                onChange={(e) => isDoar ? setDoarSearchQuery(e.target.value) : setCcReportSearch(e.target.value)}
+              <Input placeholder="Pesquisar centros..."
+                value={ccReportSearch}
+                onChange={(e) => setCcReportSearch(e.target.value)}
                 className="h-7 pl-8 pr-7 text-xs rounded-lg" />
-              {(isDoar ? doarSearchQuery : ccReportSearch) && (
-                <button onClick={() => isDoar ? setDoarSearchQuery("") : setCcReportSearch("")} className="absolute right-2 top-2 text-[#9ca3af] hover:text-foreground">
+              {ccReportSearch && (
+                <button onClick={() => setCcReportSearch("")} className="absolute right-2 top-2 text-muted-foreground hover:text-foreground">
                   <X className="h-4 w-4" />
                 </button>
               )}
@@ -1924,22 +2034,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             {renderSharedHoje()}
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
-                <button onClick={isDoar ? handlePrintDOAR : handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors">
                   <Printer className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>Imprimir</TooltipContent>
             </Tooltip>
-            {isDoar && (
-              <Tooltip delayDuration={200}>
-                <TooltipTrigger asChild>
-                  <button onClick={cycleDoarExpand} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
-                    <ChevronsUpDown className="h-5 w-5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>Expandir/Recolher (Nível {doarExpandLevel}/3)</TooltipContent>
-              </Tooltip>
-            )}
           </>
         )}
 
@@ -1977,8 +2077,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             { key: "indicadores" as ViewTab, label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
             { key: "previsao" as ViewTab, label: "Fluxo de Caixa", icon: <CircleDollarSign className="h-3 w-3" /> },
             { key: "doar" as ViewTab, label: "DOAR", icon: <Landmark className="h-3 w-3" /> },
-            { key: "centrocusto" as ViewTab, label: "Centro de Custo", icon: <FolderKanban className="h-3 w-3" /> },
-          ]).filter(tab => tab.key === "centrocusto" || visibleTabs.includes(tab.key)).map(tab => (
+          ]).filter(tab => visibleTabs.includes(tab.key)).map(tab => (
             <Button key={tab.key} size="sm"
               variant={viewTab === tab.key ? "default" : "ghost"}
               className={cn("h-7 text-xs px-3 rounded-full gap-1.5", viewTab !== tab.key && "text-muted-foreground")}
@@ -2055,8 +2154,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                     <Filter className="h-3.5 w-3.5" /> Filtros Avançados
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                    <div className="col-span-full">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {/* Linha 1: Status + Tipo */}
+                    <div>
                       <Label className="text-[10px] text-muted-foreground">Status</Label>
                       <Select value={colFilterStatus} onValueChange={(v) => {
                         setColFilterStatus(v);
@@ -2078,8 +2178,19 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">Todos</SelectItem>
-                          <SelectItem value="revenue">🟢 Receita</SelectItem>
-                          <SelectItem value="expense">🔴 Despesa</SelectItem>
+                          <SelectItem value="revenue"><span className="flex items-center gap-1.5"><TrendingUp className="h-3 w-3" /> Contas a receber</span></SelectItem>
+                          <SelectItem value="expense"><span className="flex items-center gap-1.5"><TrendingDown className="h-3 w-3" /> Contas a pagar</span></SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Linha 2: Programa + Categoria */}
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Programa</Label>
+                      <Select value={filterProgramId || "__all__"} onValueChange={(v) => setFilterProgramId(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todos</SelectItem>
+                          {programs.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -2093,39 +2204,13 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         </SelectContent>
                       </Select>
                     </div>
+                    {/* Linha 3: Carteira + Forma pgto + Conta fixa */}
                     <div>
-                      <Label className="text-[10px] text-muted-foreground">Centro de Custo</Label>
-                      <Select value={filterCostCenterId || "__all__"} onValueChange={(v) => setFilterCostCenterId(v === "__all__" ? "" : v)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__all__">Todos</SelectItem>
-                          {costCenters.map((cc: any) => (
-                            <SelectItem key={cc.id} value={cc.id}>
-                              <span className="flex items-center gap-1.5">
-                                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color }} />
-                                {cc.name}
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Projeto</Label>
-                      <Select value={filterProjectId || "__all__"} onValueChange={(v) => setFilterProjectId(v === "__all__" ? "" : v)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__all__">Todos</SelectItem>
-                          {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Carteira</Label>
+                      <Label className="text-[10px] text-muted-foreground">Carteira / Conta</Label>
                       <Select value={filterAccountId || "__all__"} onValueChange={(v) => setFilterAccountId(v === "__all__" ? "" : v)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas as contas" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__all__">Todas</SelectItem>
+                          <SelectItem value="__all__">Todas as contas</SelectItem>
                           {accounts.filter(a => a.is_active).map(a => (
                             <SelectItem key={a.id} value={a.id}>
                               <span className="flex items-center gap-1.5">
@@ -2147,16 +2232,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Conta Fixa</Label>
-                      <Select value={filterIsFixed} onValueChange={setFilterIsFixed}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todas</SelectItem>
-                          <SelectItem value="yes">Sim</SelectItem>
-                          <SelectItem value="no">Não</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="flex items-end pb-1">
+                      <div className="flex items-center gap-1.5">
+                        <Switch checked={filterIsFixed === "yes"} onCheckedChange={(c) => setFilterIsFixed(c ? "yes" : "all")} />
+                        <Label className="text-xs whitespace-nowrap">Conta fixa</Label>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2768,19 +2848,125 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
           return (
           <div className="space-y-4" id="doar-print-area">
+            {/* DOAR Advanced Filter Panel */}
+            {doarAdvancedOpen && (
+              <div className="my-4 space-y-4">
+                <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Filter className="h-3.5 w-3.5" /> Filtros Avançados — DOAR
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {/* Linha 1: Status + Tipo */}
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Status</Label>
+                      <Select value={doarFilterStatus} onValueChange={setDoarFilterStatus}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="overdue">Atrasado</SelectItem>
+                          <SelectItem value="paid">Pago</SelectItem>
+                          <SelectItem value="recebido">Recebido</SelectItem>
+                          <SelectItem value="pending">Pendente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Tipo</Label>
+                      <Select value={doarFilterType} onValueChange={setDoarFilterType}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="revenue"><span className="flex items-center gap-1.5"><TrendingUp className="h-3 w-3" /> Contas a receber</span></SelectItem>
+                          <SelectItem value="expense"><span className="flex items-center gap-1.5"><TrendingDown className="h-3 w-3" /> Contas a pagar</span></SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Linha 2: Programa + Categoria */}
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Programa</Label>
+                      <Select value={doarFilterProgramId || "__all__"} onValueChange={(v) => setDoarFilterProgramId(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todos</SelectItem>
+                          {programs.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Categoria</Label>
+                      <Select value={doarFilterCategoryId || "__all__"} onValueChange={(v) => setDoarFilterCategoryId(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas</SelectItem>
+                          {sortedFinCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Linha 3: Carteira + Forma pgto + Conta fixa */}
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Carteira / Conta</Label>
+                      <Select value={doarFilterAccountId || "__all__"} onValueChange={(v) => setDoarFilterAccountId(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas as contas" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas as contas</SelectItem>
+                          {accounts.filter(a => a.is_active).map(a => (
+                            <SelectItem key={a.id} value={a.id}>
+                              <span className="flex items-center gap-1.5">
+                                {ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon}
+                                {a.name}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Forma de Pagamento</Label>
+                      <Select value={doarFilterPaymentMethod || "__all__"} onValueChange={(v) => setDoarFilterPaymentMethod(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas</SelectItem>
+                          {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end pb-1">
+                      <div className="flex items-center gap-1.5">
+                        <Switch checked={doarFilterIsFixed} onCheckedChange={setDoarFilterIsFixed} />
+                        <Label className="text-xs whitespace-nowrap">Conta fixa</Label>
+                      </div>
+                    </div>
+                    {/* Realizado / Previsto */}
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Visualização</Label>
+                      <Select value={doarViewMode} onValueChange={setDoarViewMode}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="realizado">Realizado</SelectItem>
+                          <SelectItem value="previsto">Previsto</SelectItem>
+                          <SelectItem value="all">Todos</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t border-border/50" />
+              </div>
+            )}
+
             {/* DOAR quick filters */}
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5">
-                <Checkbox checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} id="carry-over" className="h-3.5 w-3.5" />
-                <Label htmlFor="carry-over" className="text-xs text-muted-foreground whitespace-nowrap">Saldo anterior</Label>
+                <Switch checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} />
+                <Label className="text-xs text-muted-foreground whitespace-nowrap">Saldo anterior</Label>
               </div>
             </div>
 
-            {/* PREVISTO — Contas a Pagar/Receber */}
-            {renderDoarTable(dreData.previsto, "PREVISTO", "Contas a Pagar / Receber", "prev")}
-
-            {/* REALIZADO — Contas Pagas/Recebidas */}
-            {renderDoarTable(dreData.realizado, "REALIZADO", "Contas Pagas / Recebidas", "real")}
+            {/* Conditional DOAR tables based on viewMode */}
+            {(doarViewMode === "previsto" || doarViewMode === "all") &&
+              renderDoarTable(dreData.previsto, "PREVISTO", "Contas a Pagar / Receber", "prev")}
+            {(doarViewMode === "realizado" || doarViewMode === "all") &&
+              renderDoarTable(dreData.realizado, "REALIZADO", "Contas Pagas / Recebidas", "real")}
           </div>
           );
         })()}

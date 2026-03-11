@@ -1188,23 +1188,22 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 </div>
               )}
 
-              {/* Three checkboxes in one line */}
+              {/* Three toggles in one line */}
               <div className="flex items-center gap-4 pt-1">
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={isFixed} onCheckedChange={(c) => setIsFixed(!!c)} id="is-fixed-central" />
-                  <label htmlFor="is-fixed-central" className="text-xs cursor-pointer">Conta fixa</label>
+                <div className="flex items-center gap-1.5">
+                  <Switch checked={isFixed} onCheckedChange={(c) => setIsFixed(c)} />
+                  <label className="text-xs cursor-pointer">Conta fixa</label>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={splitEnabled} onCheckedChange={(c) => {
-                    const val = !!c;
-                    setSplitEnabled(val);
-                    if (val && splitLines.length === 0) addSplitLine();
-                  }} id="split-toggle" />
-                  <label htmlFor="split-toggle" className="text-xs cursor-pointer">Múltiplas carteiras</label>
+                <div className="flex items-center gap-1.5">
+                  <Switch checked={splitEnabled} onCheckedChange={(c) => {
+                    setSplitEnabled(c);
+                    if (c && splitLines.length === 0) addSplitLine();
+                  }} />
+                  <label className="text-xs cursor-pointer">Múltiplas carteiras</label>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={isPaid} onCheckedChange={(c) => setIsPaid(!!c)} id="is-paid-central" />
-                  <label htmlFor="is-paid-central" className="text-xs cursor-pointer">Baixar conta</label>
+                <div className="flex items-center gap-1.5">
+                  <Switch checked={isPaid} onCheckedChange={(c) => setIsPaid(c)} />
+                  <label className="text-xs cursor-pointer">Baixar conta</label>
                 </div>
               </div>
 
@@ -1400,8 +1399,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                   <SimpleDatePicker value={startDate} onChange={setStartDate} placeholder="Selecionar data" />
                 </div>
                 <div className="flex items-center gap-1.5 pt-5">
-                  <Checkbox checked={allDay} onCheckedChange={(c) => setAllDay(!!c)} id="allday" />
-                  <Label htmlFor="allday" className="text-sm whitespace-nowrap">Dia inteiro</Label>
+                  <Switch checked={allDay} onCheckedChange={(c) => setAllDay(c)} />
+                  <Label className="text-sm whitespace-nowrap">Dia inteiro</Label>
                 </div>
               </div>
 
@@ -1455,13 +1454,12 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
               {recurrence !== "none" && (
                 <>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
+                  <div className="flex items-center gap-1.5">
+                    <Switch
                       checked={recurrenceIndeterminate}
-                      onCheckedChange={(c) => setRecurrenceIndeterminate(!!c)}
-                      id="rec-indeterminate"
+                      onCheckedChange={(c) => setRecurrenceIndeterminate(c)}
                     />
-                    <Label htmlFor="rec-indeterminate" className="text-sm">Indeterminada</Label>
+                    <Label className="text-sm">Indeterminada</Label>
                   </div>
                   {!recurrenceIndeterminate && (
                     <div>
