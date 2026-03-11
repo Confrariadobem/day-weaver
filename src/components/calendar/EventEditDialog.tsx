@@ -58,6 +58,7 @@ const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
   event: <CalendarDays className="h-3.5 w-3.5" />,
   investment: <TrendingUp className="h-3.5 w-3.5" />,
   patrimonio: <Home className="h-3.5 w-3.5" />,
+  project: <FolderKanban className="h-3.5 w-3.5" />,
   programa: <FolderKanban className="h-3.5 w-3.5" />,
 };
 
