@@ -1458,6 +1458,49 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </div>
           )}
 
+          {/* Transferência entre contas */}
+          {eventType === "transferencia" && (
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <p className="text-xs text-muted-foreground">Transferir valor entre carteiras / contas.</p>
+              <div>
+                <Label className="text-sm">De (Origem)</Label>
+                <Select value={transferFromAccountId} onValueChange={setTransferFromAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar carteira de origem" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a: any) => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Para (Destino)</Label>
+                <Select value={transferToAccountId} onValueChange={setTransferToAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar carteira de destino" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.filter((a: any) => a.id !== transferFromAccountId).map((a: any) => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Valor (R$)</Label>
+                <Input type="text" inputMode="decimal" placeholder="0,00" value={transferAmount}
+                  onChange={(e) => setTransferAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
+              </div>
+              <div>
+                <Label className="text-sm">Data</Label>
+                <SimpleDatePicker value={startDate} onChange={(v) => setStartDate(v)} placeholder="Selecionar data" />
+              </div>
+              <div>
+                <Label className="text-sm">Descrição (opcional)</Label>
+                <Textarea value={transferDescription} onChange={(e) => setTransferDescription(e.target.value)}
+                  placeholder="Observações sobre a transferência" rows={2} className="resize-none" />
+              </div>
+            </div>
+          )}
+
           {/* Project priority */}
           {eventType === "project" && (
             <div className="space-y-3 rounded-lg border border-border/30 p-3">
