@@ -248,6 +248,10 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [doarFilterIsFixed, setDoarFilterIsFixed] = useState(false);
   const [doarFilterProgramId, setDoarFilterProgramId] = useState<string>("");
 
+  // Dynamic payment methods
+  const [paymentMethodsList, setPaymentMethodsList] = useState<any[]>([]);
+  const [accountPaymentMethods, setAccountPaymentMethods] = useState<any[]>([]);
+
   const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
   const splitTotal = splitLines.reduce((s, l) => s + parseNum(l.amount), 0);
   const totalAmountNum = parseNum(amount);
