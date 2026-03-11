@@ -992,9 +992,9 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   };
 
   // Types that show the main title/description/classification fields
-  const showMainFields = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo" && eventType !== "categoria";
+  const showMainFields = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo" && eventType !== "categoria" && eventType !== "transferencia";
   // Types that show dates/scheduling
-  const showDates = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo" && eventType !== "categoria";
+  const showDates = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo" && eventType !== "categoria" && eventType !== "transferencia";
 
   return (
     <>
