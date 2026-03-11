@@ -2478,7 +2478,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           {statusText}
                         </td>
                         <td className="py-2.5 px-1 w-24 no-print">
-                          <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
+                          <div className="hidden group-hover:flex items-center gap-3 justify-center">
                             {!e.is_paid && (
                               <Tooltip delayDuration={200}>
                                 <TooltipTrigger asChild>
