@@ -1464,7 +1464,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                   <SelectTrigger className="text-xs"><SelectValue placeholder="Opcional" /></SelectTrigger>
                   <SelectContent>
-                    {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    {availablePaymentMethods.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
