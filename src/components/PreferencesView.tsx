@@ -292,6 +292,37 @@ export default function PreferencesView() {
     if (data) setCostCenters(data as any[]);
   };
 
+  const DEFAULT_PAYMENT_METHODS = ["PIX", "Boleto", "Cartão de crédito", "Cartão de débito", "TED", "DOC", "Dinheiro", "Transferência interna"];
+
+  const fetchPaymentMethods = async () => {
+    if (!user) return;
+    const { data } = await supabase.from("payment_methods" as any).select("*").eq("user_id", user.id).order("name");
+    if (data && data.length > 0) {
+      setPaymentMethods(data as any[]);
+    } else if (data && data.length === 0) {
+      // Seed default payment methods
+      const toInsert = DEFAULT_PAYMENT_METHODS.map(name => ({
+        user_id: user.id, name, is_active: true, is_system: true,
+      }));
+      await supabase.from("payment_methods" as any).insert(toInsert);
+      const { data: seeded } = await supabase.from("payment_methods" as any).select("*").eq("user_id", user.id).order("name");
+      if (seeded) setPaymentMethods(seeded as any[]);
+    }
+  };
+
+  const togglePaymentMethod = async (id: string, active: boolean) => {
+    await supabase.from("payment_methods" as any).update({ is_active: active }).eq("id", id);
+    fetchPaymentMethods();
+  };
+
+  const addPaymentMethod = async () => {
+    if (!newPmName.trim() || !user) return;
+    await supabase.from("payment_methods" as any).insert({ user_id: user.id, name: newPmName.trim(), is_active: true, is_system: false });
+    setNewPmName("");
+    fetchPaymentMethods();
+    toast({ title: "Forma de pagamento adicionada!" });
+  };
+
   // ─── Auto-save general prefs ─────────────────────────────────────────────
 
   const generalPrefs = { language, currency, decimalPlaces };
