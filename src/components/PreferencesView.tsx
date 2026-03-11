@@ -23,7 +23,7 @@ import { ConfigDialog } from "@/components/shared/ConfigDialog";
 import { ColorPaletteGrid } from "@/components/shared/ColorPaletteGrid";
 import {
   Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp, Plus, DollarSign,
-  FolderKanban, Eye, Sparkles, Sunset, Flower2, Waves, ChevronDown, Users,
+  FolderKanban, Eye, Sparkles, Sunset, Flower2, Waves, ChevronDown, Users, CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LAUNCH_TYPE_ICONS, DATA_MODULE_ICONS, CATEGORY_ICON_MAP, CATEGORY_ICON_KEYS, INVESTMENT_TYPE_ICONS } from "@/lib/icons";
@@ -252,6 +252,10 @@ export default function PreferencesView() {
   const [ccDesc, setCcDesc] = useState("");
   const [ccColor, setCcColor] = useState("#3b82f6");
 
+  // Payment methods
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [newPmName, setNewPmName] = useState("");
+
   // Data management
   const [dataToggles, setDataToggles] = useState<Record<string, boolean>>({});
 
@@ -274,6 +278,7 @@ export default function PreferencesView() {
     });
     fetchCategories();
     fetchCostCenters();
+    fetchPaymentMethods();
   }, [user]);
 
   const fetchCategories = async () => {
@@ -286,6 +291,37 @@ export default function PreferencesView() {
     if (!user) return;
     const { data } = await supabase.from("cost_centers" as any).select("*").eq("user_id", user.id).order("name");
     if (data) setCostCenters(data as any[]);
+  };
+
+  const DEFAULT_PAYMENT_METHODS = ["PIX", "Boleto", "Cartão de crédito", "Cartão de débito", "TED", "DOC", "Dinheiro", "Transferência interna"];
+
+  const fetchPaymentMethods = async () => {
+    if (!user) return;
+    const { data } = await supabase.from("payment_methods" as any).select("*").eq("user_id", user.id).order("name");
+    if (data && data.length > 0) {
+      setPaymentMethods(data as any[]);
+    } else if (data && data.length === 0) {
+      // Seed default payment methods
+      const toInsert = DEFAULT_PAYMENT_METHODS.map(name => ({
+        user_id: user.id, name, is_active: true, is_system: true,
+      }));
+      await supabase.from("payment_methods" as any).insert(toInsert);
+      const { data: seeded } = await supabase.from("payment_methods" as any).select("*").eq("user_id", user.id).order("name");
+      if (seeded) setPaymentMethods(seeded as any[]);
+    }
+  };
+
+  const togglePaymentMethod = async (id: string, active: boolean) => {
+    await supabase.from("payment_methods" as any).update({ is_active: active }).eq("id", id);
+    fetchPaymentMethods();
+  };
+
+  const addPaymentMethod = async () => {
+    if (!newPmName.trim() || !user) return;
+    await supabase.from("payment_methods" as any).insert({ user_id: user.id, name: newPmName.trim(), is_active: true, is_system: false });
+    setNewPmName("");
+    fetchPaymentMethods();
+    toast({ title: "Forma de pagamento adicionada!" });
   };
 
   // ─── Auto-save general prefs ─────────────────────────────────────────────
@@ -732,6 +768,46 @@ export default function PreferencesView() {
                       />
                     ))}
                   </div>
+
+                  {/* ── Formas de pagamento ── */}
+                  <Accordion type="multiple" className="w-full">
+                    <AccordionItem value="payment-methods-sub" className="border border-border/40 rounded-lg overflow-hidden">
+                      <AccordionTrigger className="px-3 py-2 text-xs font-semibold hover:no-underline bg-muted/20">
+                        <span className="flex items-center gap-2"><CreditCard className="h-3.5 w-3.5" style={{ color: SECTION_COLORS.finances }} /> Formas de pagamento</span>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-3 pb-3 pt-3">
+                        <p className="text-[11px] text-muted-foreground mb-2">Ative ou desative formas de pagamento. Use o botão + para adicionar novas.</p>
+                        <div className="space-y-1.5">
+                          {[...paymentMethods].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((pm: any) => (
+                            <ToggleRow
+                              key={pm.id}
+                              icon={<CreditCard className="h-4 w-4" />}
+                              iconColor={SECTION_COLORS.finances}
+                              label={pm.name}
+                              desc={pm.is_system ? "Padrão do sistema" : "Personalizada"}
+                              enabled={pm.is_active}
+                              onToggle={(checked) => togglePaymentMethod(pm.id, checked)}
+                            />
+                          ))}
+                          {paymentMethods.length === 0 && (
+                            <p className="py-4 text-center text-xs text-muted-foreground">Nenhuma forma de pagamento</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 pt-3">
+                          <Input
+                            value={newPmName}
+                            onChange={(e) => setNewPmName(e.target.value)}
+                            placeholder="Nova forma de pagamento"
+                            className="text-xs h-8 flex-1"
+                            onKeyDown={(e) => e.key === "Enter" && addPaymentMethod()}
+                          />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={addPaymentMethod} disabled={!newPmName.trim()}>
+                            <Plus className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
 
                    {/* Programas section moved to Geral > Programas accordion */}
                 </AccordionContent>

@@ -76,23 +76,30 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
   const [accDue, setAccDue] = useState("");
   const [accIsActive, setAccIsActive] = useState(true);
 
+  // Payment methods for wallet
+  const [allPaymentMethods, setAllPaymentMethods] = useState<any[]>([]);
+  const [walletPaymentMethodIds, setWalletPaymentMethodIds] = useState<Set<string>>(new Set());
+  const [walletPmAll, setWalletPmAll] = useState(true);
+
   const [inactiveAccounts, setInactiveAccounts] = useState<any[]>([]);
   const [showInactive, setShowInactive] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [accRes, inactiveRes, entRes, invRes, projRes] = await Promise.all([
+    const [accRes, inactiveRes, entRes, invRes, projRes, pmRes] = await Promise.all([
       supabase.from("financial_accounts").select("*").eq("user_id", user.id).eq("is_active", true),
       supabase.from("financial_accounts").select("*").eq("user_id", user.id).eq("is_active", false),
       supabase.from("financial_entries").select("*").eq("user_id", user.id),
       supabase.from("investments").select("*").eq("user_id", user.id).eq("is_active", true),
       supabase.from("projects").select("*").eq("user_id", user.id),
+      supabase.from("payment_methods" as any).select("*").eq("user_id", user.id).eq("is_active", true).order("name"),
     ]);
     if (accRes.data) setAccounts(accRes.data);
     if (inactiveRes.data) setInactiveAccounts(inactiveRes.data);
     if (entRes.data) setEntries(entRes.data);
     if (invRes.data) setInvestments(invRes.data);
     if (projRes.data) setProjects(projRes.data);
+    if (pmRes.data) setAllPaymentMethods(pmRes.data as any[]);
   }, [user]);
 
   useEffect(() => {
@@ -126,7 +133,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
     }
   };
 
-  const openAccountEdit = (acc: any) => {
+  const openAccountEdit = async (acc: any) => {
     setEditingAccount(acc);
     setAccName(acc.name);
     setAccType(acc.type as AccountType);
@@ -135,6 +142,15 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
     setAccClosing(acc.closing_day ? String(acc.closing_day) : "");
     setAccDue(acc.due_day ? String(acc.due_day) : "");
     setAccIsActive(acc.is_active !== false);
+    // Load wallet-specific payment methods
+    const { data: apm } = await supabase.from("account_payment_methods" as any).select("payment_method_id").eq("account_id", acc.id);
+    if (apm && apm.length > 0) {
+      setWalletPmAll(false);
+      setWalletPaymentMethodIds(new Set((apm as any[]).map((r: any) => r.payment_method_id)));
+    } else {
+      setWalletPmAll(true);
+      setWalletPaymentMethodIds(new Set());
+    }
     setEditDialogOpen(true);
   };
 
@@ -153,6 +169,16 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
     };
     if (editingAccount) {
       await supabase.from("financial_accounts").update(data).eq("id", editingAccount.id);
+      // Save wallet payment methods
+      await supabase.from("account_payment_methods" as any).delete().eq("account_id", editingAccount.id);
+      if (!walletPmAll && walletPaymentMethodIds.size > 0) {
+        const rows = Array.from(walletPaymentMethodIds).map(pmId => ({
+          account_id: editingAccount.id,
+          payment_method_id: pmId,
+          user_id: user!.id,
+        }));
+        await supabase.from("account_payment_methods" as any).insert(rows);
+      }
     }
     setEditDialogOpen(false);
     setEditingAccount(null);
@@ -659,6 +685,37 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
               <Label className="text-sm text-muted-foreground">Ativa</Label>
               <Switch checked={accIsActive} onCheckedChange={setAccIsActive} />
             </div>
+
+            {/* Payment methods section */}
+            {allPaymentMethods.length > 0 && (
+              <div className="pt-2 border-t border-border/20 space-y-2">
+                <Label className="text-sm font-semibold">Formas de pagamento permitidas</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">Todos (usa todas ativas do sistema)</Label>
+                  <Switch checked={walletPmAll} onCheckedChange={(checked) => {
+                    setWalletPmAll(checked);
+                    if (checked) setWalletPaymentMethodIds(new Set());
+                  }} />
+                </div>
+                {!walletPmAll && (
+                  <div className="space-y-1">
+                    {allPaymentMethods.map((pm: any) => (
+                      <div key={pm.id} className="flex items-center justify-between rounded-lg border border-border/40 px-2.5 py-1.5">
+                        <span className="text-xs">{pm.name}</span>
+                        <Switch
+                          checked={walletPaymentMethodIds.has(pm.id)}
+                          onCheckedChange={(checked) => {
+                            const next = new Set(walletPaymentMethodIds);
+                            if (checked) next.add(pm.id); else next.delete(pm.id);
+                            setWalletPaymentMethodIds(next);
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex gap-2 justify-end pt-3 border-t border-border/20">
             <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>

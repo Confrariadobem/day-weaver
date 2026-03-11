@@ -73,7 +73,7 @@ const ACCOUNT_TYPE_LABELS: Record<AccountType, { label: string; icon: React.Reac
   crypto: { label: "Criptoativos", icon: <Bitcoin className="h-4 w-4" /> },
 };
 
-const PAYMENT_METHODS = ["Débito", "Crédito", "PIX", "Boleto", "Transferência", "Dinheiro", "Crypto"];
+const PAYMENT_METHODS_FALLBACK = ["Débito", "Crédito", "PIX", "Boleto", "Transferência", "Dinheiro", "Crypto"];
 
 const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" };
 const CHART_COLORS = ["#3b82f6", "#22c55e", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
@@ -248,6 +248,10 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [doarFilterIsFixed, setDoarFilterIsFixed] = useState(false);
   const [doarFilterProgramId, setDoarFilterProgramId] = useState<string>("");
 
+  // Dynamic payment methods
+  const [paymentMethodsList, setPaymentMethodsList] = useState<any[]>([]);
+  const [accountPaymentMethods, setAccountPaymentMethods] = useState<any[]>([]);
+
   const parseNum = (v: string) => parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
   const splitTotal = splitLines.reduce((s, l) => s + parseNum(l.amount), 0);
   const totalAmountNum = parseNum(amount);
@@ -270,13 +274,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [entRes, projRes, catRes, accRes, ccRes, progRes] = await Promise.all([
+    const [entRes, projRes, catRes, accRes, ccRes, progRes, pmRes, apmRes] = await Promise.all([
       supabase.from("financial_entries").select("*").eq("user_id", user.id).order("entry_date", { ascending: false }),
       supabase.from("projects").select("*").eq("user_id", user.id),
       supabase.from("categories").select("*").eq("user_id", user.id),
       supabase.from("financial_accounts").select("*").eq("user_id", user.id).order("name"),
       supabase.from("cost_centers" as any).select("*").eq("user_id", user.id).eq("is_active", true).order("name"),
       supabase.from("programs").select("*").eq("user_id", user.id).order("name"),
+      supabase.from("payment_methods" as any).select("*").eq("user_id", user.id).eq("is_active", true).order("name"),
+      supabase.from("account_payment_methods" as any).select("*").eq("user_id", user.id),
     ]);
     if (entRes.data) setEntries(entRes.data);
     if (projRes.data) setProjects(projRes.data);
@@ -284,7 +290,24 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     if (accRes.data) setAccounts(accRes.data as FinancialAccount[]);
     if (ccRes.data) setCostCenters(ccRes.data as any[]);
     if (progRes.data) setPrograms(progRes.data as any[]);
+    if (pmRes.data) setPaymentMethodsList(pmRes.data as any[]);
+    if (apmRes.data) setAccountPaymentMethods(apmRes.data as any[]);
   }, [user]);
+
+  // Compute available payment methods: if accountId is selected and has specific methods, use those; otherwise all active
+  const availablePaymentMethods = useMemo(() => {
+    const allActive = paymentMethodsList.length > 0 ? paymentMethodsList.map((pm: any) => pm.name) : PAYMENT_METHODS_FALLBACK;
+    if (!accountId) return allActive;
+    const walletMethods = accountPaymentMethods.filter((apm: any) => apm.account_id === accountId);
+    if (walletMethods.length === 0) return allActive; // "Todos" mode
+    const allowedIds = new Set(walletMethods.map((apm: any) => apm.payment_method_id));
+    return paymentMethodsList.filter((pm: any) => allowedIds.has(pm.id)).map((pm: any) => pm.name);
+  }, [accountId, paymentMethodsList, accountPaymentMethods]);
+
+  // All payment method names for filters (not filtered by wallet)
+  const allPaymentMethodNames = useMemo(() => {
+    return paymentMethodsList.length > 0 ? paymentMethodsList.map((pm: any) => pm.name) : PAYMENT_METHODS_FALLBACK;
+  }, [paymentMethodsList]);
 
   useEffect(() => {
     fetchData();
@@ -1441,7 +1464,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                   <SelectTrigger className="text-xs"><SelectValue placeholder="Opcional" /></SelectTrigger>
                   <SelectContent>
-                    {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    {availablePaymentMethods.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -1478,7 +1501,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <Select value={line.paymentMethod} onValueChange={(v) => updateSplitLine(line.id, "paymentMethod", v)}>
                     <SelectTrigger className="text-xs w-24"><SelectValue placeholder="Forma" /></SelectTrigger>
                     <SelectContent>
-                      {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      {allPaymentMethodNames.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <Input type="text" inputMode="decimal" placeholder="Valor" value={line.amount}
@@ -2208,7 +2231,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__all__">Todas</SelectItem>
-                          {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                          {allPaymentMethodNames.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -2906,7 +2929,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__all__">Todas</SelectItem>
-                          {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                          {allPaymentMethodNames.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
