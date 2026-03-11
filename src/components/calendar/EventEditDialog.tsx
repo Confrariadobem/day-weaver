@@ -825,7 +825,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       }
 
       // Create calendar events - skip for cashflow/investment/carteira/patrimonio
-      if (eventType !== "cashflow" && eventType !== "investment" && eventType !== "carteira" && eventType !== "patrimonio") {
+      if (eventType !== "cashflow" && eventType !== "investment" && eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "transferencia") {
         if (recurrence !== "none") {
           const calMaxDate = new Date(startDt.getFullYear(), 11, 31);
           const count = recurrenceIndeterminate ? 999 : Math.max(1, parseInt(recurrenceCount) || 12);
