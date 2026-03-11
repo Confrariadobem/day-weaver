@@ -3117,7 +3117,44 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               </CardContent>
             </Card>
 
-
+            {/* Resumo por Programa */}
+            {(() => {
+              const programMap = new Map<string, { name: string; value: number; color: string }>();
+              periodFilteredEntries.forEach(e => {
+                if (!e.cost_center_id) return;
+                const cc = costCenters.find((c: any) => c.id === e.cost_center_id);
+                if (!cc) return;
+                const prev = programMap.get(cc.id) || { name: cc.name, value: 0, color: cc.color || "#6b7280" };
+                prev.value += Number(e.amount);
+                programMap.set(cc.id, prev);
+              });
+              const programData = Array.from(programMap.values()).sort((a, b) => b.value - a.value);
+              const totalProgram = programData.reduce((s, d) => s + d.value, 0);
+              if (programData.length === 0) return null;
+              return (
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> Resumo por Programa</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {programData.map((d) => {
+                        const pct = totalProgram > 0 ? (d.value / totalProgram) * 100 : 0;
+                        return (
+                          <div key={d.name} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-medium truncate">{d.name}</span>
+                              <span className="text-muted-foreground shrink-0 ml-2">{pct.toFixed(1)}% · {brl(d.value)}</span>
+                            </div>
+                            <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
 
             {/* Cost Center Breakdown */}
