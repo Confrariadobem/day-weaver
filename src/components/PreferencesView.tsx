@@ -23,7 +23,7 @@ import { ConfigDialog } from "@/components/shared/ConfigDialog";
 import { ColorPaletteGrid } from "@/components/shared/ColorPaletteGrid";
 import {
   Save, Globe, CalendarDays, Tag, Trash2, Database, TrendingUp, Plus, DollarSign,
-  FolderKanban, Eye, Sparkles, Sunset, Flower2, Waves, ChevronDown, Users,
+  FolderKanban, Eye, Sparkles, Sunset, Flower2, Waves, ChevronDown, Users, CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LAUNCH_TYPE_ICONS, DATA_MODULE_ICONS, CATEGORY_ICON_MAP, CATEGORY_ICON_KEYS, INVESTMENT_TYPE_ICONS } from "@/lib/icons";
