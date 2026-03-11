@@ -73,7 +73,7 @@ const ACCOUNT_TYPE_LABELS: Record<AccountType, { label: string; icon: React.Reac
   crypto: { label: "Criptoativos", icon: <Bitcoin className="h-4 w-4" /> },
 };
 
-const PAYMENT_METHODS = ["Débito", "Crédito", "PIX", "Boleto", "Transferência", "Dinheiro", "Crypto"];
+const PAYMENT_METHODS_FALLBACK = ["Débito", "Crédito", "PIX", "Boleto", "Transferência", "Dinheiro", "Crypto"];
 
 const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" };
 const CHART_COLORS = ["#3b82f6", "#22c55e", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
