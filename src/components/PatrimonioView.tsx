@@ -685,6 +685,37 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
               <Label className="text-sm text-muted-foreground">Ativa</Label>
               <Switch checked={accIsActive} onCheckedChange={setAccIsActive} />
             </div>
+
+            {/* Payment methods section */}
+            {allPaymentMethods.length > 0 && (
+              <div className="pt-2 border-t border-border/20 space-y-2">
+                <Label className="text-sm font-semibold">Formas de pagamento permitidas</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">Todos (usa todas ativas do sistema)</Label>
+                  <Switch checked={walletPmAll} onCheckedChange={(checked) => {
+                    setWalletPmAll(checked);
+                    if (checked) setWalletPaymentMethodIds(new Set());
+                  }} />
+                </div>
+                {!walletPmAll && (
+                  <div className="space-y-1">
+                    {allPaymentMethods.map((pm: any) => (
+                      <div key={pm.id} className="flex items-center justify-between rounded-lg border border-border/40 px-2.5 py-1.5">
+                        <span className="text-xs">{pm.name}</span>
+                        <Switch
+                          checked={walletPaymentMethodIds.has(pm.id)}
+                          onCheckedChange={(checked) => {
+                            const next = new Set(walletPaymentMethodIds);
+                            if (checked) next.add(pm.id); else next.delete(pm.id);
+                            setWalletPaymentMethodIds(next);
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex gap-2 justify-end pt-3 border-t border-border/20">
             <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
