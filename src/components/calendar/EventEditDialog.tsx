@@ -1018,7 +1018,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
           {eventType === "centro_custo" && (
             <div className="space-y-3 rounded-lg border border-border/30 p-3">
-              <p className="text-xs text-muted-foreground">Criar novo centro de custo.</p>
+              <p className="text-xs text-muted-foreground">Criar novo programa.</p>
               <div>
                 <Label className="text-sm">Nome</Label>
                 <Input value={ccName} onChange={(e) => setCcName(e.target.value)} placeholder="Ex: TI, Marketing..." />

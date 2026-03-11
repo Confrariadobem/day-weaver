@@ -2320,7 +2320,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     </th>
                     <th className="w-24 py-2.5 px-1">
                       {selectedIds.size > 0 ? (
-                      <div className="flex items-center justify-center gap-0.5">
+                      <div className="flex items-center justify-center gap-3">
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
                               <button
