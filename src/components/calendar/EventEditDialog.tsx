@@ -100,7 +100,7 @@ const REMINDER_OPTIONS = [
   { value: "10080", label: "1 semana antes" },
 ];
 
-const PAYMENT_METHODS = ["Boleto", "Crédito", "Crypto", "Débito", "Dinheiro", "PIX", "Transferência"];
+const PAYMENT_METHODS_FALLBACK = ["Boleto", "Crédito", "Crypto", "Débito", "Dinheiro", "PIX", "Transferência"];
 
 const WEEKDAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
