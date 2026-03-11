@@ -67,7 +67,7 @@ const EVENT_TYPES_UNSORTED: { value: EventType; label: string; color: string }[]
   { value: "carteira", label: "Carteira", color: "#8b5cf6" },
   { value: "categoria", label: "Categoria", color: "#06b6d4" },
   { value: "cashflow", label: "Fluxo de Caixa", color: "#22c55e" },
-  { value: "centro_custo", label: "Centro de Custo", color: "#06b6d4" },
+  { value: "centro_custo", label: "Programa", color: "#06b6d4" },
   { value: "event", label: "Evento", color: "#3b82f6" },
   { value: "investment", label: "Investimento", color: "#d4a017" },
   { value: "patrimonio", label: "Patrimônio", color: "#f97316" },
@@ -1018,7 +1018,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
           {eventType === "centro_custo" && (
             <div className="space-y-3 rounded-lg border border-border/30 p-3">
-              <p className="text-xs text-muted-foreground">Criar novo centro de custo.</p>
+              <p className="text-xs text-muted-foreground">Criar novo programa.</p>
               <div>
                 <Label className="text-sm">Nome</Label>
                 <Input value={ccName} onChange={(e) => setCcName(e.target.value)} placeholder="Ex: TI, Marketing..." />
@@ -1103,11 +1103,11 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 </ClearableSelect>
               </div>
 
-              {/* Centro de Custo - below Categoria, above Projeto */}
+              {/* Programa - below Categoria, above Projeto */}
               {(eventType === "cashflow" || eventType === "investment" || eventType === "project") && (
                 <div>
-                  <Label className="text-sm">Centro de Custo</Label>
-                  <ClearableSelect value={costCenterId} onValueChange={handleClearableChange(setCostCenterId)} placeholder="Selecionar centro de custo">
+                  <Label className="text-sm">Programa</Label>
+                  <ClearableSelect value={costCenterId} onValueChange={handleClearableChange(setCostCenterId)} placeholder="Selecionar programa">
                     {costCenters.map((cc: any) => (
                       <SelectItem key={cc.id} value={cc.id}>
                         <span className="flex items-center gap-2">

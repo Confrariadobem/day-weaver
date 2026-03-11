@@ -1287,9 +1287,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             </Select>
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground">Centro de Custo</Label>
+            <Label className="text-xs text-muted-foreground">Programa</Label>
             <Select value={costCenterId} onValueChange={(v) => setCostCenterId(v === "__clear__" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Centro de custo (opcional)" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Programa (opcional)" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__clear__"><span className="text-muted-foreground italic">Nenhum</span></SelectItem>
                 {costCenters.map((cc: any) => (
@@ -1300,16 +1300,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     </span>
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">Projeto</Label>
-            <Select value={projectId} onValueChange={(v) => setProjectId(v === "__clear__" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Projeto (opcional)" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__clear__"><span className="text-muted-foreground italic">Nenhum</span></SelectItem>
-                {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -1761,16 +1751,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <Input placeholder="Buscar por descrição, status, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-7 pl-8 pr-[5.5rem] text-xs rounded-lg" />
               <div className="absolute right-2 top-1 flex items-center gap-1">
-                {searchQuery && (
-                  <Tooltip delayDuration={200}>
-                    <TooltipTrigger asChild>
-                      <button onClick={() => setSearchQuery("")} className="rounded p-0.5 transition-colors text-muted-foreground hover:text-foreground">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent className="z-[100] text-xs">Limpar busca</TooltipContent>
-                  </Tooltip>
-                )}
                 {/* Eraser — reset all to default */}
                 <Tooltip delayDuration={200}>
                   <TooltipTrigger asChild>
@@ -2340,7 +2320,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     </th>
                     <th className="w-24 py-2.5 px-1">
                       {selectedIds.size > 0 ? (
-                      <div className="flex items-center justify-center gap-0.5">
+                      <div className="flex items-center justify-center gap-3">
                           <Tooltip delayDuration={200}>
                             <TooltipTrigger asChild>
                               <button
@@ -2498,7 +2478,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           {statusText}
                         </td>
                         <td className="py-2.5 px-1 w-24 no-print">
-                          <div className="hidden group-hover:flex items-center gap-0.5 justify-center">
+                          <div className="hidden group-hover:flex items-center gap-3 justify-center">
                             {!e.is_paid && (
                               <Tooltip delayDuration={200}>
                                 <TooltipTrigger asChild>
@@ -3137,13 +3117,50 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               </CardContent>
             </Card>
 
-
+            {/* Resumo por Programa */}
+            {(() => {
+              const programMap = new Map<string, { name: string; value: number; color: string }>();
+              periodFilteredEntries.forEach(e => {
+                if (!e.cost_center_id) return;
+                const cc = costCenters.find((c: any) => c.id === e.cost_center_id);
+                if (!cc) return;
+                const prev = programMap.get(cc.id) || { name: cc.name, value: 0, color: cc.color || "#6b7280" };
+                prev.value += Number(e.amount);
+                programMap.set(cc.id, prev);
+              });
+              const programData = Array.from(programMap.values()).sort((a, b) => b.value - a.value);
+              const totalProgram = programData.reduce((s, d) => s + d.value, 0);
+              if (programData.length === 0) return null;
+              return (
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> Resumo por Programa</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {programData.map((d) => {
+                        const pct = totalProgram > 0 ? (d.value / totalProgram) * 100 : 0;
+                        return (
+                          <div key={d.name} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-medium truncate">{d.name}</span>
+                              <span className="text-muted-foreground shrink-0 ml-2">{pct.toFixed(1)}% · {brl(d.value)}</span>
+                            </div>
+                            <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
 
             {/* Cost Center Breakdown */}
             {costCenterData.length > 0 && (
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> Indicadores por Centro de Custo</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> Indicadores por Programa</CardTitle></CardHeader>
                 <CardContent>
                   <div className="w-full min-w-0" style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
@@ -3165,7 +3182,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             {/* Project Financial Breakdown */}
             {projectFinData.length > 0 && (
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><ListChecks className="h-3.5 w-3.5 text-primary" /> Indicadores por Projeto</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><ListChecks className="h-3.5 w-3.5 text-primary" /> Indicadores por Programa (Projetos)</CardTitle></CardHeader>
                 <CardContent>
                   <div className="w-full min-w-0" style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
