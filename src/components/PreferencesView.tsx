@@ -542,10 +542,39 @@ export default function PreferencesView() {
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* ── Avançado / Dados ── */}
+                    {/* ── Programas (ex-Centro de Custo) ── */}
+                    <AccordionItem value="programs-sub" className="border border-border/40 rounded-lg overflow-hidden mt-2">
+                      <AccordionTrigger className="px-3 py-2 text-xs font-semibold hover:no-underline bg-muted/20">
+                        <span className="flex items-center gap-2"><FolderKanban className="h-3.5 w-3.5" style={{ color: SECTION_COLORS.finances }} /> Programas</span>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-3 pb-3 pt-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-[11px] text-muted-foreground">Clique duas vezes para editar. Use o FAB (+) para criar novos.</p>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openNewCc}>
+                            <Plus className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        <div className="space-y-1.5">
+                          {costCenters.map((cc: any) => (
+                            <ToggleRow
+                              key={cc.id}
+                              colorDot={cc.color}
+                              label={cc.name}
+                              desc={cc.description || "Sem descrição"}
+                              onDoubleClick={() => openEditCc(cc)}
+                            />
+                          ))}
+                          {costCenters.length === 0 && (
+                            <p className="py-4 text-center text-xs text-muted-foreground">Nenhum programa cadastrado</p>
+                          )}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    {/* ── Limpeza de dados ── */}
                     <AccordionItem value="advanced-sub" className="border border-border/40 rounded-lg overflow-hidden mt-2">
                       <AccordionTrigger className="px-3 py-2 text-xs font-semibold hover:no-underline bg-muted/20">
-                        <span className="flex items-center gap-2"><Database className="h-3.5 w-3.5 text-destructive" /> Avançado</span>
+                        <span className="flex items-center gap-2"><Database className="h-3.5 w-3.5 text-destructive" /> Limpeza de dados</span>
                       </AccordionTrigger>
                       <AccordionContent className="px-3 pb-3 pt-3">
                         <p className="text-[11px] text-muted-foreground mb-2">Selecione módulos para limpar dados. Ação irreversível.</p>
