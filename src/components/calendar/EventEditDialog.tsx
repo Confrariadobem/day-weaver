@@ -1103,11 +1103,11 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 </ClearableSelect>
               </div>
 
-              {/* Centro de Custo - below Categoria, above Projeto */}
+              {/* Programa - below Categoria, above Projeto */}
               {(eventType === "cashflow" || eventType === "investment" || eventType === "project") && (
                 <div>
-                  <Label className="text-sm">Centro de Custo</Label>
-                  <ClearableSelect value={costCenterId} onValueChange={handleClearableChange(setCostCenterId)} placeholder="Selecionar centro de custo">
+                  <Label className="text-sm">Programa</Label>
+                  <ClearableSelect value={costCenterId} onValueChange={handleClearableChange(setCostCenterId)} placeholder="Selecionar programa">
                     {costCenters.map((cc: any) => (
                       <SelectItem key={cc.id} value={cc.id}>
                         <span className="flex items-center gap-2">

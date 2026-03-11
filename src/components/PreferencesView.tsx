@@ -366,7 +366,7 @@ export default function PreferencesView() {
     if (!editingCc) return;
     await supabase.from("cost_centers" as any).delete().eq("id", editingCc.id);
     setCcDialogOpen(false); fetchCostCenters();
-    toast({ title: "Centro de custo excluído" });
+    toast({ title: "Programa excluído" });
   };
 
   // ─── Data management ─────────────────────────────────────────────────────
