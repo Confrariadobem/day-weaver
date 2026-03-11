@@ -1287,9 +1287,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             </Select>
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground">Centro de Custo</Label>
+            <Label className="text-xs text-muted-foreground">Programa</Label>
             <Select value={costCenterId} onValueChange={(v) => setCostCenterId(v === "__clear__" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Centro de custo (opcional)" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Programa (opcional)" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__clear__"><span className="text-muted-foreground italic">Nenhum</span></SelectItem>
                 {costCenters.map((cc: any) => (
@@ -1300,16 +1300,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     </span>
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">Projeto</Label>
-            <Select value={projectId} onValueChange={(v) => setProjectId(v === "__clear__" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Projeto (opcional)" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__clear__"><span className="text-muted-foreground italic">Nenhum</span></SelectItem>
-                {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
