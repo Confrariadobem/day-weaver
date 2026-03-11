@@ -727,8 +727,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           if (filterType === "expense" && e.type !== "expense") return false;
         }
         if (filterCategoryId && e.category_id !== filterCategoryId) return false;
-        if (filterCostCenterId && e.cost_center_id !== filterCostCenterId) return false;
-        if (filterProjectId && e.project_id !== filterProjectId) return false;
+        if (filterProgramId && e.cost_center_id !== filterProgramId) return false;
         if (filterAccountId && e.account_id !== filterAccountId) return false;
         if (filterPaymentMethod && e.payment_method !== filterPaymentMethod) return false;
         if (filterIsFixed === "yes" && !e.is_fixed) return false;
