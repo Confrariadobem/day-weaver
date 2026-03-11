@@ -1397,8 +1397,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           )}
         </div>
 
-        {/* Juros, Multa, Desconto */}
-        <div className="rounded-lg border border-border/30 p-3">
+        {/* Juros, Multa, Desconto + Valor Final */}
+        <div className="rounded-lg border border-border/30 p-3 space-y-2">
           <div className="grid grid-cols-3 gap-2">
             <div>
               <Label className="text-xs text-muted-foreground">Juros</Label>
@@ -1416,6 +1416,24 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 onChange={(e) => setDesconto(e.target.value.replace(/[^0-9.,]/g, ""))} className="text-xs" />
             </div>
           </div>
+          {(() => {
+            const base = parseNum(amount);
+            const j = parseNum(juros);
+            const m = parseNum(multa);
+            const d = parseNum(desconto);
+            const final_ = base + j + m - d;
+            if (j > 0 || m > 0 || d > 0) {
+              return (
+                <div className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 mt-1">
+                  <span className="text-xs font-medium text-muted-foreground">Valor a {type === "revenue" ? "receber" : "pagar"}</span>
+                  <span className={cn("text-sm font-bold tabular-nums", final_ >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                    R$ {final_.toFixed(2).replace(".", ",")}
+                  </span>
+                </div>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         {/* Toggles & Payment */}
