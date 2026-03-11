@@ -1501,7 +1501,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <Select value={line.paymentMethod} onValueChange={(v) => updateSplitLine(line.id, "paymentMethod", v)}>
                     <SelectTrigger className="text-xs w-24"><SelectValue placeholder="Forma" /></SelectTrigger>
                     <SelectContent>
-                      {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      {allPaymentMethodNames.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <Input type="text" inputMode="decimal" placeholder="Valor" value={line.amount}
