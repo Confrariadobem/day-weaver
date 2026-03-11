@@ -169,6 +169,16 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
     };
     if (editingAccount) {
       await supabase.from("financial_accounts").update(data).eq("id", editingAccount.id);
+      // Save wallet payment methods
+      await supabase.from("account_payment_methods" as any).delete().eq("account_id", editingAccount.id);
+      if (!walletPmAll && walletPaymentMethodIds.size > 0) {
+        const rows = Array.from(walletPaymentMethodIds).map(pmId => ({
+          account_id: editingAccount.id,
+          payment_method_id: pmId,
+          user_id: user!.id,
+        }));
+        await supabase.from("account_payment_methods" as any).insert(rows);
+      }
     }
     setEditDialogOpen(false);
     setEditingAccount(null);
