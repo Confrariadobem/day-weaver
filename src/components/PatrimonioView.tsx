@@ -86,18 +86,20 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [accRes, inactiveRes, entRes, invRes, projRes] = await Promise.all([
+    const [accRes, inactiveRes, entRes, invRes, projRes, pmRes] = await Promise.all([
       supabase.from("financial_accounts").select("*").eq("user_id", user.id).eq("is_active", true),
       supabase.from("financial_accounts").select("*").eq("user_id", user.id).eq("is_active", false),
       supabase.from("financial_entries").select("*").eq("user_id", user.id),
       supabase.from("investments").select("*").eq("user_id", user.id).eq("is_active", true),
       supabase.from("projects").select("*").eq("user_id", user.id),
+      supabase.from("payment_methods" as any).select("*").eq("user_id", user.id).eq("is_active", true).order("name"),
     ]);
     if (accRes.data) setAccounts(accRes.data);
     if (inactiveRes.data) setInactiveAccounts(inactiveRes.data);
     if (entRes.data) setEntries(entRes.data);
     if (invRes.data) setInvestments(invRes.data);
     if (projRes.data) setProjects(projRes.data);
+    if (pmRes.data) setAllPaymentMethods(pmRes.data as any[]);
   }, [user]);
 
   useEffect(() => {
