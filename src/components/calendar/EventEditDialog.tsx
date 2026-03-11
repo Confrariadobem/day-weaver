@@ -1189,7 +1189,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                   <div>
                     <Label className="text-sm">Forma Pgto</Label>
                     <ClearableSelect value={paymentMethod} onValueChange={handleClearableChange(setPaymentMethod)} placeholder="Selecionar">
-                      {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      {dynamicPaymentMethods.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                     </ClearableSelect>
                   </div>
                 </div>
