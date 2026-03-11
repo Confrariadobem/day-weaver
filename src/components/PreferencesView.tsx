@@ -769,6 +769,46 @@ export default function PreferencesView() {
                     ))}
                   </div>
 
+                  {/* ── Formas de pagamento ── */}
+                  <Accordion type="multiple" className="w-full">
+                    <AccordionItem value="payment-methods-sub" className="border border-border/40 rounded-lg overflow-hidden">
+                      <AccordionTrigger className="px-3 py-2 text-xs font-semibold hover:no-underline bg-muted/20">
+                        <span className="flex items-center gap-2"><CreditCard className="h-3.5 w-3.5" style={{ color: SECTION_COLORS.finances }} /> Formas de pagamento</span>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-3 pb-3 pt-3">
+                        <p className="text-[11px] text-muted-foreground mb-2">Ative ou desative formas de pagamento. Use o botão + para adicionar novas.</p>
+                        <div className="space-y-1.5">
+                          {[...paymentMethods].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((pm: any) => (
+                            <ToggleRow
+                              key={pm.id}
+                              icon={<CreditCard className="h-4 w-4" />}
+                              iconColor={SECTION_COLORS.finances}
+                              label={pm.name}
+                              desc={pm.is_system ? "Padrão do sistema" : "Personalizada"}
+                              enabled={pm.is_active}
+                              onToggle={(checked) => togglePaymentMethod(pm.id, checked)}
+                            />
+                          ))}
+                          {paymentMethods.length === 0 && (
+                            <p className="py-4 text-center text-xs text-muted-foreground">Nenhuma forma de pagamento</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 pt-3">
+                          <Input
+                            value={newPmName}
+                            onChange={(e) => setNewPmName(e.target.value)}
+                            placeholder="Nova forma de pagamento"
+                            className="text-xs h-8 flex-1"
+                            onKeyDown={(e) => e.key === "Enter" && addPaymentMethod()}
+                          />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={addPaymentMethod} disabled={!newPmName.trim()}>
+                            <Plus className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+
                    {/* Programas section moved to Geral > Programas accordion */}
                 </AccordionContent>
               </AccordionItem>
