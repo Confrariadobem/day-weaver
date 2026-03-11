@@ -359,7 +359,7 @@ export default function PreferencesView() {
     if (editingCc) await supabase.from("cost_centers" as any).update(payload).eq("id", editingCc.id);
     else await supabase.from("cost_centers" as any).insert(payload);
     setCcDialogOpen(false); fetchCostCenters();
-    toast({ title: "Centro de custo salvo!" });
+    toast({ title: "Programa salvo!" });
   };
 
   const deleteCc = async () => {
