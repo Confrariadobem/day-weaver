@@ -1994,8 +1994,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             { key: "indicadores" as ViewTab, label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
             { key: "previsao" as ViewTab, label: "Fluxo de Caixa", icon: <CircleDollarSign className="h-3 w-3" /> },
             { key: "doar" as ViewTab, label: "DOAR", icon: <Landmark className="h-3 w-3" /> },
-            { key: "centrocusto" as ViewTab, label: "Centro de Custo", icon: <FolderKanban className="h-3 w-3" /> },
-          ]).filter(tab => tab.key === "centrocusto" || visibleTabs.includes(tab.key)).map(tab => (
+          ]).filter(tab => visibleTabs.includes(tab.key)).map(tab => (
             <Button key={tab.key} size="sm"
               variant={viewTab === tab.key ? "default" : "ghost"}
               className={cn("h-7 text-xs px-3 rounded-full gap-1.5", viewTab !== tab.key && "text-muted-foreground")}
