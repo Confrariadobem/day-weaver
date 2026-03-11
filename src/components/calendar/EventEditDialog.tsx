@@ -562,6 +562,59 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       return;
     }
 
+    // Transferência entre contas
+    if (eventType === "transferencia") {
+      const amount = parseNum(transferAmount);
+      if (!transferFromAccountId || !transferToAccountId || amount <= 0) return;
+      const fromAcc = accounts.find((a: any) => a.id === transferFromAccountId);
+      const toAcc = accounts.find((a: any) => a.id === transferToAccountId);
+      const refId = crypto.randomUUID().slice(0, 8).toUpperCase();
+      const refNote = `De: ${fromAcc?.name || "?"} → Para: ${toAcc?.name || "?"}`;
+      const dateStr = format(new Date(`${startDate}T12:00:00`), "yyyy-MM-dd");
+
+      // Create two entries: outgoing and incoming
+      await supabase.from("financial_entries").insert([
+        {
+          user_id: userId,
+          title: `Transf. #${refId}`,
+          amount: amount,
+          type: "expense",
+          entry_date: dateStr,
+          account_id: transferFromAccountId,
+          description: `[tipo:transferencia] ${refNote}. ${transferDescription}`.trim(),
+          is_paid: true,
+          counterpart: toAcc?.name || null,
+        },
+        {
+          user_id: userId,
+          title: `Transf. #${refId}`,
+          amount: amount,
+          type: "revenue",
+          entry_date: dateStr,
+          account_id: transferToAccountId,
+          description: `[tipo:transferencia] ${refNote}. ${transferDescription}`.trim(),
+          is_paid: true,
+          counterpart: fromAcc?.name || null,
+        },
+      ]);
+
+      // Update account balances
+      if (fromAcc) {
+        await supabase.from("financial_accounts").update({
+          current_balance: fromAcc.current_balance - amount,
+        }).eq("id", transferFromAccountId);
+      }
+      if (toAcc) {
+        await supabase.from("financial_accounts").update({
+          current_balance: toAcc.current_balance + amount,
+        }).eq("id", transferToAccountId);
+      }
+
+      onSaved();
+      onOpenChange(false);
+      return;
+    }
+
     if (!title.trim() && eventType !== "carteira" && eventType !== "patrimonio") return;
     const startDt = allDay
       ? new Date(`${startDate}T00:00:00`)
