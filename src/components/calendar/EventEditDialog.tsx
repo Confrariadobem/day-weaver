@@ -47,19 +47,18 @@ interface EventEditDialogProps {
   defaultEventType?: EventType;
 }
 
-type EventType = "birthday" | "event" | "cashflow" | "investment" | "carteira" | "patrimonio" | "programa" | "project" | "centro_custo" | "categoria";
+type EventType = "birthday" | "event" | "cashflow" | "investment" | "carteira" | "patrimonio" | "programa" | "centro_custo" | "categoria";
 
 const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
   birthday: <Cake className="h-3.5 w-3.5" />,
   carteira: <Wallet className="h-3.5 w-3.5" />,
   cashflow: <CircleDollarSign className="h-3.5 w-3.5" />,
   categoria: <Tag className="h-3.5 w-3.5" />,
-  centro_custo: <Tag className="h-3.5 w-3.5" />,
+  centro_custo: <FolderKanban className="h-3.5 w-3.5" />,
   event: <CalendarDays className="h-3.5 w-3.5" />,
   investment: <TrendingUp className="h-3.5 w-3.5" />,
   patrimonio: <Home className="h-3.5 w-3.5" />,
   programa: <FolderKanban className="h-3.5 w-3.5" />,
-  project: <FolderKanban className="h-3.5 w-3.5" />,
 };
 
 const EVENT_TYPES_UNSORTED: { value: EventType; label: string; color: string }[] = [
@@ -71,8 +70,6 @@ const EVENT_TYPES_UNSORTED: { value: EventType; label: string; color: string }[]
   { value: "event", label: "Evento", color: "#3b82f6" },
   { value: "investment", label: "Investimento", color: "#d4a017" },
   { value: "patrimonio", label: "Patrimônio", color: "#f97316" },
-  { value: "programa", label: "Programa", color: "#06b6d4" },
-  { value: "project", label: "Projeto", color: "#eab308" },
 ];
 const EVENT_TYPES = [...EVENT_TYPES_UNSORTED].sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
 
