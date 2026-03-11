@@ -323,7 +323,7 @@ export default function TeamsSection() {
                           <p className="text-xs font-medium truncate">{user.name}</p>
                           <p className="text-[10px] text-muted-foreground">{user.role}</p>
                         </div>
-                        <Checkbox checked={selected} className="pointer-events-none" />
+                        <Switch checked={selected} className="pointer-events-none" />
                       </button>
                     );
                   })}
