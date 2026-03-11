@@ -828,10 +828,9 @@ export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (t
                             </td>
                             <td className="py-2.5 px-2">
                               <div className="flex items-center gap-2">
-                                <Checkbox
+                                <Switch
                                   checked={task.is_completed || false}
                                   onCheckedChange={() => toggleComplete(task)}
-                                  className="h-3.5 w-3.5 shrink-0"
                                 />
                                 <span className={cn("font-medium", task.is_completed && "line-through text-muted-foreground")}>
                                   {task.title}
