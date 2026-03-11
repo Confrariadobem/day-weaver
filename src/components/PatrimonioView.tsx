@@ -76,6 +76,11 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
   const [accDue, setAccDue] = useState("");
   const [accIsActive, setAccIsActive] = useState(true);
 
+  // Payment methods for wallet
+  const [allPaymentMethods, setAllPaymentMethods] = useState<any[]>([]);
+  const [walletPaymentMethodIds, setWalletPaymentMethodIds] = useState<Set<string>>(new Set());
+  const [walletPmAll, setWalletPmAll] = useState(true);
+
   const [inactiveAccounts, setInactiveAccounts] = useState<any[]>([]);
   const [showInactive, setShowInactive] = useState(false);
 
