@@ -3160,7 +3160,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             {/* Cost Center Breakdown */}
             {costCenterData.length > 0 && (
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> Indicadores por Centro de Custo</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> Indicadores por Programa</CardTitle></CardHeader>
                 <CardContent>
                   <div className="w-full min-w-0" style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
