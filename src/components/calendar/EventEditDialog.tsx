@@ -67,7 +67,7 @@ const EVENT_TYPES_UNSORTED: { value: EventType; label: string; color: string }[]
   { value: "carteira", label: "Carteira", color: "#8b5cf6" },
   { value: "categoria", label: "Categoria", color: "#06b6d4" },
   { value: "cashflow", label: "Fluxo de Caixa", color: "#22c55e" },
-  { value: "centro_custo", label: "Centro de Custo", color: "#06b6d4" },
+  { value: "centro_custo", label: "Programa", color: "#06b6d4" },
   { value: "event", label: "Evento", color: "#3b82f6" },
   { value: "investment", label: "Investimento", color: "#d4a017" },
   { value: "patrimonio", label: "Patrimônio", color: "#f97316" },
