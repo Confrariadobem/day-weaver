@@ -1073,9 +1073,9 @@ export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (t
                 <Input value={editCost} onChange={(e) => setEditCost(e.target.value.replace(/[^0-9.,]/g, ""))} placeholder="0,00" />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Checkbox checked={editIsMilestone} onCheckedChange={(c) => setEditIsMilestone(!!c)} id="milestone" />
-              <Label htmlFor="milestone" className="text-sm cursor-pointer flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              <Switch checked={editIsMilestone} onCheckedChange={(c) => setEditIsMilestone(c)} />
+              <Label className="text-sm cursor-pointer flex items-center gap-1">
                 <Diamond className="h-3 w-3 text-primary" /> Marcar como Marco
               </Label>
             </div>

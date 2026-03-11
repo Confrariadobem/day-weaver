@@ -1454,13 +1454,12 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
               {recurrence !== "none" && (
                 <>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
+                  <div className="flex items-center gap-1.5">
+                    <Switch
                       checked={recurrenceIndeterminate}
-                      onCheckedChange={(c) => setRecurrenceIndeterminate(!!c)}
-                      id="rec-indeterminate"
+                      onCheckedChange={(c) => setRecurrenceIndeterminate(c)}
                     />
-                    <Label htmlFor="rec-indeterminate" className="text-sm">Indeterminada</Label>
+                    <Label className="text-sm">Indeterminada</Label>
                   </div>
                   {!recurrenceIndeterminate && (
                     <div>
