@@ -1923,16 +1923,109 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           </>;
         })()}
 
-        {(isDoar || isCentro) && (
+        {isDoar && (() => {
+          const doarActiveFilterCount = [
+            doarSearchQuery.trim() !== "",
+            doarFilterStatus !== "all",
+            doarFilterType !== "all",
+            doarFilterCategoryId !== "",
+            doarFilterAccountId !== "",
+            doarFilterPaymentMethod !== "",
+            doarFilterIsFixed,
+            doarFilterProgramId !== "",
+            doarViewMode !== "realizado",
+            sharedDateFrom !== "" || sharedDateTo !== "",
+          ].filter(Boolean).length;
+
+          const resetDoarFilters = () => {
+            setDoarSearchQuery("");
+            setDoarFilterStatus("all");
+            setDoarFilterType("all");
+            setDoarFilterCategoryId("");
+            setDoarFilterAccountId("");
+            setDoarFilterPaymentMethod("");
+            setDoarFilterIsFixed(false);
+            setDoarFilterProgramId("");
+            setDoarViewMode("realizado");
+            handleClearSharedInterval();
+          };
+
+          return <>
+            <div className="relative" style={{ width: 360 }}>
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input placeholder="Buscar categorias, lançamentos..."
+                value={doarSearchQuery}
+                onChange={(e) => setDoarSearchQuery(e.target.value)}
+                className="h-7 pl-8 pr-[4rem] text-xs rounded-lg" />
+              <div className="absolute right-2 top-1 flex items-center gap-1">
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={resetDoarFilters}
+                      className={cn(
+                        "relative rounded p-0.5 transition-colors",
+                        doarActiveFilterCount > 0 ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs">Limpar tudo</TooltipContent>
+                </Tooltip>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setDoarAdvancedOpen(!doarAdvancedOpen)}
+                      className={cn(
+                        "relative rounded p-0.5 transition-colors",
+                        doarAdvancedOpen || doarActiveFilterCount > 0
+                          ? "text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Filter className="h-4 w-4" />
+                      {doarActiveFilterCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[7px] font-bold text-primary-foreground">
+                          {doarActiveFilterCount}
+                        </span>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs">Filtros avançados</TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+            {renderSharedInterval()}
+            {renderSharedHoje()}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={handleExportCSV} className="text-muted-foreground hover:text-primary transition-colors">
+                  <FileUp className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="z-[100] text-xs">Exportar CSV</TooltipContent>
+            </Tooltip>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={handlePrintDOAR} className="text-muted-foreground hover:text-primary transition-colors">
+                  <Printer className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="z-[100] text-xs">Imprimir relatório</TooltipContent>
+            </Tooltip>
+          </>;
+        })()}
+
+        {isCentro && (
           <>
             <div className="relative" style={{ width: 300 }}>
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input placeholder={isDoar ? "Pesquisar categorias..." : "Pesquisar centros..."} 
-                value={isDoar ? doarSearchQuery : ccReportSearch} 
-                onChange={(e) => isDoar ? setDoarSearchQuery(e.target.value) : setCcReportSearch(e.target.value)}
+              <Input placeholder="Pesquisar centros..."
+                value={ccReportSearch}
+                onChange={(e) => setCcReportSearch(e.target.value)}
                 className="h-7 pl-8 pr-7 text-xs rounded-lg" />
-              {(isDoar ? doarSearchQuery : ccReportSearch) && (
-                <button onClick={() => isDoar ? setDoarSearchQuery("") : setCcReportSearch("")} className="absolute right-2 top-2 text-[#9ca3af] hover:text-foreground">
+              {ccReportSearch && (
+                <button onClick={() => setCcReportSearch("")} className="absolute right-2 top-2 text-muted-foreground hover:text-foreground">
                   <X className="h-4 w-4" />
                 </button>
               )}
@@ -1941,22 +2034,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             {renderSharedHoje()}
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
-                <button onClick={isDoar ? handlePrintDOAR : handlePrint} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
+                <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors">
                   <Printer className="h-5 w-5" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>Imprimir</TooltipContent>
             </Tooltip>
-            {isDoar && (
-              <Tooltip delayDuration={200}>
-                <TooltipTrigger asChild>
-                  <button onClick={cycleDoarExpand} className="text-[#6b7280] hover:text-[#3b82f6] transition-colors">
-                    <ChevronsUpDown className="h-5 w-5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>Expandir/Recolher (Nível {doarExpandLevel}/3)</TooltipContent>
-              </Tooltip>
-            )}
           </>
         )}
 
