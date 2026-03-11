@@ -1246,7 +1246,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                         <Select value={line.paymentMethod} onValueChange={(v) => updateSplitLine(line.id, "paymentMethod", v)}>
                           <SelectTrigger className="text-xs h-8"><SelectValue placeholder="Forma" /></SelectTrigger>
                           <SelectContent>
-                            {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                            {dynamicPaymentMethods.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
