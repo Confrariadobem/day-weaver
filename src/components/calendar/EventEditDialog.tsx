@@ -1147,18 +1147,50 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 <Label className="text-sm">Contraparte (Recebedor / Pagador)</Label>
                 <CounterpartInput value={counterpart} onChange={setCounterpart} counterpartSuggestions={counterpartSuggestions} />
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <Label className="text-sm">Valor (R$)</Label>
-                  <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
-                    onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
-                </div>
-                {recurrence === "none" && (
-                  <div className="w-[100px]">
-                    <Label className="text-sm">Parcelas</Label>
-                    <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="text-xs" />
+              <div>
+                <Label className="text-sm">Valor (R$)</Label>
+                <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
+                  onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
+              </div>
+
+              {/* Parcelamento */}
+              {recurrence === "none" && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setInstallments(parseInt(installments) > 1 ? "1" : "2")}
+                      className={cn(
+                        "rounded-full px-3 py-1.5 text-xs font-medium transition-all border",
+                        parseInt(installments) > 1
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-muted text-muted-foreground border-border hover:border-primary/60"
+                      )}
+                    >
+                      <CalendarDays className="h-3 w-3 inline mr-1" /> Parcelado
+                    </button>
                   </div>
-                )}
+                  {parseInt(installments) > 1 && (
+                    <div className="rounded-md border border-border/30 p-2.5 bg-muted/10 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <Label className="text-[10px] text-muted-foreground">Quantidade de parcelas</Label>
+                          <Input type="number" min="2" max="36" value={installments}
+                            onChange={(e) => setInstallments(e.target.value)} className="text-xs h-8" />
+                        </div>
+                        <div className="text-right pt-3">
+                          <p className="text-xs font-medium text-foreground">
+                            {parseInt(installments) > 0 && totalAmount > 0
+                              ? `${parseInt(installments)}x R$ ${(totalAmount / parseInt(installments)).toFixed(2).replace(".", ",")}`
+                              : "—"}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">Sem juros</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               </div>
 
               {/* Single-source payment fields (hidden when split is enabled) */}
