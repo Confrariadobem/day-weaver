@@ -1803,7 +1803,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
                       className={cn(
                         "relative rounded p-0.5 transition-colors",
-                        advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || colFilterStatus !== "pending" || showSettled
+                        advancedFilterOpen || filterType !== "all" || filterCategoryId || filterProgramId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || colFilterStatus !== "pending" || showSettled
                           ? "text-primary"
                           : "text-muted-foreground hover:text-foreground"
                       )}
