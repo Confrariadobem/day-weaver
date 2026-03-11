@@ -1754,8 +1754,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             colFilterStatus !== "pending",
             filterType !== "all",
             filterCategoryId !== "",
-            filterCostCenterId !== "",
-            filterProjectId !== "",
+            filterProgramId !== "",
             filterAccountId !== "",
             filterPaymentMethod !== "",
             filterIsFixed !== "all",
@@ -1766,8 +1765,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           const resetAllFilters = () => {
             setSearchQuery("");
             setColFilterStatus("pending");
-            setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
-            setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
+            setFilterType("all"); setFilterCategoryId(""); setFilterProgramId("");
+            setFilterAccountId(""); setFilterPaymentMethod("");
             setFilterIsFixed("all"); setShowSettled(false);
             setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
             setFluxoDateFrom(""); setFluxoDateTo("");
