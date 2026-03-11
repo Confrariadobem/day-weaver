@@ -1751,16 +1751,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <Input placeholder="Buscar por descrição, status, valor..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-7 pl-8 pr-[5.5rem] text-xs rounded-lg" />
               <div className="absolute right-2 top-1 flex items-center gap-1">
-                {searchQuery && (
-                  <Tooltip delayDuration={200}>
-                    <TooltipTrigger asChild>
-                      <button onClick={() => setSearchQuery("")} className="rounded p-0.5 transition-colors text-muted-foreground hover:text-foreground">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent className="z-[100] text-xs">Limpar busca</TooltipContent>
-                  </Tooltip>
-                )}
                 {/* Eraser — reset all to default */}
                 <Tooltip delayDuration={200}>
                   <TooltipTrigger asChild>
