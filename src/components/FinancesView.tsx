@@ -294,6 +294,21 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     if (apmRes.data) setAccountPaymentMethods(apmRes.data as any[]);
   }, [user]);
 
+  // Compute available payment methods: if accountId is selected and has specific methods, use those; otherwise all active
+  const availablePaymentMethods = useMemo(() => {
+    const allActive = paymentMethodsList.length > 0 ? paymentMethodsList.map((pm: any) => pm.name) : PAYMENT_METHODS_FALLBACK;
+    if (!accountId) return allActive;
+    const walletMethods = accountPaymentMethods.filter((apm: any) => apm.account_id === accountId);
+    if (walletMethods.length === 0) return allActive; // "Todos" mode
+    const allowedIds = new Set(walletMethods.map((apm: any) => apm.payment_method_id));
+    return paymentMethodsList.filter((pm: any) => allowedIds.has(pm.id)).map((pm: any) => pm.name);
+  }, [accountId, paymentMethodsList, accountPaymentMethods]);
+
+  // All payment method names for filters (not filtered by wallet)
+  const allPaymentMethodNames = useMemo(() => {
+    return paymentMethodsList.length > 0 ? paymentMethodsList.map((pm: any) => pm.name) : PAYMENT_METHODS_FALLBACK;
+  }, [paymentMethodsList]);
+
   useEffect(() => {
     fetchData();
     const handleDataChanged = () => fetchData();
