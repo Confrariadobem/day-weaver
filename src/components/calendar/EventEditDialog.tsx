@@ -1107,8 +1107,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 </ClearableSelect>
               </div>
 
-              {/* Programa - below Categoria, above Projeto */}
-              {(eventType === "cashflow" || eventType === "investment" || eventType === "project") && (
+              {/* Programa - single unified field */}
+              {(eventType === "cashflow" || eventType === "investment" || eventType === "programa") && (
                 <div>
                   <Label className="text-sm">Programa</Label>
                   <ClearableSelect value={costCenterId} onValueChange={handleClearableChange(setCostCenterId)} placeholder="Selecionar programa">
@@ -1119,17 +1119,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                           {cc.name}
                         </span>
                       </SelectItem>
-                    ))}
-                  </ClearableSelect>
-                </div>
-              )}
-
-              {(eventType === "project" || eventType === "event" || eventType === "cashflow") && (
-                <div>
-                  <Label className="text-sm">{eventType === "project" ? "Programa" : "Projeto"}</Label>
-                  <ClearableSelect value={projectId} onValueChange={handleClearableChange(setProjectId)} placeholder={eventType === "project" ? "Selecionar programa" : "Selecionar projeto"}>
-                    {projects.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                     ))}
                   </ClearableSelect>
                 </div>
