@@ -2848,19 +2848,125 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
           return (
           <div className="space-y-4" id="doar-print-area">
+            {/* DOAR Advanced Filter Panel */}
+            {doarAdvancedOpen && (
+              <div className="my-4 space-y-4">
+                <div className="rounded-lg border border-border/50 bg-card p-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Filter className="h-3.5 w-3.5" /> Filtros Avançados — DOAR
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {/* Linha 1: Status + Tipo */}
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Status</Label>
+                      <Select value={doarFilterStatus} onValueChange={setDoarFilterStatus}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="overdue">Atrasado</SelectItem>
+                          <SelectItem value="paid">Pago</SelectItem>
+                          <SelectItem value="recebido">Recebido</SelectItem>
+                          <SelectItem value="pending">Pendente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Tipo</Label>
+                      <Select value={doarFilterType} onValueChange={setDoarFilterType}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="revenue"><span className="flex items-center gap-1.5"><TrendingUp className="h-3 w-3" /> Contas a receber</span></SelectItem>
+                          <SelectItem value="expense"><span className="flex items-center gap-1.5"><TrendingDown className="h-3 w-3" /> Contas a pagar</span></SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Linha 2: Programa + Categoria */}
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Programa</Label>
+                      <Select value={doarFilterProgramId || "__all__"} onValueChange={(v) => setDoarFilterProgramId(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todos</SelectItem>
+                          {programs.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Categoria</Label>
+                      <Select value={doarFilterCategoryId || "__all__"} onValueChange={(v) => setDoarFilterCategoryId(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas</SelectItem>
+                          {sortedFinCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Linha 3: Carteira + Forma pgto + Conta fixa */}
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Carteira / Conta</Label>
+                      <Select value={doarFilterAccountId || "__all__"} onValueChange={(v) => setDoarFilterAccountId(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas as contas" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas as contas</SelectItem>
+                          {accounts.filter(a => a.is_active).map(a => (
+                            <SelectItem key={a.id} value={a.id}>
+                              <span className="flex items-center gap-1.5">
+                                {ACCOUNT_TYPE_LABELS[a.type as AccountType]?.icon}
+                                {a.name}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Forma de Pagamento</Label>
+                      <Select value={doarFilterPaymentMethod || "__all__"} onValueChange={(v) => setDoarFilterPaymentMethod(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas</SelectItem>
+                          {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end pb-1">
+                      <div className="flex items-center gap-1.5">
+                        <Switch checked={doarFilterIsFixed} onCheckedChange={setDoarFilterIsFixed} />
+                        <Label className="text-xs whitespace-nowrap">Conta fixa</Label>
+                      </div>
+                    </div>
+                    {/* Realizado / Previsto */}
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Visualização</Label>
+                      <Select value={doarViewMode} onValueChange={setDoarViewMode}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="realizado">Realizado</SelectItem>
+                          <SelectItem value="previsto">Previsto</SelectItem>
+                          <SelectItem value="all">Todos</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t border-border/50" />
+              </div>
+            )}
+
             {/* DOAR quick filters */}
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5">
-                <Checkbox checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} id="carry-over" className="h-3.5 w-3.5" />
-                <Label htmlFor="carry-over" className="text-xs text-muted-foreground whitespace-nowrap">Saldo anterior</Label>
+                <Switch checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} />
+                <Label className="text-xs text-muted-foreground whitespace-nowrap">Saldo anterior</Label>
               </div>
             </div>
 
-            {/* PREVISTO — Contas a Pagar/Receber */}
-            {renderDoarTable(dreData.previsto, "PREVISTO", "Contas a Pagar / Receber", "prev")}
-
-            {/* REALIZADO — Contas Pagas/Recebidas */}
-            {renderDoarTable(dreData.realizado, "REALIZADO", "Contas Pagas / Recebidas", "real")}
+            {/* Conditional DOAR tables based on viewMode */}
+            {(doarViewMode === "previsto" || doarViewMode === "all") &&
+              renderDoarTable(dreData.previsto, "PREVISTO", "Contas a Pagar / Receber", "prev")}
+            {(doarViewMode === "realizado" || doarViewMode === "all") &&
+              renderDoarTable(dreData.realizado, "REALIZADO", "Contas Pagas / Recebidas", "real")}
           </div>
           );
         })()}
