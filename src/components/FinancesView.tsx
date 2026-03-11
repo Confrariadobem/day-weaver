@@ -1344,21 +1344,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <div className="flex-1">
               <Label className="text-xs text-muted-foreground">Valor</Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">{currency === "USDT" ? "$" : "R$"}</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
                 <Input type="text" inputMode="decimal" placeholder="0,00" value={amount}
                   onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
                   className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               </div>
-            </div>
-            <div className="w-20">
-              <Label className="text-xs text-muted-foreground">Moeda</Label>
-              <Select value={currency} onValueChange={(v) => setCurrency(v as CurrencyType)}>
-                <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BRL">R$ BRL</SelectItem>
-                  <SelectItem value="USDT">$ USDT</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <div>
