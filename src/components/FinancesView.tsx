@@ -684,15 +684,19 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         return true;
       })
       .filter((e) => {
-        // Status filter (1.2)
-        let passStatus = true;
-        if (colFilterStatus === "pending") passStatus = !e.is_paid;
-        if (colFilterStatus === "overdue") { const ed = parseEntryDate(e.entry_date); passStatus = !e.is_paid && ed < today; }
-        if (colFilterStatus === "paid") passStatus = e.is_paid && e.type === "expense";
-        if (colFilterStatus === "recebido") passStatus = e.is_paid && e.type === "revenue";
-        // showSettled override: include settled entries even if filter would hide them
-        if (!passStatus && showSettled && e.is_paid) passStatus = true;
-        if (!passStatus) return false;
+        // Search ignores status filter — show all statuses when searching (5.1)
+        const hasSearch = searchQuery.trim().length > 0;
+        if (!hasSearch) {
+          // Status filter (1.2)
+          let passStatus = true;
+          if (colFilterStatus === "pending") passStatus = !e.is_paid;
+          if (colFilterStatus === "overdue") { const ed = parseEntryDate(e.entry_date); passStatus = !e.is_paid && ed < today; }
+          if (colFilterStatus === "paid") passStatus = e.is_paid && e.type === "expense";
+          if (colFilterStatus === "recebido") passStatus = e.is_paid && e.type === "revenue";
+          // showSettled override: include settled entries even if filter would hide them
+          if (!passStatus && showSettled && e.is_paid) passStatus = true;
+          if (!passStatus) return false;
+        }
         if (colFilterCounterpart && !(e.counterpart || "").toLowerCase().includes(colFilterCounterpart.toLowerCase())) return false;
         // Advanced filter fields
         if (filterType !== "all") {
