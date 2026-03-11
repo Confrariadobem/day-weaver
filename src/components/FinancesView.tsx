@@ -283,6 +283,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     if (catRes.data) setCategories(catRes.data);
     if (accRes.data) setAccounts(accRes.data as FinancialAccount[]);
     if (ccRes.data) setCostCenters(ccRes.data as any[]);
+    if (progRes.data) setPrograms(progRes.data as any[]);
   }, [user]);
 
   useEffect(() => {
