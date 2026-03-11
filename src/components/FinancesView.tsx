@@ -2955,6 +2955,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <Label className="text-xs whitespace-nowrap">Conta fixa</Label>
                       </div>
                     </div>
+                    <div className="flex items-end pb-1">
+                      <div className="flex items-center gap-1.5">
+                        <Switch checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} />
+                        <Label className="text-xs whitespace-nowrap">Saldo anterior</Label>
+                      </div>
+                    </div>
                     {/* Realizado / Previsto */}
                     <div>
                       <Label className="text-[10px] text-muted-foreground">Visualização</Label>
@@ -2972,14 +2978,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 <div className="border-t border-border/50" />
               </div>
             )}
-
-            {/* DOAR quick filters */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <Switch checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} />
-                <Label className="text-xs text-muted-foreground whitespace-nowrap">Saldo anterior</Label>
-              </div>
-            </div>
 
             {/* Conditional DOAR tables based on viewMode */}
             {(doarViewMode === "previsto" || doarViewMode === "all") &&
