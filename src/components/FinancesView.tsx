@@ -274,13 +274,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [entRes, projRes, catRes, accRes, ccRes, progRes] = await Promise.all([
+    const [entRes, projRes, catRes, accRes, ccRes, progRes, pmRes, apmRes] = await Promise.all([
       supabase.from("financial_entries").select("*").eq("user_id", user.id).order("entry_date", { ascending: false }),
       supabase.from("projects").select("*").eq("user_id", user.id),
       supabase.from("categories").select("*").eq("user_id", user.id),
       supabase.from("financial_accounts").select("*").eq("user_id", user.id).order("name"),
       supabase.from("cost_centers" as any).select("*").eq("user_id", user.id).eq("is_active", true).order("name"),
       supabase.from("programs").select("*").eq("user_id", user.id).order("name"),
+      supabase.from("payment_methods" as any).select("*").eq("user_id", user.id).eq("is_active", true).order("name"),
+      supabase.from("account_payment_methods" as any).select("*").eq("user_id", user.id),
     ]);
     if (entRes.data) setEntries(entRes.data);
     if (projRes.data) setProjects(projRes.data);
@@ -288,6 +290,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     if (accRes.data) setAccounts(accRes.data as FinancialAccount[]);
     if (ccRes.data) setCostCenters(ccRes.data as any[]);
     if (progRes.data) setPrograms(progRes.data as any[]);
+    if (pmRes.data) setPaymentMethodsList(pmRes.data as any[]);
+    if (apmRes.data) setAccountPaymentMethods(apmRes.data as any[]);
   }, [user]);
 
   useEffect(() => {
