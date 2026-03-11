@@ -270,6 +270,12 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const [newAccCurrency, setNewAccCurrency] = useState("BRL");
   const [newAccBalance, setNewAccBalance] = useState("");
 
+  // Transferência entre contas
+  const [transferFromAccountId, setTransferFromAccountId] = useState("");
+  const [transferToAccountId, setTransferToAccountId] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferDescription, setTransferDescription] = useState("");
+
   // Patrimônio: real estate, cars, etc.
   const [patrimonioName, setPatrimonioName] = useState("");
   const [patrimonioType, setPatrimonioType] = useState("imovel");
