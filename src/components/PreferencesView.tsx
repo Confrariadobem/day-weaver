@@ -733,29 +733,7 @@ export default function PreferencesView() {
                     ))}
                   </div>
 
-                  {/* Cost Centers */}
-                  <div className="pt-2 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] text-muted-foreground">Centros de Custo. Clique duas vezes para editar.</p>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openNewCc}>
-                        <Plus className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    <div className="space-y-1.5">
-                      {costCenters.map((cc: any) => (
-                        <ToggleRow
-                          key={cc.id}
-                          colorDot={cc.color}
-                          label={cc.name}
-                          desc={cc.description || "Sem descrição"}
-                          onDoubleClick={() => openEditCc(cc)}
-                        />
-                      ))}
-                      {costCenters.length === 0 && (
-                        <p className="py-4 text-center text-xs text-muted-foreground">Nenhum centro de custo cadastrado</p>
-                      )}
-                    </div>
-                  </div>
+                   {/* Programas section moved to Geral > Programas accordion */}
                 </AccordionContent>
               </AccordionItem>
             )}
