@@ -3156,33 +3156,56 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
             {/* Resumo por Programa */}
             {(() => {
-              const programMap = new Map<string, { name: string; value: number; color: string }>();
+              const programMap = new Map<string, { name: string; revenue: number; expense: number; color: string }>();
               periodFilteredEntries.forEach(e => {
                 if (!e.cost_center_id) return;
                 const cc = costCenters.find((c: any) => c.id === e.cost_center_id);
                 if (!cc) return;
-                const prev = programMap.get(cc.id) || { name: cc.name, value: 0, color: cc.color || "#6b7280" };
-                prev.value += Number(e.amount);
+                const prev = programMap.get(cc.id) || { name: cc.name, revenue: 0, expense: 0, color: cc.color || "#6b7280" };
+                if (e.type === "revenue") prev.revenue += Number(e.amount);
+                else prev.expense += Number(e.amount);
                 programMap.set(cc.id, prev);
               });
-              const programData = Array.from(programMap.values()).sort((a, b) => b.value - a.value);
-              const totalProgram = programData.reduce((s, d) => s + d.value, 0);
+              const programData = Array.from(programMap.values()).sort((a, b) => (b.revenue + b.expense) - (a.revenue + a.expense));
+              const totalProgram = programData.reduce((s, d) => s + d.revenue + d.expense, 0);
               if (programData.length === 0) return null;
               return (
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> Resumo por Programa</CardTitle></CardHeader>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> PROGRAMA — Recursos alocados</CardTitle></CardHeader>
                   <CardContent>
                     <div className="space-y-3">
                       {programData.map((d) => {
-                        const pct = totalProgram > 0 ? (d.value / totalProgram) * 100 : 0;
+                        const total = d.revenue + d.expense;
+                        const saldo = d.revenue - d.expense;
+                        const maxVal = Math.max(...programData.map(p => Math.max(p.revenue, p.expense)));
+                        const revPct = maxVal > 0 ? (d.revenue / maxVal) * 100 : 0;
+                        const expPct = maxVal > 0 ? (d.expense / maxVal) * 100 : 0;
                         return (
-                          <div key={d.name} className="space-y-1">
+                          <div key={d.name} className="space-y-1.5">
                             <div className="flex items-center justify-between text-xs">
-                              <span className="font-medium truncate">{d.name}</span>
-                              <span className="text-muted-foreground shrink-0 ml-2">{pct.toFixed(1)}% · {brl(d.value)}</span>
+                              <span className="font-medium truncate flex items-center gap-1.5">
+                                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                                {d.name}
+                              </span>
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                <span className={cn("text-xs font-bold tabular-nums", saldo >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                                  {saldo >= 0 ? "+" : ""}{brl(saldo)}
+                                </span>
+                              </div>
                             </div>
-                            <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
-                              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex-1 space-y-0.5">
+                                <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                                  <div className="h-full rounded-full bg-[hsl(var(--success))] transition-all" style={{ width: `${revPct}%` }} />
+                                </div>
+                                <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                                  <div className="h-full rounded-full bg-destructive transition-all" style={{ width: `${expPct}%` }} />
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0" style={{ minWidth: 70 }}>
+                                <p className="text-[10px] text-[hsl(var(--success))]">{brl(d.revenue)}</p>
+                                <p className="text-[10px] text-destructive">{brl(d.expense)}</p>
+                              </div>
                             </div>
                           </div>
                         );
