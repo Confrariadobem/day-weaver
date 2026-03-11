@@ -865,10 +865,10 @@ export default function PreferencesView() {
         </div>
       </ConfigDialog>
 
-      {/* Cost Center Dialog */}
+      {/* Programa Dialog */}
       <ConfigDialog
         open={ccDialogOpen}
-        title={editingCc ? "Editar Centro de Custo" : "Novo Centro de Custo"}
+        title={editingCc ? "Editar Programa" : "Novo Programa"}
         onClose={() => setCcDialogOpen(false)}
         onSave={saveCc}
         saveDisabled={!ccName.trim()}
