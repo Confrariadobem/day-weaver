@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash, Star, Wallet, Repeat, Cake, CalendarDays, TrendingUp, FolderKanban, CircleDollarSign, Building2, Plus, X, SplitSquareVertical, Receipt, Home, Car } from "lucide-react";
+import { Trash2, Save, Calendar, Clock, Bell, Tag, Hash, Star, Wallet, Repeat, Cake, CalendarDays, TrendingUp, FolderKanban, CircleDollarSign, Building2, Plus, X, SplitSquareVertical, Receipt, Home, Car, ArrowLeftRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -47,7 +47,7 @@ interface EventEditDialogProps {
   defaultEventType?: EventType;
 }
 
-type EventType = "birthday" | "event" | "cashflow" | "investment" | "carteira" | "patrimonio" | "programa" | "project" | "centro_custo" | "categoria";
+type EventType = "birthday" | "event" | "cashflow" | "investment" | "carteira" | "patrimonio" | "programa" | "project" | "centro_custo" | "categoria" | "transferencia";
 
 const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
   birthday: <Cake className="h-3.5 w-3.5" />,
@@ -60,6 +60,7 @@ const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
   patrimonio: <Home className="h-3.5 w-3.5" />,
   project: <FolderKanban className="h-3.5 w-3.5" />,
   programa: <FolderKanban className="h-3.5 w-3.5" />,
+  transferencia: <ArrowLeftRight className="h-3.5 w-3.5" />,
 };
 
 const EVENT_TYPES_UNSORTED: { value: EventType; label: string; color: string }[] = [
@@ -71,6 +72,7 @@ const EVENT_TYPES_UNSORTED: { value: EventType; label: string; color: string }[]
   { value: "event", label: "Evento", color: "#3b82f6" },
   { value: "investment", label: "Investimento", color: "#d4a017" },
   { value: "patrimonio", label: "Patrimônio", color: "#f97316" },
+  { value: "transferencia", label: "Transferência entre contas", color: "#8b5cf6" },
 ];
 const EVENT_TYPES = [...EVENT_TYPES_UNSORTED].sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
 
@@ -267,6 +269,12 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const [newAccType, setNewAccType] = useState("bank_account");
   const [newAccCurrency, setNewAccCurrency] = useState("BRL");
   const [newAccBalance, setNewAccBalance] = useState("");
+
+  // Transferência entre contas
+  const [transferFromAccountId, setTransferFromAccountId] = useState("");
+  const [transferToAccountId, setTransferToAccountId] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferDescription, setTransferDescription] = useState("");
 
   // Patrimônio: real estate, cars, etc.
   const [patrimonioName, setPatrimonioName] = useState("");
@@ -549,6 +557,59 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         color: ccColor,
         is_active: true,
       });
+      onSaved();
+      onOpenChange(false);
+      return;
+    }
+
+    // Transferência entre contas
+    if (eventType === "transferencia") {
+      const amount = parseNum(transferAmount);
+      if (!transferFromAccountId || !transferToAccountId || amount <= 0) return;
+      const fromAcc = accounts.find((a: any) => a.id === transferFromAccountId);
+      const toAcc = accounts.find((a: any) => a.id === transferToAccountId);
+      const refId = crypto.randomUUID().slice(0, 8).toUpperCase();
+      const refNote = `De: ${fromAcc?.name || "?"} → Para: ${toAcc?.name || "?"}`;
+      const dateStr = format(new Date(`${startDate}T12:00:00`), "yyyy-MM-dd");
+
+      // Create two entries: outgoing and incoming
+      await supabase.from("financial_entries").insert([
+        {
+          user_id: userId,
+          title: `Transf. #${refId}`,
+          amount: amount,
+          type: "expense",
+          entry_date: dateStr,
+          account_id: transferFromAccountId,
+          description: `[tipo:transferencia] ${refNote}. ${transferDescription}`.trim(),
+          is_paid: true,
+          counterpart: toAcc?.name || null,
+        },
+        {
+          user_id: userId,
+          title: `Transf. #${refId}`,
+          amount: amount,
+          type: "revenue",
+          entry_date: dateStr,
+          account_id: transferToAccountId,
+          description: `[tipo:transferencia] ${refNote}. ${transferDescription}`.trim(),
+          is_paid: true,
+          counterpart: fromAcc?.name || null,
+        },
+      ]);
+
+      // Update account balances
+      if (fromAcc) {
+        await supabase.from("financial_accounts").update({
+          current_balance: fromAcc.current_balance - amount,
+        }).eq("id", transferFromAccountId);
+      }
+      if (toAcc) {
+        await supabase.from("financial_accounts").update({
+          current_balance: toAcc.current_balance + amount,
+        }).eq("id", transferToAccountId);
+      }
+
       onSaved();
       onOpenChange(false);
       return;
@@ -931,9 +992,9 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   };
 
   // Types that show the main title/description/classification fields
-  const showMainFields = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo" && eventType !== "categoria";
+  const showMainFields = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo" && eventType !== "categoria" && eventType !== "transferencia";
   // Types that show dates/scheduling
-  const showDates = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo" && eventType !== "categoria";
+  const showDates = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo" && eventType !== "categoria" && eventType !== "transferencia";
 
   return (
     <>
@@ -1393,6 +1454,49 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 <Label className="text-sm">Descrição</Label>
                 <Textarea value={patrimonioDesc} onChange={(e) => setPatrimonioDesc(e.target.value)}
                   placeholder="Detalhes adicionais (opcional)" rows={2} className="resize-none" />
+              </div>
+            </div>
+          )}
+
+          {/* Transferência entre contas */}
+          {eventType === "transferencia" && (
+            <div className="space-y-3 rounded-lg border border-border/30 p-3">
+              <p className="text-xs text-muted-foreground">Transferir valor entre carteiras / contas.</p>
+              <div>
+                <Label className="text-sm">De (Origem)</Label>
+                <Select value={transferFromAccountId} onValueChange={setTransferFromAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar carteira de origem" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a: any) => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Para (Destino)</Label>
+                <Select value={transferToAccountId} onValueChange={setTransferToAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar carteira de destino" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.filter((a: any) => a.id !== transferFromAccountId).map((a: any) => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Valor (R$)</Label>
+                <Input type="text" inputMode="decimal" placeholder="0,00" value={transferAmount}
+                  onChange={(e) => setTransferAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
+              </div>
+              <div>
+                <Label className="text-sm">Data</Label>
+                <SimpleDatePicker value={startDate} onChange={(v) => setStartDate(v)} placeholder="Selecionar data" />
+              </div>
+              <div>
+                <Label className="text-sm">Descrição (opcional)</Label>
+                <Textarea value={transferDescription} onChange={(e) => setTransferDescription(e.target.value)}
+                  placeholder="Observações sobre a transferência" rows={2} className="resize-none" />
               </div>
             </div>
           )}

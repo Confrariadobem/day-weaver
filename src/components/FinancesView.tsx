@@ -727,8 +727,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           if (filterType === "expense" && e.type !== "expense") return false;
         }
         if (filterCategoryId && e.category_id !== filterCategoryId) return false;
-        if (filterCostCenterId && e.cost_center_id !== filterCostCenterId) return false;
-        if (filterProjectId && e.project_id !== filterProjectId) return false;
+        if (filterProgramId && e.cost_center_id !== filterProgramId) return false;
         if (filterAccountId && e.account_id !== filterAccountId) return false;
         if (filterPaymentMethod && e.payment_method !== filterPaymentMethod) return false;
         if (filterIsFixed === "yes" && !e.is_fixed) return false;
@@ -781,7 +780,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterCostCenterId, filterProjectId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart, showSettled]);
+  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterProgramId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart, showSettled]);
 
   // KPI totals — now derived from filtered entries so they respond to search/filters in real-time (1.8)
   const kpiData = useMemo(() => {
@@ -1755,8 +1754,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             colFilterStatus !== "pending",
             filterType !== "all",
             filterCategoryId !== "",
-            filterCostCenterId !== "",
-            filterProjectId !== "",
+            filterProgramId !== "",
             filterAccountId !== "",
             filterPaymentMethod !== "",
             filterIsFixed !== "all",
@@ -1767,8 +1765,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           const resetAllFilters = () => {
             setSearchQuery("");
             setColFilterStatus("pending");
-            setFilterType("all"); setFilterCategoryId(""); setFilterCostCenterId("");
-            setFilterProjectId(""); setFilterAccountId(""); setFilterPaymentMethod("");
+            setFilterType("all"); setFilterCategoryId(""); setFilterProgramId("");
+            setFilterAccountId(""); setFilterPaymentMethod("");
             setFilterIsFixed("all"); setShowSettled(false);
             setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
             setFluxoDateFrom(""); setFluxoDateTo("");
@@ -1805,7 +1803,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
                       className={cn(
                         "relative rounded p-0.5 transition-colors",
-                        advancedFilterOpen || filterType !== "all" || filterCategoryId || filterCostCenterId || filterProjectId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || colFilterStatus !== "pending" || showSettled
+                        advancedFilterOpen || filterType !== "all" || filterCategoryId || filterProgramId || filterAccountId || filterPaymentMethod || filterIsFixed !== "all" || colFilterStatus !== "pending" || showSettled
                           ? "text-primary"
                           : "text-muted-foreground hover:text-foreground"
                       )}
@@ -2209,7 +2207,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__all__">Todos</SelectItem>
-                          {programs.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                          {costCenters.map((cc: any) => <SelectItem key={cc.id} value={cc.id}>{cc.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -2875,7 +2873,18 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <Filter className="h-3.5 w-3.5" /> Filtros Avançados — DOAR
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {/* Linha 1: Status + Tipo */}
+                    {/* Linha 1: Visualização + Status + Tipo */}
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Visualização</Label>
+                      <Select value={doarViewMode} onValueChange={setDoarViewMode}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="realizado">Realizado</SelectItem>
+                          <SelectItem value="previsto">Previsto</SelectItem>
+                          <SelectItem value="all">Todos</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div>
                       <Label className="text-[10px] text-muted-foreground">Status</Label>
                       <Select value={doarFilterStatus} onValueChange={setDoarFilterStatus}>
@@ -2907,7 +2916,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__all__">Todos</SelectItem>
-                          {programs.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                          {costCenters.map((cc: any) => <SelectItem key={cc.id} value={cc.id}>{cc.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -2921,7 +2930,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         </SelectContent>
                       </Select>
                     </div>
-                    {/* Linha 3: Carteira + Forma pgto + Conta fixa */}
+                    {/* Linha 3: Carteira + Forma pgto + Conta fixa + Saldo anterior */}
                     <div>
                       <Label className="text-[10px] text-muted-foreground">Carteira / Conta</Label>
                       <Select value={doarFilterAccountId || "__all__"} onValueChange={(v) => setDoarFilterAccountId(v === "__all__" ? "" : v)}>
@@ -2960,18 +2969,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <Switch checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} />
                         <Label className="text-xs whitespace-nowrap">Saldo anterior</Label>
                       </div>
-                    </div>
-                    {/* Realizado / Previsto */}
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Visualização</Label>
-                      <Select value={doarViewMode} onValueChange={setDoarViewMode}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="realizado">Realizado</SelectItem>
-                          <SelectItem value="previsto">Previsto</SelectItem>
-                          <SelectItem value="all">Todos</SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
                 </div>

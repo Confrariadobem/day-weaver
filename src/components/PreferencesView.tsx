@@ -585,9 +585,6 @@ export default function PreferencesView() {
                       <AccordionContent className="px-3 pb-3 pt-3">
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-[11px] text-muted-foreground">Clique duas vezes para editar. Use o FAB (+) para criar novos.</p>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openNewCc}>
-                            <Plus className="h-3.5 w-3.5" />
-                          </Button>
                         </div>
                         <div className="space-y-1.5">
                           {costCenters.map((cc: any) => (
