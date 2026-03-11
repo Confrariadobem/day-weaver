@@ -1967,7 +1967,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <Input placeholder="Buscar categorias, lançamentos..."
                 value={doarSearchQuery}
                 onChange={(e) => setDoarSearchQuery(e.target.value)}
-                className="h-7 pl-8 pr-[4rem] text-xs rounded-lg" />
+                className="h-7 pl-8 pr-[5.5rem] text-xs rounded-lg" />
               <div className="absolute right-2 top-1 flex items-center gap-1">
                 <Tooltip delayDuration={200}>
                   <TooltipTrigger asChild>
@@ -2008,6 +2008,14 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             </div>
             {renderSharedInterval()}
             {renderSharedHoje()}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={cycleDoarExpand} className="text-muted-foreground hover:text-primary transition-colors">
+                  <ChevronsUpDown className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="z-[100] text-xs">Expandir/Contrair</TooltipContent>
+            </Tooltip>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button onClick={handleExportCSV} className="text-muted-foreground hover:text-primary transition-colors">
