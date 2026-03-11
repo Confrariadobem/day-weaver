@@ -252,6 +252,10 @@ export default function PreferencesView() {
   const [ccDesc, setCcDesc] = useState("");
   const [ccColor, setCcColor] = useState("#3b82f6");
 
+  // Payment methods
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [newPmName, setNewPmName] = useState("");
+
   // Data management
   const [dataToggles, setDataToggles] = useState<Record<string, boolean>>({});
 
