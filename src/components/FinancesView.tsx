@@ -2873,7 +2873,18 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <Filter className="h-3.5 w-3.5" /> Filtros Avançados — DOAR
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {/* Linha 1: Status + Tipo */}
+                    {/* Linha 1: Visualização + Status + Tipo */}
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Visualização</Label>
+                      <Select value={doarViewMode} onValueChange={setDoarViewMode}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="realizado">Realizado</SelectItem>
+                          <SelectItem value="previsto">Previsto</SelectItem>
+                          <SelectItem value="all">Todos</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div>
                       <Label className="text-[10px] text-muted-foreground">Status</Label>
                       <Select value={doarFilterStatus} onValueChange={setDoarFilterStatus}>
@@ -2919,7 +2930,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         </SelectContent>
                       </Select>
                     </div>
-                    {/* Linha 3: Carteira + Forma pgto + Conta fixa */}
+                    {/* Linha 3: Carteira + Forma pgto + Conta fixa + Saldo anterior */}
                     <div>
                       <Label className="text-[10px] text-muted-foreground">Carteira / Conta</Label>
                       <Select value={doarFilterAccountId || "__all__"} onValueChange={(v) => setDoarFilterAccountId(v === "__all__" ? "" : v)}>
@@ -2958,18 +2969,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <Switch checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} />
                         <Label className="text-xs whitespace-nowrap">Saldo anterior</Label>
                       </div>
-                    </div>
-                    {/* Realizado / Previsto */}
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Visualização</Label>
-                      <Select value={doarViewMode} onValueChange={setDoarViewMode}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="realizado">Realizado</SelectItem>
-                          <SelectItem value="previsto">Previsto</SelectItem>
-                          <SelectItem value="all">Todos</SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
                 </div>
