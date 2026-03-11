@@ -1344,21 +1344,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <div className="flex-1">
               <Label className="text-xs text-muted-foreground">Valor</Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">{currency === "USDT" ? "$" : "R$"}</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
                 <Input type="text" inputMode="decimal" placeholder="0,00" value={amount}
                   onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
                   className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               </div>
-            </div>
-            <div className="w-20">
-              <Label className="text-xs text-muted-foreground">Moeda</Label>
-              <Select value={currency} onValueChange={(v) => setCurrency(v as CurrencyType)}>
-                <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BRL">R$ BRL</SelectItem>
-                  <SelectItem value="USDT">$ USDT</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <div>
@@ -1407,8 +1397,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           )}
         </div>
 
-        {/* Juros, Multa, Desconto */}
-        <div className="rounded-lg border border-border/30 p-3">
+        {/* Juros, Multa, Desconto + Valor Final */}
+        <div className="rounded-lg border border-border/30 p-3 space-y-2">
           <div className="grid grid-cols-3 gap-2">
             <div>
               <Label className="text-xs text-muted-foreground">Juros</Label>
@@ -1426,6 +1416,24 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 onChange={(e) => setDesconto(e.target.value.replace(/[^0-9.,]/g, ""))} className="text-xs" />
             </div>
           </div>
+          {(() => {
+            const base = parseNum(amount);
+            const j = parseNum(juros);
+            const m = parseNum(multa);
+            const d = parseNum(desconto);
+            const final_ = base + j + m - d;
+            if (j > 0 || m > 0 || d > 0) {
+              return (
+                <div className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 mt-1">
+                  <span className="text-xs font-medium text-muted-foreground">Valor a {type === "revenue" ? "receber" : "pagar"}</span>
+                  <span className={cn("text-sm font-bold tabular-nums", final_ >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                    R$ {final_.toFixed(2).replace(".", ",")}
+                  </span>
+                </div>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         {/* Toggles & Payment */}
@@ -1959,7 +1967,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <Input placeholder="Buscar categorias, lançamentos..."
                 value={doarSearchQuery}
                 onChange={(e) => setDoarSearchQuery(e.target.value)}
-                className="h-7 pl-8 pr-[4rem] text-xs rounded-lg" />
+                className="h-7 pl-8 pr-[5.5rem] text-xs rounded-lg" />
               <div className="absolute right-2 top-1 flex items-center gap-1">
                 <Tooltip delayDuration={200}>
                   <TooltipTrigger asChild>
@@ -2000,6 +2008,14 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             </div>
             {renderSharedInterval()}
             {renderSharedHoje()}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button onClick={cycleDoarExpand} className="text-muted-foreground hover:text-primary transition-colors">
+                  <ChevronsUpDown className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="z-[100] text-xs">Expandir/Contrair</TooltipContent>
+            </Tooltip>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button onClick={handleExportCSV} className="text-muted-foreground hover:text-primary transition-colors">
@@ -2939,6 +2955,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <Label className="text-xs whitespace-nowrap">Conta fixa</Label>
                       </div>
                     </div>
+                    <div className="flex items-end pb-1">
+                      <div className="flex items-center gap-1.5">
+                        <Switch checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} />
+                        <Label className="text-xs whitespace-nowrap">Saldo anterior</Label>
+                      </div>
+                    </div>
                     {/* Realizado / Previsto */}
                     <div>
                       <Label className="text-[10px] text-muted-foreground">Visualização</Label>
@@ -2956,14 +2978,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 <div className="border-t border-border/50" />
               </div>
             )}
-
-            {/* DOAR quick filters */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <Switch checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} />
-                <Label className="text-xs text-muted-foreground whitespace-nowrap">Saldo anterior</Label>
-              </div>
-            </div>
 
             {/* Conditional DOAR tables based on viewMode */}
             {(doarViewMode === "previsto" || doarViewMode === "all") &&
@@ -3142,33 +3156,56 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
             {/* Resumo por Programa */}
             {(() => {
-              const programMap = new Map<string, { name: string; value: number; color: string }>();
+              const programMap = new Map<string, { name: string; revenue: number; expense: number; color: string }>();
               periodFilteredEntries.forEach(e => {
                 if (!e.cost_center_id) return;
                 const cc = costCenters.find((c: any) => c.id === e.cost_center_id);
                 if (!cc) return;
-                const prev = programMap.get(cc.id) || { name: cc.name, value: 0, color: cc.color || "#6b7280" };
-                prev.value += Number(e.amount);
+                const prev = programMap.get(cc.id) || { name: cc.name, revenue: 0, expense: 0, color: cc.color || "#6b7280" };
+                if (e.type === "revenue") prev.revenue += Number(e.amount);
+                else prev.expense += Number(e.amount);
                 programMap.set(cc.id, prev);
               });
-              const programData = Array.from(programMap.values()).sort((a, b) => b.value - a.value);
-              const totalProgram = programData.reduce((s, d) => s + d.value, 0);
+              const programData = Array.from(programMap.values()).sort((a, b) => (b.revenue + b.expense) - (a.revenue + a.expense));
+              const totalProgram = programData.reduce((s, d) => s + d.revenue + d.expense, 0);
               if (programData.length === 0) return null;
               return (
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> Resumo por Programa</CardTitle></CardHeader>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><FolderKanban className="h-3.5 w-3.5 text-primary" /> PROGRAMA — Recursos alocados</CardTitle></CardHeader>
                   <CardContent>
                     <div className="space-y-3">
                       {programData.map((d) => {
-                        const pct = totalProgram > 0 ? (d.value / totalProgram) * 100 : 0;
+                        const total = d.revenue + d.expense;
+                        const saldo = d.revenue - d.expense;
+                        const maxVal = Math.max(...programData.map(p => Math.max(p.revenue, p.expense)));
+                        const revPct = maxVal > 0 ? (d.revenue / maxVal) * 100 : 0;
+                        const expPct = maxVal > 0 ? (d.expense / maxVal) * 100 : 0;
                         return (
-                          <div key={d.name} className="space-y-1">
+                          <div key={d.name} className="space-y-1.5">
                             <div className="flex items-center justify-between text-xs">
-                              <span className="font-medium truncate">{d.name}</span>
-                              <span className="text-muted-foreground shrink-0 ml-2">{pct.toFixed(1)}% · {brl(d.value)}</span>
+                              <span className="font-medium truncate flex items-center gap-1.5">
+                                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                                {d.name}
+                              </span>
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                <span className={cn("text-xs font-bold tabular-nums", saldo >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                                  {saldo >= 0 ? "+" : ""}{brl(saldo)}
+                                </span>
+                              </div>
                             </div>
-                            <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
-                              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex-1 space-y-0.5">
+                                <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                                  <div className="h-full rounded-full bg-[hsl(var(--success))] transition-all" style={{ width: `${revPct}%` }} />
+                                </div>
+                                <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                                  <div className="h-full rounded-full bg-destructive transition-all" style={{ width: `${expPct}%` }} />
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0" style={{ minWidth: 70 }}>
+                                <p className="text-[10px] text-[hsl(var(--success))]">{brl(d.revenue)}</p>
+                                <p className="text-[10px] text-destructive">{brl(d.expense)}</p>
+                              </div>
                             </div>
                           </div>
                         );

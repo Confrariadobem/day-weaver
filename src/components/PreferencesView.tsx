@@ -153,7 +153,6 @@ const FINANCE_TABS = [
 const PROJECT_TABS = [
   { key: "projects", label: "Projetos", desc: "Lista de projetos", locked: true },
   { key: "dashboard", label: "Dashboard", desc: "Visão geral e métricas" },
-  { key: "programs", label: "Programas", desc: "Agrupamento de projetos" },
   { key: "tasks", label: "Tarefas", desc: "Tarefas avulsas e vinculadas" },
 ];
 

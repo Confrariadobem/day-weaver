@@ -54,12 +54,12 @@ const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
   carteira: <Wallet className="h-3.5 w-3.5" />,
   cashflow: <CircleDollarSign className="h-3.5 w-3.5" />,
   categoria: <Tag className="h-3.5 w-3.5" />,
-  centro_custo: <Tag className="h-3.5 w-3.5" />,
+  centro_custo: <FolderKanban className="h-3.5 w-3.5" />,
   event: <CalendarDays className="h-3.5 w-3.5" />,
   investment: <TrendingUp className="h-3.5 w-3.5" />,
   patrimonio: <Home className="h-3.5 w-3.5" />,
-  programa: <FolderKanban className="h-3.5 w-3.5" />,
   project: <FolderKanban className="h-3.5 w-3.5" />,
+  programa: <FolderKanban className="h-3.5 w-3.5" />,
 };
 
 const EVENT_TYPES_UNSORTED: { value: EventType; label: string; color: string }[] = [
@@ -71,8 +71,6 @@ const EVENT_TYPES_UNSORTED: { value: EventType; label: string; color: string }[]
   { value: "event", label: "Evento", color: "#3b82f6" },
   { value: "investment", label: "Investimento", color: "#d4a017" },
   { value: "patrimonio", label: "Patrimônio", color: "#f97316" },
-  { value: "programa", label: "Programa", color: "#06b6d4" },
-  { value: "project", label: "Projeto", color: "#eab308" },
 ];
 const EVENT_TYPES = [...EVENT_TYPES_UNSORTED].sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
 
@@ -1110,8 +1108,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 </ClearableSelect>
               </div>
 
-              {/* Programa - below Categoria, above Projeto */}
-              {(eventType === "cashflow" || eventType === "investment" || eventType === "project") && (
+              {/* Programa - single unified field */}
+              {(eventType === "cashflow" || eventType === "investment" || eventType === "programa") && (
                 <div>
                   <Label className="text-sm">Programa</Label>
                   <ClearableSelect value={costCenterId} onValueChange={handleClearableChange(setCostCenterId)} placeholder="Selecionar programa">
@@ -1122,17 +1120,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                           {cc.name}
                         </span>
                       </SelectItem>
-                    ))}
-                  </ClearableSelect>
-                </div>
-              )}
-
-              {(eventType === "project" || eventType === "event" || eventType === "cashflow") && (
-                <div>
-                  <Label className="text-sm">{eventType === "project" ? "Programa" : "Projeto"}</Label>
-                  <ClearableSelect value={projectId} onValueChange={handleClearableChange(setProjectId)} placeholder={eventType === "project" ? "Selecionar programa" : "Selecionar projeto"}>
-                    {projects.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                     ))}
                   </ClearableSelect>
                 </div>
@@ -1161,19 +1148,50 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
                 <Label className="text-sm">Contraparte (Recebedor / Pagador)</Label>
                 <CounterpartInput value={counterpart} onChange={setCounterpart} counterpartSuggestions={counterpartSuggestions} />
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <Label className="text-sm">Valor (R$)</Label>
-                  <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
-                    onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
-                </div>
-                {recurrence === "none" && (
-                  <div className="w-[100px]">
-                    <Label className="text-sm">Parcelas</Label>
-                    <Input type="number" placeholder="1" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} className="text-xs" />
-                  </div>
-                )}
+              <div>
+                <Label className="text-sm">Valor (R$)</Label>
+                <Input type="text" inputMode="decimal" placeholder="0,00" value={billAmount}
+                  onChange={(e) => setBillAmount(e.target.value.replace(/[^0-9.,]/g, ""))} />
               </div>
+
+              {/* Parcelamento */}
+              {recurrence === "none" && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setInstallments(parseInt(installments) > 1 ? "1" : "2")}
+                      className={cn(
+                        "rounded-full px-3 py-1.5 text-xs font-medium transition-all border",
+                        parseInt(installments) > 1
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-muted text-muted-foreground border-border hover:border-primary/60"
+                      )}
+                    >
+                      <CalendarDays className="h-3 w-3 inline mr-1" /> Parcelado
+                    </button>
+                  </div>
+                  {parseInt(installments) > 1 && (
+                    <div className="rounded-md border border-border/30 p-2.5 bg-muted/10 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <Label className="text-[10px] text-muted-foreground">Quantidade de parcelas</Label>
+                          <Input type="number" min="2" max="36" value={installments}
+                            onChange={(e) => setInstallments(e.target.value)} className="text-xs h-8" />
+                        </div>
+                        <div className="text-right pt-3">
+                          <p className="text-xs font-medium text-foreground">
+                            {parseInt(installments) > 0 && totalAmount > 0
+                              ? `${parseInt(installments)}x R$ ${(totalAmount / parseInt(installments)).toFixed(2).replace(".", ",")}`
+                              : "—"}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">Sem juros</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Single-source payment fields (hidden when split is enabled) */}
               {!splitEnabled && (
