@@ -298,12 +298,13 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const [allTitles, setAllTitles] = useState<{ title: string; count: number }[]>([]);
   const [counterpartSuggestions, setCounterpartSuggestions] = useState<{ name: string; count: number }[]>([]);
+  const [dynamicPaymentMethods, setDynamicPaymentMethods] = useState<string[]>([]);
 
   // Fetch categories, projects, accounts, cost centers, and past titles
   useEffect(() => {
     if (!userId || !open) return;
     const fetchAll = async () => {
-      const [catRes, projRes, accRes, evtRes, taskRes, finRes, ccRes] = await Promise.all([
+      const [catRes, projRes, accRes, evtRes, taskRes, finRes, ccRes, pmRes] = await Promise.all([
         supabase.from("categories").select("*").eq("user_id", userId).order("name"),
         supabase.from("projects").select("*").eq("user_id", userId).order("name"),
         supabase.from("financial_accounts").select("*").eq("user_id", userId).eq("is_active", true).order("name"),
@@ -311,11 +312,17 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         supabase.from("tasks").select("title").eq("user_id", userId),
         supabase.from("financial_entries").select("title, counterpart").eq("user_id", userId),
         supabase.from("cost_centers" as any).select("*").eq("user_id", userId).eq("is_active", true).order("name"),
+        supabase.from("payment_methods" as any).select("*").eq("user_id", userId).eq("is_active", true).order("name"),
       ]);
       if (catRes.data) setCategories(catRes.data);
       if (projRes.data) setProjects(projRes.data);
       if (accRes.data) setAccounts(accRes.data);
       if (ccRes.data) setCostCenters(ccRes.data as any[]);
+      if (pmRes.data && (pmRes.data as any[]).length > 0) {
+        setDynamicPaymentMethods((pmRes.data as any[]).map((pm: any) => pm.name));
+      } else {
+        setDynamicPaymentMethods(PAYMENT_METHODS_FALLBACK);
+      }
 
       const titleMap = new Map<string, number>();
       const addTitles = (data: { title: string }[] | null) => {
