@@ -214,7 +214,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [counterpart, setCounterpart] = useState("");
   const [isFixed, setIsFixed] = useState(false);
   const [allDay, setAllDay] = useState(true);
-  const [costCenterId, setCostCenterId] = useState("");
+  const [programaId, setProgramaId] = useState("");
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [splitLines, setSplitLines] = useState<{ id: string; accountId: string; paymentMethod: string; amount: string }[]>([]);
   const [description, setDescription] = useState("");
