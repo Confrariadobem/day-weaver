@@ -1163,7 +1163,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
               </div>
 
               {/* Programa - single unified field */}
-              {(eventType === "cashflow" || eventType === "investment" || eventType === "programa") && (
+              {(eventType === "cashflow" || eventType === "investment") && (
                 <div>
                   <Label className="text-sm">Programa</Label>
                   <ClearableSelect value={programaId} onValueChange={handleClearableChange(setProgramaId)} placeholder="Selecionar programa">
