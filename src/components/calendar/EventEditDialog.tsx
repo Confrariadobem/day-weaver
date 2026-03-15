@@ -545,12 +545,12 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
     // Centro de Custo creation — now creates a Program
     if (eventType === "programa" && ccName.trim()) {
-      await supabase.from("programs").insert({
+      await supabase.from("cost_centers").insert({
         user_id: userId,
         name: ccName.trim(),
         description: ccDesc || null,
         color: ccColor,
-        status: "active",
+        is_active: true,
       });
       onSaved();
       onOpenChange(false);
