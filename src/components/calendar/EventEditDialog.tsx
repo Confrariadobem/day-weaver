@@ -314,7 +314,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         supabase.from("calendar_events").select("title").eq("user_id", userId),
         supabase.from("tasks").select("title").eq("user_id", userId),
         supabase.from("financial_entries").select("title, counterpart").eq("user_id", userId),
-        supabase.from("programs").select("*").eq("user_id", userId).order("name"),
+        supabase.from("cost_centers").select("*").eq("user_id", userId).order("name"),
         supabase.from("payment_methods" as any).select("*").eq("user_id", userId).eq("is_active", true).order("name"),
       ]);
       if (catRes.data) setCategories(catRes.data);

@@ -1128,12 +1128,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
   const handleExportCSV = () => {
     const allItems = filtered;
-    const header = "Data,Título,Tipo,Categoria,Projeto,Conta,Pago,Forma Pgto,Valor\n";
+    const header = "Data,Título,Tipo,Categoria,Programa,Conta,Pago,Forma Pgto,Valor\n";
     const rows = allItems.map(e => {
       const cat = categories.find(c => c.id === e.category_id)?.name || "";
-      const proj = projects.find(p => p.id === e.project_id)?.name || "";
+      const prog = programs.find((p: any) => p.id === e.cost_center_id)?.name || "";
       const acc = accounts.find(a => a.id === e.account_id)?.name || "";
-      return `${e.entry_date},"${e.title}",${e.type === "revenue" ? "Receita" : "Despesa"},"${cat}","${proj}","${acc}",${e.is_paid ? "Sim" : "Não"},"${e.payment_method || ""}",${e.amount}`;
+      return `${e.entry_date},"${e.title}",${e.type === "revenue" ? "Receita" : "Despesa"},"${cat}","${prog}","${acc}",${e.is_paid ? "Sim" : "Não"},"${e.payment_method || ""}",${e.amount}`;
     }).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
