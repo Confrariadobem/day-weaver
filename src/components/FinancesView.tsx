@@ -407,8 +407,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     if (editingEntry) {
       const updateData: any = {
         title, amount: parseFloat(amount), type,
-        category_id: categoryId || null, project_id: projectId || null,
-        cost_center_id: costCenterId || null,
+        category_id: categoryId || null, project_id: null,
+        cost_center_id: programaId || null,
         entry_date: entryDate,
         account_id: splitEnabled ? null : (accountId || null),
         payment_method: splitEnabled ? null : (paymentMethod || null),
