@@ -655,8 +655,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       }
 
       if (eventType === "programa") {
-        await supabase.from("programs").insert({
-          user_id: userId, name: title, description: displayDescription || null,
+        await supabase.from("cost_centers").insert({
+          user_id: userId, name: title, description: displayDescription || null, is_active: true,
         });
       }
 
