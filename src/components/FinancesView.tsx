@@ -159,7 +159,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [projects, setProjects] = useState<DBTables<"projects">[]>([]);
   const [categories, setCategories] = useState<DBTables<"categories">[]>([]);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
-  const [costCenters, setCostCenters] = useState<any[]>([]);
+  // costCenters removed — unified under programs
   const [sortField, setSortField] = useState<SortField>("entry_date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [dialogOpen, setDialogOpen] = useState(false);
