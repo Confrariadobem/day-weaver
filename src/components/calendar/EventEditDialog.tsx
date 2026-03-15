@@ -54,7 +54,6 @@ const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
   carteira: <Wallet className="h-3.5 w-3.5" />,
   cashflow: <CircleDollarSign className="h-3.5 w-3.5" />,
   categoria: <Tag className="h-3.5 w-3.5" />,
-  centro_custo: <FolderKanban className="h-3.5 w-3.5" />,
   event: <CalendarDays className="h-3.5 w-3.5" />,
   investment: <TrendingUp className="h-3.5 w-3.5" />,
   patrimonio: <Home className="h-3.5 w-3.5" />,
