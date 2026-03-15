@@ -2331,6 +2331,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     </th>
                     <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("programa")}>
                       Programa <SortIcon field="programa" />
+                    </th>
                     <th className="text-right py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("amount")}>
                       Valor <SortIcon field="amount" />
                     </th>
