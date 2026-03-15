@@ -543,15 +543,14 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       return;
     }
 
-    // Centro de Custo creation
-    if (eventType === "centro_custo") {
-      if (!ccName.trim()) return;
-      await supabase.from("cost_centers" as any).insert({
+    // Centro de Custo creation — now creates a Program
+    if (eventType === "programa" && ccName.trim()) {
+      await supabase.from("programs").insert({
         user_id: userId,
         name: ccName.trim(),
         description: ccDesc || null,
         color: ccColor,
-        is_active: true,
+        status: "active",
       });
       onSaved();
       onOpenChange(false);
