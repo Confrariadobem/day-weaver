@@ -2488,6 +2488,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                             )}
                           </span>
                         </td>
+                        <td className="py-2.5 px-3 text-xs text-muted-foreground truncate max-w-[140px]">{e.counterpart || "—"}</td>
                         <td className="py-2.5 px-3 text-xs text-muted-foreground truncate max-w-[120px]">{programs.find((p: any) => p.id === e.cost_center_id)?.name || "—"}</td>
                         <td className={cn("py-2.5 px-3 text-right text-xs font-bold tabular-nums",
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
