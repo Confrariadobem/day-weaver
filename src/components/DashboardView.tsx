@@ -14,7 +14,7 @@ import { format, startOfYear, endOfYear, eachMonthOfInterval, startOfMonth, endO
 import { ptBR } from "date-fns/locale";
 import {
   TrendingUp, TrendingDown, Wallet, PiggyBank,
-  BarChart3, Building2,
+  BarChart3, Building2, FolderKanban, AlertTriangle,
   CalendarCheck, CalendarDays, CalendarRange, Scale, PieChart as PieChartIcon,
   ArrowRightLeft,
 } from "lucide-react";
