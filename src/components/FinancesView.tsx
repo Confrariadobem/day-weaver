@@ -1021,42 +1021,30 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const costCenterData = useMemo(() => {
     const map = new Map<string, { name: string; revenue: number; expense: number; color: string }>();
     periodFilteredEntries.filter(e => e.cost_center_id).forEach(e => {
-      const cc = costCenters.find((c: any) => c.id === e.cost_center_id);
-      if (!cc) return;
-      const prev = map.get(cc.id) || { name: cc.name, revenue: 0, expense: 0, color: cc.color || "#6b7280" };
+      const prog = programs.find((c: any) => c.id === e.cost_center_id);
+      if (!prog) return;
+      const prev = map.get(prog.id) || { name: prog.name, revenue: 0, expense: 0, color: prog.color || "#6b7280" };
       if (e.type === "revenue") prev.revenue += Number(e.amount);
       else prev.expense += Number(e.amount);
-      map.set(cc.id, prev);
+      map.set(prog.id, prev);
     });
     return Array.from(map.values()).sort((a, b) => (b.revenue + b.expense) - (a.revenue + a.expense));
-  }, [periodFilteredEntries, costCenters]);
+  }, [periodFilteredEntries, programs]);
 
-  const projectFinData = useMemo(() => {
-    const map = new Map<string, { name: string; budget: number; revenue: number; expense: number }>();
-    periodFilteredEntries.filter(e => e.project_id).forEach(e => {
-      const proj = projects.find(p => p.id === e.project_id);
-      if (!proj) return;
-      const prev = map.get(proj.id) || { name: proj.name, budget: Number(proj.budget || 0), revenue: 0, expense: 0 };
-      if (e.type === "revenue") prev.revenue += Number(e.amount);
-      else prev.expense += Number(e.amount);
-      map.set(proj.id, prev);
-    });
-    return Array.from(map.values()).sort((a, b) => (b.revenue + b.expense) - (a.revenue + a.expense));
-  }, [periodFilteredEntries, projects]);
+  // projectFinData removed — unified under programs
 
-  // Centro de custo report data
+  // Programa report data (formerly centro de custo)
   const ccReportData = useMemo(() => {
     const yr = periodYear;
     const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
-    const activeCCs = ccReportFilterIds.size > 0
-      ? costCenters.filter((cc: any) => ccReportFilterIds.has(cc.id))
-      : costCenters;
+    const activeProgs = ccReportFilterIds.size > 0
+      ? programs.filter((p: any) => ccReportFilterIds.has(p.id))
+      : programs;
 
-    return activeCCs.map((cc: any) => {
-      const ccEntries = periodFilteredEntries.filter(e => e.cost_center_id === cc.id);
-      // Group by category
+    return activeProgs.map((prog: any) => {
+      const progEntries = periodFilteredEntries.filter(e => e.cost_center_id === prog.id);
       const catMap = new Map<string, { name: string; type: string; months: number[]; entries: any[][] }>();
-      ccEntries.forEach(e => {
+      progEntries.forEach(e => {
         const cat = categories.find(c => c.id === e.category_id);
         const catName = cat?.name || "Sem Categoria";
         const key = `${e.type}-${catName}`;
@@ -1075,14 +1063,14 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       const monthBalance = months.map((_, i) => monthTotalsRev[i] - monthTotalsExp[i]);
 
       return {
-        id: cc.id, name: cc.name, color: cc.color,
+        id: prog.id, name: prog.name, color: prog.color,
         revRows, expRows, monthTotalsRev, monthTotalsExp, monthBalance,
       };
-    }).filter(cc => {
+    }).filter(p => {
       if (!ccReportSearch) return true;
-      return cc.name.toLowerCase().includes(ccReportSearch.toLowerCase());
+      return p.name.toLowerCase().includes(ccReportSearch.toLowerCase());
     });
-  }, [periodFilteredEntries, costCenters, categories, periodYear, ccReportFilterIds, ccReportSearch]);
+  }, [periodFilteredEntries, programs, categories, periodYear, ccReportFilterIds, ccReportSearch]);
 
   const handlePrint = () => {
     const now = new Date();
