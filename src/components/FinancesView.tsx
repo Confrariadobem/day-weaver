@@ -278,7 +278,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       supabase.from("projects").select("*").eq("user_id", user.id),
       supabase.from("categories").select("*").eq("user_id", user.id),
       supabase.from("financial_accounts").select("*").eq("user_id", user.id).order("name"),
-      supabase.from("programs").select("*").eq("user_id", user.id).order("name"),
+      supabase.from("cost_centers").select("*").eq("user_id", user.id).order("name"),
       supabase.from("payment_methods" as any).select("*").eq("user_id", user.id).eq("is_active", true).order("name"),
       supabase.from("account_payment_methods" as any).select("*").eq("user_id", user.id),
     ]);
