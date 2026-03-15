@@ -641,7 +641,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         await supabase.from("tasks").update({
           title, is_favorite: isFavorite,
           category_id: categoryId || null,
-          project_id: projectId || null,
         }).eq("id", item.task_id);
       }
     } else {
