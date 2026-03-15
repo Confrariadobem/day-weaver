@@ -398,7 +398,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       const patriValueMatch = desc.match(/\[patri_value:([\d.,]+)\]/);
       if (patriValueMatch) setPatrimonioValue(patriValueMatch[1]); else setPatrimonioValue("");
       // Reset other fields to defaults for edit
-      setCategoryId(""); setCostCenterId(""); setProjectId(""); setProgramId("");
+      setCategoryId(""); setProgramaId(""); setProgramId("");
       setAccountId(""); setPaymentMethod(""); setIsPaid(false); setIsFixed(false);
       setCounterpart(""); setInstallments("1");
       setSplitEnabled(false); setSplitLines([]);
