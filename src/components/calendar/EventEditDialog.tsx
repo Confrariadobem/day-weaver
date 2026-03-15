@@ -242,12 +242,11 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
   // Primary group fields
   const [categoryId, setCategoryId] = useState("");
-  const [costCenterId, setCostCenterId] = useState("");
-  const [projectId, setProjectId] = useState("");
+  const [programaId, setProgramaId] = useState("");
   const [programId, setProgramId] = useState("");
   const [categories, setCategories] = useState<any[]>([]);
-  const [costCenters, setCostCenters] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [programsList, setProgramsList] = useState<any[]>([]);
 
   // Cashflow extra fields
   const [accountId, setAccountId] = useState("");
