@@ -2412,7 +2412,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">
+                    <tr><td colSpan={9} className="text-center text-muted-foreground/40 py-12">
                       Sem lançamentos no período
                     </td></tr>
                   )}
