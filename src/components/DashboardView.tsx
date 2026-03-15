@@ -48,6 +48,7 @@ export default function DashboardView() {
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [programas, setProgramas] = useState<any[]>([]);
 
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>("year");
