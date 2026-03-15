@@ -3144,7 +3144,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 const prev = programMap.get(prog.id) || { name: prog.name, revenue: 0, expense: 0, color: prog.color || "#6b7280" };
                 if (e.type === "revenue") prev.revenue += Number(e.amount);
                 else prev.expense += Number(e.amount);
-                programMap.set(cc.id, prev);
+                programMap.set(prog.id, prev);
               });
               const programData = Array.from(programMap.values()).sort((a, b) => (b.revenue + b.expense) - (a.revenue + a.expense));
               const totalProgram = programData.reduce((s, d) => s + d.revenue + d.expense, 0);
