@@ -349,8 +349,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     setAmount(String(entry.amount));
     setType(entry.type as "revenue" | "expense");
     setCategoryId(entry.category_id || "");
-    setCostCenterId(entry.cost_center_id || "");
-    setProjectId(entry.project_id || "");
+    setProgramaId(entry.cost_center_id || "");
     setEntryDate(entry.entry_date);
     setAccountId(entry.account_id || "");
     setPaymentMethod(entry.payment_method || "");
