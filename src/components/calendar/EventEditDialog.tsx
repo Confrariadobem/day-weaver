@@ -433,8 +433,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setCashflowDirection("expense");
       setInvestmentType("stock");
       setCategoryId("");
-      setCostCenterId("");
-      setProjectId("");
+      setProgramaId("");
       setProgramId("");
       setAccountId("");
       setPaymentMethod("");
