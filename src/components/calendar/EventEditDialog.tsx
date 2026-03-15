@@ -809,8 +809,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           } else {
             await supabase.from("financial_entries").insert({
               user_id: userId, title, amount, type: "investment",
-              category_id: categoryId || null, project_id: projectId || null,
-              cost_center_id: costCenterId || null,
+              category_id: categoryId || null, project_id: null,
+              cost_center_id: programaId || null,
               entry_date: format(startDt, "yyyy-MM-dd"), is_paid: false,
             } as any);
           }
