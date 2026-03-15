@@ -3219,28 +3219,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               </Card>
             )}
 
-            {/* Project Financial Breakdown */}
-            {projectFinData.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><ListChecks className="h-3.5 w-3.5 text-primary" /> Indicadores por Programa (Projetos)</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="w-full min-w-0" style={{ height: 220 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={projectFinData} barGap={4}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} />
-                        <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                        <Legend wrapperStyle={{ fontSize: 10 }} />
-                        <Bar dataKey="budget" name="Orçamento" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="revenue" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="expense" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {/* Project Financial Breakdown removed — unified under Programa */}
 
             {/* Pie charts */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
