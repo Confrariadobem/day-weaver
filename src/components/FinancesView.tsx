@@ -1293,15 +1293,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Programa</Label>
-            <Select value={costCenterId} onValueChange={(v) => setCostCenterId(v === "__clear__" ? "" : v)}>
+            <Select value={programaId} onValueChange={(v) => setProgramaId(v === "__clear__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Programa (opcional)" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__clear__"><span className="text-muted-foreground italic">Nenhum</span></SelectItem>
-                {costCenters.map((cc: any) => (
-                  <SelectItem key={cc.id} value={cc.id}>
+                {programs.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>
                     <span className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color }} />
-                      {cc.name}
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
+                      {p.name}
                     </span>
                   </SelectItem>
                 ))}
