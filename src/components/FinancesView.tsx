@@ -202,7 +202,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [currency, setCurrency] = useState<CurrencyType>("BRL");
   const [type, setType] = useState<"revenue" | "expense">("expense");
   const [categoryId, setCategoryId] = useState("");
-  const [projectId, setProjectId] = useState("");
+  // projectId removed — unified under programaId
   const [entryDate, setEntryDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [installments, setInstallments] = useState("1");
   const [recurrence, setRecurrence] = useState<RecurrenceType>("none");
