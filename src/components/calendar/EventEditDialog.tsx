@@ -47,7 +47,7 @@ interface EventEditDialogProps {
   defaultEventType?: EventType;
 }
 
-type EventType = "birthday" | "event" | "cashflow" | "investment" | "carteira" | "patrimonio" | "programa" | "project" | "centro_custo" | "categoria" | "transferencia";
+type EventType = "birthday" | "event" | "cashflow" | "investment" | "carteira" | "patrimonio" | "programa" | "project" | "categoria" | "transferencia";
 
 const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
   birthday: <Cake className="h-3.5 w-3.5" />,
