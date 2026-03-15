@@ -119,16 +119,18 @@ export default function DashboardView() {
   useEffect(() => {
     if (!user) return;
     const fetchData = async () => {
-      const [eRes, cRes, iRes, aRes] = await Promise.all([
+      const [eRes, cRes, iRes, aRes, pRes] = await Promise.all([
         supabase.from("financial_entries").select("*").eq("user_id", user.id),
         supabase.from("categories").select("*").eq("user_id", user.id),
         supabase.from("investments").select("*").eq("user_id", user.id).eq("is_active", true),
         supabase.from("financial_accounts").select("*").eq("user_id", user.id).eq("is_active", true),
+        supabase.from("cost_centers").select("*").eq("user_id", user.id).order("name"),
       ]);
       if (eRes.data) setEntries(eRes.data);
       if (cRes.data) setCategories(cRes.data);
       if (iRes.data) setInvestments(iRes.data);
       if (aRes.data) setAccounts(aRes.data);
+      if (pRes.data) setProgramas(pRes.data as any[]);
     };
     fetchData();
     const handler = () => fetchData();
