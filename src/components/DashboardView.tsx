@@ -177,6 +177,27 @@ export default function DashboardView() {
 
   const COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
+  // Pendências por Programa
+  const programaPendencias = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const pending = entries.filter(e => !e.is_paid && e.cost_center_id);
+    const map = new Map<string, { total: number; overdue: number; amount: number }>();
+    pending.forEach(e => {
+      const ccId = e.cost_center_id!;
+      const cur = map.get(ccId) || { total: 0, overdue: 0, amount: 0 };
+      cur.total++;
+      cur.amount += Number(e.amount);
+      const d = new Date(e.entry_date);
+      if (d < today) cur.overdue++;
+      map.set(ccId, cur);
+    });
+    return programas
+      .filter(p => map.has(p.id))
+      .map(p => ({ id: p.id, name: p.name, color: p.color || "#3b82f6", ...map.get(p.id)! }))
+      .sort((a, b) => b.overdue - a.overdue || b.total - a.total);
+  }, [entries, programas]);
+
   const totalRevenue = filteredEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
   const totalExpense = filteredEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
   const totalCash = accounts.reduce((s: number, a: any) => s + Number(a.current_balance || 0), 0);
