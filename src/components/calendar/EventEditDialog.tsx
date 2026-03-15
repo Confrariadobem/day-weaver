@@ -650,7 +650,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           user_id: userId, title, description: displayDescription,
           scheduled_date: startDate, is_completed: false, is_favorite: isFavorite,
           category_id: categoryId || null,
-          project_id: projectId || null,
         }).select("id").single();
         if (data) taskId = data.id;
       }
