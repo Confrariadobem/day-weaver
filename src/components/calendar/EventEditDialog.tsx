@@ -1075,7 +1075,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </div>
           )}
 
-          {eventType === "centro_custo" && (
+          {eventType === "programa" && !showMainFields && (
             <div className="space-y-3 rounded-lg border border-border/30 p-3">
               <p className="text-xs text-muted-foreground">Criar novo programa.</p>
               <div>
