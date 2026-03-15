@@ -3139,9 +3139,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               const programMap = new Map<string, { name: string; revenue: number; expense: number; color: string }>();
               periodFilteredEntries.forEach(e => {
                 if (!e.cost_center_id) return;
-                const cc = costCenters.find((c: any) => c.id === e.cost_center_id);
-                if (!cc) return;
-                const prev = programMap.get(cc.id) || { name: cc.name, revenue: 0, expense: 0, color: cc.color || "#6b7280" };
+                const prog = programs.find((c: any) => c.id === e.cost_center_id);
+                if (!prog) return;
+                const prev = programMap.get(prog.id) || { name: prog.name, revenue: 0, expense: 0, color: prog.color || "#6b7280" };
                 if (e.type === "revenue") prev.revenue += Number(e.amount);
                 else prev.expense += Number(e.amount);
                 programMap.set(cc.id, prev);
