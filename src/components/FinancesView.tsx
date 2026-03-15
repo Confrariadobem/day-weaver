@@ -734,8 +734,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       .filter((e) => {
         if (!query) return true;
         const cat = categories.find(c => c.id === e.category_id)?.name || "";
-        const cc = costCenters.find((c: any) => c.id === e.cost_center_id)?.name || "";
-        const proj = projects.find(p => p.id === e.project_id)?.name || "";
+        const prog = programs.find((p: any) => p.id === e.cost_center_id)?.name || "";
         const acc = accounts.find(a => a.id === e.account_id)?.name || "";
         const cp = e.counterpart || "";
         const amt = String(e.amount);
@@ -746,7 +745,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const isOverdue = !e.is_paid && parseEntryDate(e.entry_date) < today;
         const overdueLabel = isOverdue ? "atrasado vencido" : "";
-        const haystack = [e.title, cat, cc, proj, acc, cp, amt, pm, desc, dateStr, statusLabel, overdueLabel]
+        const haystack = [e.title, cat, prog, acc, cp, amt, pm, desc, dateStr, statusLabel, overdueLabel]
           .join(" ").toLowerCase();
         // Simple fuzzy: all query words must appear somewhere
         const words = query.split(/\s+/).filter(Boolean);
@@ -760,9 +759,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         } else if (sortField === "counterpart") {
           aVal = a.counterpart || "";
           bVal = b.counterpart || "";
-        } else if (sortField === "cost_center") {
-          aVal = costCenters.find((cc: any) => cc.id === a.cost_center_id)?.name || "";
-          bVal = costCenters.find((cc: any) => cc.id === b.cost_center_id)?.name || "";
+        } else if (sortField === "programa") {
+          aVal = programs.find((p: any) => p.id === a.cost_center_id)?.name || "";
+          bVal = programs.find((p: any) => p.id === b.cost_center_id)?.name || "";
         } else if (sortField === "is_paid") {
           aVal = a.is_paid ? 1 : 0; bVal = b.is_paid ? 1 : 0;
         } else if (sortField === "balance") {
@@ -776,7 +775,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterProgramId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart, showSettled]);
+  }, [entries, sortField, sortDir, categories, programs, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterProgramId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart, showSettled]);
 
   // KPI totals — now derived from filtered entries so they respond to search/filters in real-time (1.8)
   const kpiData = useMemo(() => {
