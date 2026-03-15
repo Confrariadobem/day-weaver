@@ -230,8 +230,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
   const [filterCategoryId, setFilterCategoryId] = useState<string>("");
-  const [filterCostCenterId, setFilterCostCenterId] = useState<string>("");
-  const [filterProjectId, setFilterProjectId] = useState<string>("");
+  // filterCostCenterId/filterProjectId removed — unified under filterProgramId
   const [filterAccountId, setFilterAccountId] = useState<string>("");
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>("");
   const [filterIsFixed, setFilterIsFixed] = useState<string>("all");
