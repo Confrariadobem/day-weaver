@@ -314,7 +314,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         supabase.from("calendar_events").select("title").eq("user_id", userId),
         supabase.from("tasks").select("title").eq("user_id", userId),
         supabase.from("financial_entries").select("title, counterpart").eq("user_id", userId),
-        supabase.from("programs").select("*").eq("user_id", userId).order("name"),
+        supabase.from("cost_centers").select("*").eq("user_id", userId).order("name"),
         supabase.from("payment_methods" as any).select("*").eq("user_id", userId).eq("is_active", true).order("name"),
       ]);
       if (catRes.data) setCategories(catRes.data);
@@ -545,12 +545,12 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
     // Centro de Custo creation — now creates a Program
     if (eventType === "programa" && ccName.trim()) {
-      await supabase.from("programs").insert({
+      await supabase.from("cost_centers").insert({
         user_id: userId,
         name: ccName.trim(),
         description: ccDesc || null,
         color: ccColor,
-        status: "active",
+        is_active: true,
       });
       onSaved();
       onOpenChange(false);
@@ -655,8 +655,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       }
 
       if (eventType === "programa") {
-        await supabase.from("programs").insert({
-          user_id: userId, name: title, description: displayDescription || null,
+        await supabase.from("cost_centers").insert({
+          user_id: userId, name: title, description: displayDescription || null, is_active: true,
         });
       }
 

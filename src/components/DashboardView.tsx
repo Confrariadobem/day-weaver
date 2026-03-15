@@ -14,7 +14,7 @@ import { format, startOfYear, endOfYear, eachMonthOfInterval, startOfMonth, endO
 import { ptBR } from "date-fns/locale";
 import {
   TrendingUp, TrendingDown, Wallet, PiggyBank,
-  BarChart3, Building2,
+  BarChart3, Building2, FolderKanban, AlertTriangle,
   CalendarCheck, CalendarDays, CalendarRange, Scale, PieChart as PieChartIcon,
   ArrowRightLeft,
 } from "lucide-react";
@@ -48,6 +48,7 @@ export default function DashboardView() {
   const [categories, setCategories] = useState<Tables<"categories">[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [programas, setProgramas] = useState<any[]>([]);
 
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>("year");
@@ -118,16 +119,18 @@ export default function DashboardView() {
   useEffect(() => {
     if (!user) return;
     const fetchData = async () => {
-      const [eRes, cRes, iRes, aRes] = await Promise.all([
+      const [eRes, cRes, iRes, aRes, pRes] = await Promise.all([
         supabase.from("financial_entries").select("*").eq("user_id", user.id),
         supabase.from("categories").select("*").eq("user_id", user.id),
         supabase.from("investments").select("*").eq("user_id", user.id).eq("is_active", true),
         supabase.from("financial_accounts").select("*").eq("user_id", user.id).eq("is_active", true),
+        supabase.from("cost_centers").select("*").eq("user_id", user.id).order("name"),
       ]);
       if (eRes.data) setEntries(eRes.data);
       if (cRes.data) setCategories(cRes.data);
       if (iRes.data) setInvestments(iRes.data);
       if (aRes.data) setAccounts(aRes.data);
+      if (pRes.data) setProgramas(pRes.data as any[]);
     };
     fetchData();
     const handler = () => fetchData();
@@ -173,6 +176,27 @@ export default function DashboardView() {
   }, [filteredEntries, categories]);
 
   const COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
+
+  // Pendências por Programa
+  const programaPendencias = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const pending = entries.filter(e => !e.is_paid && e.cost_center_id);
+    const map = new Map<string, { total: number; overdue: number; amount: number }>();
+    pending.forEach(e => {
+      const ccId = e.cost_center_id!;
+      const cur = map.get(ccId) || { total: 0, overdue: 0, amount: 0 };
+      cur.total++;
+      cur.amount += Number(e.amount);
+      const d = new Date(e.entry_date);
+      if (d < today) cur.overdue++;
+      map.set(ccId, cur);
+    });
+    return programas
+      .filter(p => map.has(p.id))
+      .map(p => ({ id: p.id, name: p.name, color: p.color || "#3b82f6", ...map.get(p.id)! }))
+      .sort((a, b) => b.overdue - a.overdue || b.total - a.total);
+  }, [entries, programas]);
 
   const totalRevenue = filteredEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
   const totalExpense = filteredEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
@@ -483,6 +507,39 @@ export default function DashboardView() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Pendências por Programa */}
+        {programaPendencias.length > 0 && (
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
+                <FolderKanban className="size-7 mr-2 text-muted-foreground" /> Pendências por Programa
+              </p>
+              <div className="space-y-2">
+                {programaPendencias.map(p => {
+                  const maxBar = Math.max(...programaPendencias.map(x => x.total), 1);
+                  return (
+                    <div key={p.id} className="flex items-center gap-3">
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                      <span className="text-xs text-foreground flex-1 truncate min-w-0">{p.name}</span>
+                      <div className="w-24 h-2 rounded-full bg-secondary overflow-hidden shrink-0">
+                        <div className="h-full rounded-full" style={{ width: `${(p.total / maxBar) * 100}%`, backgroundColor: p.overdue > 0 ? "hsl(var(--destructive))" : "hsl(var(--success))" }} />
+                      </div>
+                      <span className="text-[10px] font-medium text-muted-foreground shrink-0 w-14 text-right">
+                        {p.total} pend.
+                      </span>
+                      {p.overdue > 0 && (
+                        <span className="flex items-center gap-0.5 text-[10px] text-destructive font-medium shrink-0">
+                          <AlertTriangle className="size-3" /> {p.overdue}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </ScrollArea>
   );
