@@ -47,14 +47,13 @@ interface EventEditDialogProps {
   defaultEventType?: EventType;
 }
 
-type EventType = "birthday" | "event" | "cashflow" | "investment" | "carteira" | "patrimonio" | "programa" | "project" | "centro_custo" | "categoria" | "transferencia";
+type EventType = "birthday" | "event" | "cashflow" | "investment" | "carteira" | "patrimonio" | "programa" | "project" | "categoria" | "transferencia";
 
 const EVENT_TYPE_ICONS: Record<EventType, React.ReactNode> = {
   birthday: <Cake className="h-3.5 w-3.5" />,
   carteira: <Wallet className="h-3.5 w-3.5" />,
   cashflow: <CircleDollarSign className="h-3.5 w-3.5" />,
   categoria: <Tag className="h-3.5 w-3.5" />,
-  centro_custo: <FolderKanban className="h-3.5 w-3.5" />,
   event: <CalendarDays className="h-3.5 w-3.5" />,
   investment: <TrendingUp className="h-3.5 w-3.5" />,
   patrimonio: <Home className="h-3.5 w-3.5" />,
@@ -68,7 +67,6 @@ const EVENT_TYPES_UNSORTED: { value: EventType; label: string; color: string }[]
   { value: "carteira", label: "Carteira", color: "#8b5cf6" },
   { value: "categoria", label: "Categoria", color: "#06b6d4" },
   { value: "cashflow", label: "Fluxo de Caixa", color: "#22c55e" },
-  { value: "centro_custo", label: "Programa", color: "#06b6d4" },
   { value: "event", label: "Evento", color: "#3b82f6" },
   { value: "investment", label: "Investimento", color: "#d4a017" },
   { value: "patrimonio", label: "Patrimônio", color: "#f97316" },
@@ -244,12 +242,11 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
 
   // Primary group fields
   const [categoryId, setCategoryId] = useState("");
-  const [costCenterId, setCostCenterId] = useState("");
-  const [projectId, setProjectId] = useState("");
+  const [programaId, setProgramaId] = useState("");
   const [programId, setProgramId] = useState("");
   const [categories, setCategories] = useState<any[]>([]);
-  const [costCenters, setCostCenters] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [programsList, setProgramsList] = useState<any[]>([]);
 
   // Cashflow extra fields
   const [accountId, setAccountId] = useState("");
@@ -310,20 +307,20 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   useEffect(() => {
     if (!userId || !open) return;
     const fetchAll = async () => {
-      const [catRes, projRes, accRes, evtRes, taskRes, finRes, ccRes, pmRes] = await Promise.all([
+      const [catRes, projRes, accRes, evtRes, taskRes, finRes, progRes, pmRes] = await Promise.all([
         supabase.from("categories").select("*").eq("user_id", userId).order("name"),
         supabase.from("projects").select("*").eq("user_id", userId).order("name"),
         supabase.from("financial_accounts").select("*").eq("user_id", userId).eq("is_active", true).order("name"),
         supabase.from("calendar_events").select("title").eq("user_id", userId),
         supabase.from("tasks").select("title").eq("user_id", userId),
         supabase.from("financial_entries").select("title, counterpart").eq("user_id", userId),
-        supabase.from("cost_centers" as any).select("*").eq("user_id", userId).eq("is_active", true).order("name"),
+        supabase.from("programs").select("*").eq("user_id", userId).order("name"),
         supabase.from("payment_methods" as any).select("*").eq("user_id", userId).eq("is_active", true).order("name"),
       ]);
       if (catRes.data) setCategories(catRes.data);
       if (projRes.data) setProjects(projRes.data);
       if (accRes.data) setAccounts(accRes.data);
-      if (ccRes.data) setCostCenters(ccRes.data as any[]);
+      if (progRes.data) setProgramsList(progRes.data as any[]);
       if (pmRes.data && (pmRes.data as any[]).length > 0) {
         setDynamicPaymentMethods((pmRes.data as any[]).map((pm: any) => pm.name));
       } else {
@@ -401,7 +398,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       const patriValueMatch = desc.match(/\[patri_value:([\d.,]+)\]/);
       if (patriValueMatch) setPatrimonioValue(patriValueMatch[1]); else setPatrimonioValue("");
       // Reset other fields to defaults for edit
-      setCategoryId(""); setCostCenterId(""); setProjectId(""); setProgramId("");
+      setCategoryId(""); setProgramaId(""); setProgramId("");
       setAccountId(""); setPaymentMethod(""); setIsPaid(false); setIsFixed(false);
       setCounterpart(""); setInstallments("1");
       setSplitEnabled(false); setSplitLines([]);
@@ -436,8 +433,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       setCashflowDirection("expense");
       setInvestmentType("stock");
       setCategoryId("");
-      setCostCenterId("");
-      setProjectId("");
+      setProgramaId("");
       setProgramId("");
       setAccountId("");
       setPaymentMethod("");
@@ -547,15 +543,14 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
       return;
     }
 
-    // Centro de Custo creation
-    if (eventType === "centro_custo") {
-      if (!ccName.trim()) return;
-      await supabase.from("cost_centers" as any).insert({
+    // Centro de Custo creation — now creates a Program
+    if (eventType === "programa" && ccName.trim()) {
+      await supabase.from("programs").insert({
         user_id: userId,
         name: ccName.trim(),
         description: ccDesc || null,
         color: ccColor,
-        is_active: true,
+        status: "active",
       });
       onSaved();
       onOpenChange(false);
@@ -646,7 +641,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
         await supabase.from("tasks").update({
           title, is_favorite: isFavorite,
           category_id: categoryId || null,
-          project_id: projectId || null,
         }).eq("id", item.task_id);
       }
     } else {
@@ -656,7 +650,6 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           user_id: userId, title, description: displayDescription,
           scheduled_date: startDate, is_completed: false, is_favorite: isFavorite,
           category_id: categoryId || null,
-          project_id: projectId || null,
         }).select("id").single();
         if (data) taskId = data.id;
       }
@@ -706,8 +699,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           const baseEntry: any = {
             user_id: userId,
             category_id: categoryId || null,
-            project_id: projectId || null,
-            cost_center_id: costCenterId || null,
+            project_id: null,
+            cost_center_id: programaId || null,
             account_id: splitEnabled ? null : (accountId || null),
             payment_method: splitEnabled ? null : (paymentMethod || null),
             counterpart: counterpart || null,
@@ -805,8 +798,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
               return {
                 user_id: userId, title: recurrenceIndeterminate ? title : `${title} (${i + 1}/${effectiveCount})`,
                 amount, type: "investment" as const,
-                category_id: categoryId || null, project_id: projectId || null,
-                cost_center_id: costCenterId || null,
+                category_id: categoryId || null, project_id: null,
+                cost_center_id: programaId || null,
                 entry_date: format(d, "yyyy-MM-dd"),
                 installment_group: group, installment_number: i + 1, total_installments: recurrenceIndeterminate ? 0 : effectiveCount,
                 is_paid: false,
@@ -816,8 +809,8 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
           } else {
             await supabase.from("financial_entries").insert({
               user_id: userId, title, amount, type: "investment",
-              category_id: categoryId || null, project_id: projectId || null,
-              cost_center_id: costCenterId || null,
+              category_id: categoryId || null, project_id: null,
+              cost_center_id: programaId || null,
               entry_date: format(startDt, "yyyy-MM-dd"), is_paid: false,
             } as any);
           }
@@ -992,9 +985,9 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
   };
 
   // Types that show the main title/description/classification fields
-  const showMainFields = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo" && eventType !== "categoria" && eventType !== "transferencia";
+  const showMainFields = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "categoria" && eventType !== "transferencia" && eventType !== "programa";
   // Types that show dates/scheduling
-  const showDates = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "centro_custo" && eventType !== "categoria" && eventType !== "transferencia";
+  const showDates = eventType !== "carteira" && eventType !== "patrimonio" && eventType !== "categoria" && eventType !== "transferencia" && eventType !== "programa";
 
   return (
     <>
@@ -1082,7 +1075,7 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
             </div>
           )}
 
-          {eventType === "centro_custo" && (
+          {eventType === "programa" && !showMainFields && (
             <div className="space-y-3 rounded-lg border border-border/30 p-3">
               <p className="text-xs text-muted-foreground">Criar novo programa.</p>
               <div>
@@ -1170,15 +1163,15 @@ export default function EventEditDialog({ open, onOpenChange, item, defaultDate,
               </div>
 
               {/* Programa - single unified field */}
-              {(eventType === "cashflow" || eventType === "investment" || eventType === "programa") && (
+              {(eventType === "cashflow" || eventType === "investment") && (
                 <div>
                   <Label className="text-sm">Programa</Label>
-                  <ClearableSelect value={costCenterId} onValueChange={handleClearableChange(setCostCenterId)} placeholder="Selecionar programa">
-                    {costCenters.map((cc: any) => (
-                      <SelectItem key={cc.id} value={cc.id}>
+                  <ClearableSelect value={programaId} onValueChange={handleClearableChange(setProgramaId)} placeholder="Selecionar programa">
+                    {programsList.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>
                         <span className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color }} />
-                          {cc.name}
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
+                          {p.name}
                         </span>
                       </SelectItem>
                     ))}

@@ -43,7 +43,7 @@ import {
 import type { Tables as DBTables } from "@/integrations/supabase/types";
 
 type PeriodFilter = "daily" | "3days" | "weekly" | "monthly" | "yearly" | "custom";
-type SortField = "title" | "amount" | "entry_date" | "type" | "category" | "is_paid" | "balance" | "counterpart" | "cost_center" | "payment_date";
+type SortField = "title" | "amount" | "entry_date" | "type" | "category" | "is_paid" | "balance" | "counterpart" | "programa" | "payment_date";
 type SortDir = "asc" | "desc";
 type RecurrenceType = "none" | "daily" | "weekly" | "biweekly" | "monthly" | "quarterly" | "semiannual" | "yearly";
 type RecurrenceDateMode = "same_date" | "first_business_day";
@@ -159,7 +159,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [projects, setProjects] = useState<DBTables<"projects">[]>([]);
   const [categories, setCategories] = useState<DBTables<"categories">[]>([]);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
-  const [costCenters, setCostCenters] = useState<any[]>([]);
+  // costCenters removed — unified under programs
   const [sortField, setSortField] = useState<SortField>("entry_date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -202,7 +202,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [currency, setCurrency] = useState<CurrencyType>("BRL");
   const [type, setType] = useState<"revenue" | "expense">("expense");
   const [categoryId, setCategoryId] = useState("");
-  const [projectId, setProjectId] = useState("");
+  // projectId removed — unified under programaId
   const [entryDate, setEntryDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [installments, setInstallments] = useState("1");
   const [recurrence, setRecurrence] = useState<RecurrenceType>("none");
@@ -214,7 +214,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [counterpart, setCounterpart] = useState("");
   const [isFixed, setIsFixed] = useState(false);
   const [allDay, setAllDay] = useState(true);
-  const [costCenterId, setCostCenterId] = useState("");
+  const [programaId, setProgramaId] = useState("");
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [splitLines, setSplitLines] = useState<{ id: string; accountId: string; paymentMethod: string; amount: string }[]>([]);
   const [description, setDescription] = useState("");
@@ -230,8 +230,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
   const [filterCategoryId, setFilterCategoryId] = useState<string>("");
-  const [filterCostCenterId, setFilterCostCenterId] = useState<string>("");
-  const [filterProjectId, setFilterProjectId] = useState<string>("");
+  // filterCostCenterId/filterProjectId removed — unified under filterProgramId
   const [filterAccountId, setFilterAccountId] = useState<string>("");
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>("");
   const [filterIsFixed, setFilterIsFixed] = useState<string>("all");
@@ -274,12 +273,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [entRes, projRes, catRes, accRes, ccRes, progRes, pmRes, apmRes] = await Promise.all([
+    const [entRes, projRes, catRes, accRes, progRes, pmRes, apmRes] = await Promise.all([
       supabase.from("financial_entries").select("*").eq("user_id", user.id).order("entry_date", { ascending: false }),
       supabase.from("projects").select("*").eq("user_id", user.id),
       supabase.from("categories").select("*").eq("user_id", user.id),
       supabase.from("financial_accounts").select("*").eq("user_id", user.id).order("name"),
-      supabase.from("cost_centers" as any).select("*").eq("user_id", user.id).eq("is_active", true).order("name"),
       supabase.from("programs").select("*").eq("user_id", user.id).order("name"),
       supabase.from("payment_methods" as any).select("*").eq("user_id", user.id).eq("is_active", true).order("name"),
       supabase.from("account_payment_methods" as any).select("*").eq("user_id", user.id),
@@ -288,7 +286,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     if (projRes.data) setProjects(projRes.data);
     if (catRes.data) setCategories(catRes.data);
     if (accRes.data) setAccounts(accRes.data as FinancialAccount[]);
-    if (ccRes.data) setCostCenters(ccRes.data as any[]);
     if (progRes.data) setPrograms(progRes.data as any[]);
     if (pmRes.data) setPaymentMethodsList(pmRes.data as any[]);
     if (apmRes.data) setAccountPaymentMethods(apmRes.data as any[]);
@@ -317,11 +314,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   }, [fetchData]);
 
   const resetForm = () => {
-    setTitle(""); setAmount(""); setInstallments("1"); setCategoryId(""); setProjectId("");
+    setTitle(""); setAmount(""); setInstallments("1"); setCategoryId("");
     setEntryDate(format(new Date(), "yyyy-MM-dd")); setType("expense");
     setRecurrence("none"); setRecurrenceCount("12"); setRecurrenceDateMode("same_date");
-    setEditingEntry(null); setAccountId(""); setPaymentMethod(""); setIsPaid(false); // 1.3: default is always Pendente
-    setCounterpart(""); setIsFixed(false); setAllDay(true); setCostCenterId("");
+    setEditingEntry(null); setAccountId(""); setPaymentMethod(""); setIsPaid(false);
+    setCounterpart(""); setIsFixed(false); setAllDay(true); setProgramaId("");
     setSplitEnabled(false); setSplitLines([]); setCurrency("BRL"); setDescription("");
     setJuros(""); setMulta(""); setDesconto(""); setRealPaymentDate("");
   };
@@ -352,8 +349,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     setAmount(String(entry.amount));
     setType(entry.type as "revenue" | "expense");
     setCategoryId(entry.category_id || "");
-    setCostCenterId(entry.cost_center_id || "");
-    setProjectId(entry.project_id || "");
+    setProgramaId(entry.cost_center_id || "");
     setEntryDate(entry.entry_date);
     setAccountId(entry.account_id || "");
     setPaymentMethod(entry.payment_method || "");
@@ -411,8 +407,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     if (editingEntry) {
       const updateData: any = {
         title, amount: parseFloat(amount), type,
-        category_id: categoryId || null, project_id: projectId || null,
-        cost_center_id: costCenterId || null,
+        category_id: categoryId || null, project_id: null,
+        cost_center_id: programaId || null,
         entry_date: entryDate,
         account_id: splitEnabled ? null : (accountId || null),
         payment_method: splitEnabled ? null : (paymentMethod || null),
@@ -482,8 +478,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             user_id: user.id,
             title: title,
             amount: baseAmount, type,
-            category_id: categoryId || null, project_id: projectId || null,
-            cost_center_id: costCenterId || null,
+            category_id: categoryId || null, project_id: null,
+            cost_center_id: programaId || null,
             entry_date: format(getNextDate(baseDate, recurrence, i, recurrenceDateMode), "yyyy-MM-dd"),
             recurrence_type: recurrence,
             installment_group: group, installment_number: i + 1, total_installments: count,
@@ -511,8 +507,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             user_id: user.id,
             title: numInst > 1 ? `${title} (${i + 1}/${numInst})` : title,
             amount: baseAmount / numInst, type,
-            category_id: categoryId || null, project_id: projectId || null,
-            cost_center_id: costCenterId || null,
+            category_id: categoryId || null, project_id: null,
+            cost_center_id: programaId || null,
             entry_date: format(addMonths(baseDate, i), "yyyy-MM-dd"),
             installment_group: instGroup, installment_number: i + 1, total_installments: numInst,
             account_id: splitEnabled ? null : (accountId || null),
@@ -738,8 +734,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       .filter((e) => {
         if (!query) return true;
         const cat = categories.find(c => c.id === e.category_id)?.name || "";
-        const cc = costCenters.find((c: any) => c.id === e.cost_center_id)?.name || "";
-        const proj = projects.find(p => p.id === e.project_id)?.name || "";
+        const prog = programs.find((p: any) => p.id === e.cost_center_id)?.name || "";
         const acc = accounts.find(a => a.id === e.account_id)?.name || "";
         const cp = e.counterpart || "";
         const amt = String(e.amount);
@@ -750,7 +745,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const isOverdue = !e.is_paid && parseEntryDate(e.entry_date) < today;
         const overdueLabel = isOverdue ? "atrasado vencido" : "";
-        const haystack = [e.title, cat, cc, proj, acc, cp, amt, pm, desc, dateStr, statusLabel, overdueLabel]
+        const haystack = [e.title, cat, prog, acc, cp, amt, pm, desc, dateStr, statusLabel, overdueLabel]
           .join(" ").toLowerCase();
         // Simple fuzzy: all query words must appear somewhere
         const words = query.split(/\s+/).filter(Boolean);
@@ -764,9 +759,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         } else if (sortField === "counterpart") {
           aVal = a.counterpart || "";
           bVal = b.counterpart || "";
-        } else if (sortField === "cost_center") {
-          aVal = costCenters.find((cc: any) => cc.id === a.cost_center_id)?.name || "";
-          bVal = costCenters.find((cc: any) => cc.id === b.cost_center_id)?.name || "";
+        } else if (sortField === "programa") {
+          aVal = programs.find((p: any) => p.id === a.cost_center_id)?.name || "";
+          bVal = programs.find((p: any) => p.id === b.cost_center_id)?.name || "";
         } else if (sortField === "is_paid") {
           aVal = a.is_paid ? 1 : 0; bVal = b.is_paid ? 1 : 0;
         } else if (sortField === "balance") {
@@ -780,7 +775,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [entries, sortField, sortDir, categories, costCenters, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterProgramId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart, showSettled]);
+  }, [entries, sortField, sortDir, categories, programs, projects, accounts, cashFlowFilter, searchQuery, customPeriodEnabled, customStart, customEnd, fluxoDateFrom, fluxoDateTo, colFilterStatus, colFilterCounterpart, walletFilter, filterType, filterCategoryId, filterProgramId, filterAccountId, filterPaymentMethod, filterIsFixed, filterCounterpart, showSettled]);
 
   // KPI totals — now derived from filtered entries so they respond to search/filters in real-time (1.8)
   const kpiData = useMemo(() => {
@@ -1026,42 +1021,30 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   const costCenterData = useMemo(() => {
     const map = new Map<string, { name: string; revenue: number; expense: number; color: string }>();
     periodFilteredEntries.filter(e => e.cost_center_id).forEach(e => {
-      const cc = costCenters.find((c: any) => c.id === e.cost_center_id);
-      if (!cc) return;
-      const prev = map.get(cc.id) || { name: cc.name, revenue: 0, expense: 0, color: cc.color || "#6b7280" };
+      const prog = programs.find((c: any) => c.id === e.cost_center_id);
+      if (!prog) return;
+      const prev = map.get(prog.id) || { name: prog.name, revenue: 0, expense: 0, color: prog.color || "#6b7280" };
       if (e.type === "revenue") prev.revenue += Number(e.amount);
       else prev.expense += Number(e.amount);
-      map.set(cc.id, prev);
+      map.set(prog.id, prev);
     });
     return Array.from(map.values()).sort((a, b) => (b.revenue + b.expense) - (a.revenue + a.expense));
-  }, [periodFilteredEntries, costCenters]);
+  }, [periodFilteredEntries, programs]);
 
-  const projectFinData = useMemo(() => {
-    const map = new Map<string, { name: string; budget: number; revenue: number; expense: number }>();
-    periodFilteredEntries.filter(e => e.project_id).forEach(e => {
-      const proj = projects.find(p => p.id === e.project_id);
-      if (!proj) return;
-      const prev = map.get(proj.id) || { name: proj.name, budget: Number(proj.budget || 0), revenue: 0, expense: 0 };
-      if (e.type === "revenue") prev.revenue += Number(e.amount);
-      else prev.expense += Number(e.amount);
-      map.set(proj.id, prev);
-    });
-    return Array.from(map.values()).sort((a, b) => (b.revenue + b.expense) - (a.revenue + a.expense));
-  }, [periodFilteredEntries, projects]);
+  // projectFinData removed — unified under programs
 
-  // Centro de custo report data
+  // Programa report data (formerly centro de custo)
   const ccReportData = useMemo(() => {
     const yr = periodYear;
     const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
-    const activeCCs = ccReportFilterIds.size > 0
-      ? costCenters.filter((cc: any) => ccReportFilterIds.has(cc.id))
-      : costCenters;
+    const activeProgs = ccReportFilterIds.size > 0
+      ? programs.filter((p: any) => ccReportFilterIds.has(p.id))
+      : programs;
 
-    return activeCCs.map((cc: any) => {
-      const ccEntries = periodFilteredEntries.filter(e => e.cost_center_id === cc.id);
-      // Group by category
+    return activeProgs.map((prog: any) => {
+      const progEntries = periodFilteredEntries.filter(e => e.cost_center_id === prog.id);
       const catMap = new Map<string, { name: string; type: string; months: number[]; entries: any[][] }>();
-      ccEntries.forEach(e => {
+      progEntries.forEach(e => {
         const cat = categories.find(c => c.id === e.category_id);
         const catName = cat?.name || "Sem Categoria";
         const key = `${e.type}-${catName}`;
@@ -1080,14 +1063,14 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       const monthBalance = months.map((_, i) => monthTotalsRev[i] - monthTotalsExp[i]);
 
       return {
-        id: cc.id, name: cc.name, color: cc.color,
+        id: prog.id, name: prog.name, color: prog.color,
         revRows, expRows, monthTotalsRev, monthTotalsExp, monthBalance,
       };
-    }).filter(cc => {
+    }).filter(p => {
       if (!ccReportSearch) return true;
-      return cc.name.toLowerCase().includes(ccReportSearch.toLowerCase());
+      return p.name.toLowerCase().includes(ccReportSearch.toLowerCase());
     });
-  }, [periodFilteredEntries, costCenters, categories, periodYear, ccReportFilterIds, ccReportSearch]);
+  }, [periodFilteredEntries, programs, categories, periodYear, ccReportFilterIds, ccReportSearch]);
 
   const handlePrint = () => {
     const now = new Date();
@@ -1310,15 +1293,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Programa</Label>
-            <Select value={costCenterId} onValueChange={(v) => setCostCenterId(v === "__clear__" ? "" : v)}>
+            <Select value={programaId} onValueChange={(v) => setProgramaId(v === "__clear__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Programa (opcional)" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__clear__"><span className="text-muted-foreground italic">Nenhum</span></SelectItem>
-                {costCenters.map((cc: any) => (
-                  <SelectItem key={cc.id} value={cc.id}>
+                {programs.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>
                     <span className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.color }} />
-                      {cc.name}
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
+                      {p.name}
                     </span>
                   </SelectItem>
                 ))}
@@ -2207,7 +2190,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__all__">Todos</SelectItem>
-                          {costCenters.map((cc: any) => <SelectItem key={cc.id} value={cc.id}>{cc.name}</SelectItem>)}
+                          {programs.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -2346,6 +2329,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("counterpart")}>
                       Contraparte <SortIcon field="counterpart" />
                     </th>
+                    <th className="text-left py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("programa")}>
+                      Programa <SortIcon field="programa" />
+                    </th>
                     <th className="text-right py-2.5 px-3 cursor-pointer select-none" onClick={() => toggleSort("amount")}>
                       Valor <SortIcon field="amount" />
                     </th>
@@ -2426,7 +2412,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={8} className="text-center text-muted-foreground/40 py-12">
+                    <tr><td colSpan={9} className="text-center text-muted-foreground/40 py-12">
                       Sem lançamentos no período
                     </td></tr>
                   )}
@@ -2503,6 +2489,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-xs text-muted-foreground truncate max-w-[140px]">{e.counterpart || "—"}</td>
+                        <td className="py-2.5 px-3 text-xs text-muted-foreground truncate max-w-[120px]">{programs.find((p: any) => p.id === e.cost_center_id)?.name || "—"}</td>
                         <td className={cn("py-2.5 px-3 text-right text-xs font-bold tabular-nums",
                           e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
                           {fmtCurrency(Number(e.amount), (e.currency as CurrencyType) || "BRL")}
@@ -2916,7 +2903,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__all__">Todos</SelectItem>
-                          {costCenters.map((cc: any) => <SelectItem key={cc.id} value={cc.id}>{cc.name}</SelectItem>)}
+                          {programs.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -3156,12 +3143,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               const programMap = new Map<string, { name: string; revenue: number; expense: number; color: string }>();
               periodFilteredEntries.forEach(e => {
                 if (!e.cost_center_id) return;
-                const cc = costCenters.find((c: any) => c.id === e.cost_center_id);
-                if (!cc) return;
-                const prev = programMap.get(cc.id) || { name: cc.name, revenue: 0, expense: 0, color: cc.color || "#6b7280" };
+                const prog = programs.find((c: any) => c.id === e.cost_center_id);
+                if (!prog) return;
+                const prev = programMap.get(prog.id) || { name: prog.name, revenue: 0, expense: 0, color: prog.color || "#6b7280" };
                 if (e.type === "revenue") prev.revenue += Number(e.amount);
                 else prev.expense += Number(e.amount);
-                programMap.set(cc.id, prev);
+                programMap.set(prog.id, prev);
               });
               const programData = Array.from(programMap.values()).sort((a, b) => (b.revenue + b.expense) - (a.revenue + a.expense));
               const totalProgram = programData.reduce((s, d) => s + d.revenue + d.expense, 0);
@@ -3236,28 +3223,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               </Card>
             )}
 
-            {/* Project Financial Breakdown */}
-            {projectFinData.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><ListChecks className="h-3.5 w-3.5 text-primary" /> Indicadores por Programa (Projetos)</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="w-full min-w-0" style={{ height: 220 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={projectFinData} barGap={4}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} />
-                        <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(v)} />
-                        <Legend wrapperStyle={{ fontSize: 10 }} />
-                        <Bar dataKey="budget" name="Orçamento" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="revenue" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="expense" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {/* Project Financial Breakdown removed — unified under Programa */}
 
             {/* Pie charts */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
