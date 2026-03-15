@@ -43,7 +43,7 @@ import {
 import type { Tables as DBTables } from "@/integrations/supabase/types";
 
 type PeriodFilter = "daily" | "3days" | "weekly" | "monthly" | "yearly" | "custom";
-type SortField = "title" | "amount" | "entry_date" | "type" | "category" | "is_paid" | "balance" | "counterpart" | "cost_center" | "payment_date";
+type SortField = "title" | "amount" | "entry_date" | "type" | "category" | "is_paid" | "balance" | "counterpart" | "programa" | "payment_date";
 type SortDir = "asc" | "desc";
 type RecurrenceType = "none" | "daily" | "weekly" | "biweekly" | "monthly" | "quarterly" | "semiannual" | "yearly";
 type RecurrenceDateMode = "same_date" | "first_business_day";
