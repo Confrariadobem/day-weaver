@@ -314,11 +314,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   }, [fetchData]);
 
   const resetForm = () => {
-    setTitle(""); setAmount(""); setInstallments("1"); setCategoryId(""); setProjectId("");
+    setTitle(""); setAmount(""); setInstallments("1"); setCategoryId("");
     setEntryDate(format(new Date(), "yyyy-MM-dd")); setType("expense");
     setRecurrence("none"); setRecurrenceCount("12"); setRecurrenceDateMode("same_date");
-    setEditingEntry(null); setAccountId(""); setPaymentMethod(""); setIsPaid(false); // 1.3: default is always Pendente
-    setCounterpart(""); setIsFixed(false); setAllDay(true); setCostCenterId("");
+    setEditingEntry(null); setAccountId(""); setPaymentMethod(""); setIsPaid(false);
+    setCounterpart(""); setIsFixed(false); setAllDay(true); setProgramaId("");
     setSplitEnabled(false); setSplitLines([]); setCurrency("BRL"); setDescription("");
     setJuros(""); setMulta(""); setDesconto(""); setRealPaymentDate("");
   };
