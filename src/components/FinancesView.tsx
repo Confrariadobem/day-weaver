@@ -2131,41 +2131,63 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
-        <Card className="bg-card">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <TrendingUp className="h-4 w-4" /> Contas a Receber
-            </p>
-            <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(kpiData.totalRevenue)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <TrendingDown className="h-4 w-4" /> Contas a Pagar
-            </p>
-            <p className="text-lg font-bold text-destructive">{brl(kpiData.totalExpense)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <Wallet className="h-4 w-4" /> Saldo
-            </p>
-            <p className={cn("text-lg font-bold", kpiData.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(kpiData.balance)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <Landmark className="h-4 w-4" /> Caixa Disponível
-            </p>
-            <p className={cn("text-lg font-bold", totalAvailable >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(totalAvailable)}</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* KPI Cards — Fluxo operacional (sem repetir Dashboard) */}
+      {(() => {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const in7days = new Date(today); in7days.setDate(in7days.getDate() + 7);
+        // Contas a Receber: pendentes no período filtrado
+        const contasReceber = filtered.filter(e => e.type === "revenue" && !e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
+        // Contas a Pagar: pendentes no período filtrado
+        const contasPagar = filtered.filter(e => e.type === "expense" && !e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
+        // Previsão 7 dias: todos pendentes nos próximos 7 dias
+        const prev7d = entries.filter(e => {
+          if (e.is_paid) return false;
+          const d = parseEntryDate(e.entry_date);
+          return d >= today && d <= in7days;
+        });
+        const prev7dRev = prev7d.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
+        const prev7dExp = prev7d.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
+        const previsao7d = prev7dRev - prev7dExp;
+        // Fluxo Líquido do período
+        const fluxoLiquido = kpiData.balance;
+
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+            <Card className="bg-card">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <TrendingUp className="h-4 w-4" /> Contas a Receber
+                </p>
+                <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(contasReceber)}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <TrendingDown className="h-4 w-4" /> Contas a Pagar
+                </p>
+                <p className="text-lg font-bold text-destructive">{brl(contasPagar)}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <CalendarDays className="h-4 w-4" /> Previsão 7 dias
+                </p>
+                <p className={cn("text-lg font-bold", previsao7d >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(previsao7d)}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Wallet className="h-4 w-4" /> Fluxo Líquido
+                </p>
+                <p className={cn("text-lg font-bold", fluxoLiquido >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(fluxoLiquido)}</p>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* Content */}
       <div>
