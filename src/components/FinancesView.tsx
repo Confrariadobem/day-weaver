@@ -2211,9 +2211,14 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <Card className="bg-card">
               <CardContent className="p-3">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <CalendarDays className="h-4 w-4" /> Previsão 7 dias
+                  <CalendarDays className="h-4 w-4" /> Previsão Caixa 7D
                 </p>
-                <p className={cn("text-lg font-bold", previsao7d >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(previsao7d)}</p>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <p className={cn("text-lg font-bold", previsao7d > 0 ? "text-[hsl(var(--success))]" : previsao7d < 0 ? "text-destructive" : "text-muted-foreground")}>{brl(previsao7d)}</p>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs max-w-[200px]">Receitas pendentes − Despesas pendentes nos próximos 7 dias</TooltipContent>
+                </Tooltip>
               </CardContent>
             </Card>
             <Card className="bg-card">
