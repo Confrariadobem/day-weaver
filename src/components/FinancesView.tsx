@@ -897,11 +897,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       const getEntriesForCatMonth = (catId: string, month: Date, type: string) =>
         getMonthEntries(month).filter(e => e.type === type && e.category_id === catId);
 
-      const prevYearEntries = applyDoarFilters(entries).filter(e => {
+      const prevPeriodEntries = applyDoarFilters(entries).filter(e => {
         if (paidFilter !== null) { if (paidFilter ? !e.is_paid : e.is_paid) return false; }
-        return new Date(e.entry_date).getFullYear() < yr;
+        return parseEntryDate(e.entry_date) < parseEntryDate(periodStart);
       });
-      const carryOver = prevYearEntries.reduce((s, e) =>
+      const carryOver = prevPeriodEntries.reduce((s, e) =>
         s + (e.type === "revenue" ? Number(e.amount) : -Number(e.amount)), 0);
 
       const revRows = revenueCategories
