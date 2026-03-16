@@ -3040,13 +3040,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex items-end pb-1">
+                    <div className="flex items-end pb-1 gap-4">
                       <div className="flex items-center gap-1.5">
                         <Switch checked={doarFilterIsFixed} onCheckedChange={setDoarFilterIsFixed} />
                         <Label className="text-xs whitespace-nowrap">Conta fixa</Label>
                       </div>
-                    </div>
-                    <div className="flex items-end pb-1">
                       <div className="flex items-center gap-1.5">
                         <Switch checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} />
                         <Label className="text-xs whitespace-nowrap">Saldo anterior</Label>
