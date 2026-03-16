@@ -143,6 +143,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
     setAccClosing(acc.closing_day ? String(acc.closing_day) : "");
     setAccDue(acc.due_day ? String(acc.due_day) : "");
     setAccIsActive(acc.is_active !== false);
+    setAccIsImmediateCash(acc.is_immediate_cash !== false);
     // Load wallet-specific payment methods
     const { data: apm } = await supabase.from("account_payment_methods" as any).select("payment_method_id").eq("account_id", acc.id);
     if (apm && apm.length > 0) {
