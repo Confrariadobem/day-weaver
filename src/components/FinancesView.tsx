@@ -1156,19 +1156,35 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   };
 
   const handleExportCSV = () => {
-    const allItems = filtered;
-    const header = "Data,Título,Tipo,Categoria,Programa,Conta,Pago,Forma Pgto,Valor\n";
-    const rows = allItems.map(e => {
-      const cat = categories.find(c => c.id === e.category_id)?.name || "";
-      const prog = programs.find((p: any) => p.id === e.cost_center_id)?.name || "";
-      const acc = accounts.find(a => a.id === e.account_id)?.name || "";
-      return `${e.entry_date},"${e.title}",${e.type === "revenue" ? "Receita" : "Despesa"},"${cat}","${prog}","${acc}",${e.is_paid ? "Sim" : "Não"},"${e.payment_method || ""}",${e.amount}`;
-    }).join("\n");
-    const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `financeiro_${format(now, "yyyy-MM-dd")}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    import("xlsx").then(XLSX => {
+      const allItems = filtered;
+      const wsData = [
+        ["Data", "Título", "Tipo", "Categoria", "Programa", "Conta", "Pago", "Forma Pgto", "Valor"],
+        ...allItems.map(e => {
+          const cat = categories.find(c => c.id === e.category_id)?.name || "";
+          const prog = programs.find((p: any) => p.id === e.cost_center_id)?.name || "";
+          const acc = accounts.find(a => a.id === e.account_id)?.name || "";
+          return [
+            e.entry_date,
+            e.title,
+            e.type === "revenue" ? "Receita" : "Despesa",
+            cat, prog, acc,
+            e.is_paid ? "Sim" : "Não",
+            e.payment_method || "",
+            Number(e.amount),
+          ];
+        }),
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      // Column widths
+      ws["!cols"] = [
+        { wch: 12 }, { wch: 30 }, { wch: 10 }, { wch: 18 }, { wch: 18 },
+        { wch: 18 }, { wch: 6 }, { wch: 15 }, { wch: 14 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Fluxo de Caixa");
+      XLSX.writeFile(wb, `financeiro_${format(now, "yyyy-MM-dd")}.xlsx`);
+    });
   };
 
   const handlePrintDOAR = () => {
