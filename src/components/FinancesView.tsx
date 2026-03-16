@@ -1029,18 +1029,17 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   }, [periodFilteredEntries, categories]);
 
   const monthlyTrendData = useMemo(() => {
-    const yr = periodYear;
-    const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
+    const months = eachMonthOfInterval({ start: new Date(periodStart + "T12:00:00"), end: new Date(periodEnd + "T12:00:00") });
     return months.map(month => {
       const mEntries = periodFilteredEntries.filter(e => {
         const d = new Date(e.entry_date);
-        return d.getMonth() === month.getMonth() && d.getFullYear() === yr;
+        return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
       });
       const paid = mEntries.filter(e => e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
       const pending = mEntries.filter(e => !e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
       return { month: (() => { const n = format(month, "MMM", { locale: ptBR }); return n.charAt(0).toUpperCase() + n.slice(1); })(), pago: paid, pendente: pending };
     });
-  }, [periodFilteredEntries, periodYear]);
+  }, [periodFilteredEntries, periodStart, periodEnd]);
 
   const accountBalanceData = useMemo(() => {
     return accounts
