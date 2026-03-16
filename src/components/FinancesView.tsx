@@ -2925,6 +2925,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           <td className={cn("text-right p-2 border-b border-border font-bold",
                             totalResult >= 0 ? "text-success" : "text-destructive"
                           )}>{brl(totalResult)}</td>
+                          <td className="text-right p-2 border-b border-border text-muted-foreground">{(() => { const nz = sectionData.monthBalance.filter(v => v !== 0).length; return nz > 0 ? brl(totalResult / nz) : "—"; })()}</td>
                         </tr>
                       );
                     })()}
