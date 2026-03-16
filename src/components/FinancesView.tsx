@@ -843,6 +843,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   }, [entries, periodStart, periodEnd]);
 
   // DRE / DOAR data — computes both Previsto (pending) and Realizado (paid)
+  // Now respects DOAR advanced filters for real-time card/table sync
   const dreData = useMemo(() => {
     const pStart = new Date(periodStart);
     const pEnd = new Date(periodEnd);
@@ -853,9 +854,35 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     const revenueCategories = categories.filter(c => c.is_revenue || catIdsWithRevEntries.has(c.id));
     const expenseCategories = categories.filter(c => c.is_expense || catIdsWithExpEntries.has(c.id));
 
+    // Apply DOAR advanced filters to entries
+    const applyDoarFilters = (src: any[]) => {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      return src.filter(e => {
+        if (doarFilterType !== "all") {
+          if (doarFilterType === "revenue" && e.type !== "revenue") return false;
+          if (doarFilterType === "expense" && e.type !== "expense") return false;
+        }
+        if (doarFilterStatus !== "all") {
+          if (doarFilterStatus === "paid" && !(e.is_paid && e.type === "expense")) return false;
+          if (doarFilterStatus === "recebido" && !(e.is_paid && e.type === "revenue")) return false;
+          if (doarFilterStatus === "pending" && e.is_paid) return false;
+          if (doarFilterStatus === "overdue") {
+            const ed = new Date(e.entry_date + "T12:00:00");
+            if (e.is_paid || ed >= today) return false;
+          }
+        }
+        if (doarFilterCategoryId && e.category_id !== doarFilterCategoryId) return false;
+        if (doarFilterProgramId && e.cost_center_id !== doarFilterProgramId) return false;
+        if (doarFilterAccountId && e.account_id !== doarFilterAccountId) return false;
+        if (doarFilterPaymentMethod && e.payment_method !== doarFilterPaymentMethod) return false;
+        if (doarFilterIsFixed && !e.is_fixed) return false;
+        return true;
+      });
+    };
+
     const buildSection = (paidFilter: boolean | null) => {
       const getMonthEntries = (month: Date) => {
-        let src = entries;
+        let src = applyDoarFilters(entries);
         if (paidFilter !== null) src = src.filter(e => paidFilter ? e.is_paid : !e.is_paid);
         return src.filter(e => {
           const d = new Date(e.entry_date);
@@ -868,7 +895,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       const getEntriesForCatMonth = (catId: string, month: Date, type: string) =>
         getMonthEntries(month).filter(e => e.type === type && e.category_id === catId);
 
-      const prevYearEntries = entries.filter(e => {
+      const prevYearEntries = applyDoarFilters(entries).filter(e => {
         if (paidFilter !== null) { if (paidFilter ? !e.is_paid : e.is_paid) return false; }
         return new Date(e.entry_date).getFullYear() < yr;
       });
@@ -947,7 +974,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       previsto,
       realizado,
     };
-  }, [entries, categories, periodStart, periodEnd, doarHideCarryOver]);
+  }, [entries, categories, periodStart, periodEnd, doarHideCarryOver, doarFilterType, doarFilterStatus, doarFilterCategoryId, doarFilterProgramId, doarFilterAccountId, doarFilterPaymentMethod, doarFilterIsFixed]);
 
   // Indicator chart data
   const reportChartData = useMemo(() => {
