@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,6 +6,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart as RechartsPieChart, Pie, Cell, Line, Legend, ComposedChart, AreaChart, Area,
@@ -16,12 +19,13 @@ import {
   TrendingUp, TrendingDown, Wallet, PiggyBank,
   BarChart3, Building2, FolderKanban, AlertTriangle,
   CalendarCheck, CalendarDays, CalendarRange, Scale, PieChart as PieChartIcon,
-  ArrowRightLeft,
+  ArrowRightLeft, Search, Printer, Check, Sun, Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyConversion } from "@/hooks/useCurrencyConversion";
+import { toast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
 const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" };
@@ -39,6 +43,29 @@ function getPeriodRange(key: PeriodKey): { start: Date; end: Date } {
   }
 }
 
+// Motivational/critical messages
+const MESSAGES = {
+  positive: [
+    "🎉 Parabéns! Todas as contas do dia foram quitadas!",
+    "💪 Excelente! Você está no controle das suas finanças.",
+    "🌟 Dia produtivo! Continue assim e sua saúde financeira agradece.",
+    "✅ Compromissos financeiros em dia. Isso é liberdade!",
+    "🏆 Meta cumprida! Pequenos passos constroem grandes conquistas.",
+  ],
+  critical: [
+    "⚠️ Atenção: você ultrapassou o orçamento em uma categoria este mês.",
+    "🔴 Existem contas atrasadas. Regularize para evitar juros e multas.",
+    "📊 Suas despesas estão maiores que as receitas neste período.",
+  ],
+  tips: [
+    "💡 Dica: revise suas assinaturas mensais — pequenos gastos somam grandes valores.",
+    "💡 Dica: tente manter uma reserva de emergência de 3 a 6 meses de despesas.",
+    "💡 Dica: automatize seus investimentos para não esquecer.",
+    "💡 Dica: categorize todos os seus lançamentos para ter relatórios mais precisos.",
+    "💡 Dica: revise seu fluxo de caixa semanalmente para evitar surpresas.",
+  ],
+};
+
 export default function DashboardView() {
   const { user } = useAuth();
   const { formatCurrency: brl, currency } = useCurrency();
@@ -49,7 +76,8 @@ export default function DashboardView() {
   const [investments, setInvestments] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [programas, setProgramas] = useState<any[]>([]);
-
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>("year");
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>(getPeriodRange("year"));
@@ -58,6 +86,7 @@ export default function DashboardView() {
   const [intervalOpen, setIntervalOpen] = useState(false);
   const [fromText, setFromText] = useState("");
   const [toText, setToText] = useState("");
+  const [messageShown, setMessageShown] = useState(false);
 
   const period = useMemo(() => {
     if (periodKey === "custom") return customRange;
@@ -116,38 +145,84 @@ export default function DashboardView() {
     if (d) { handleCustomTo(d); setToText(formatDate(d)); }
   };
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!user) return;
-    const fetchData = async () => {
-      const [eRes, cRes, iRes, aRes, pRes] = await Promise.all([
-        supabase.from("financial_entries").select("*").eq("user_id", user.id),
-        supabase.from("categories").select("*").eq("user_id", user.id),
-        supabase.from("investments").select("*").eq("user_id", user.id).eq("is_active", true),
-        supabase.from("financial_accounts").select("*").eq("user_id", user.id).eq("is_active", true),
-        supabase.from("cost_centers").select("*").eq("user_id", user.id).order("name"),
-      ]);
-      if (eRes.data) setEntries(eRes.data);
-      if (cRes.data) setCategories(cRes.data);
-      if (iRes.data) setInvestments(iRes.data);
-      if (aRes.data) setAccounts(aRes.data);
-      if (pRes.data) setProgramas(pRes.data as any[]);
-    };
+    const [eRes, cRes, iRes, aRes, pRes, tRes] = await Promise.all([
+      supabase.from("financial_entries").select("*").eq("user_id", user.id),
+      supabase.from("categories").select("*").eq("user_id", user.id),
+      supabase.from("investments").select("*").eq("user_id", user.id).eq("is_active", true),
+      supabase.from("financial_accounts").select("*").eq("user_id", user.id).eq("is_active", true),
+      supabase.from("cost_centers").select("*").eq("user_id", user.id).order("name"),
+      supabase.from("tasks").select("*").eq("user_id", user.id),
+    ]);
+    if (eRes.data) setEntries(eRes.data);
+    if (cRes.data) setCategories(cRes.data);
+    if (iRes.data) setInvestments(iRes.data);
+    if (aRes.data) setAccounts(aRes.data);
+    if (pRes.data) setProgramas(pRes.data as any[]);
+    if (tRes.data) setTasks(tRes.data);
+  }, [user]);
+
+  useEffect(() => {
     fetchData();
     const handler = () => fetchData();
     window.addEventListener("lovable:data-changed", handler);
     return () => window.removeEventListener("lovable:data-changed", handler);
-  }, [user]);
+  }, [fetchData]);
 
   useEffect(() => { localStorage.removeItem("dashboard-period-year"); }, []);
+
+  // Gamification: show message on load if tips enabled
+  useEffect(() => {
+    if (messageShown || entries.length === 0) return;
+    const tipsEnabled = localStorage.getItem("agile-money-tips") !== "false";
+    if (!tipsEnabled) return;
+
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const todayEntries = entries.filter(e => {
+      const d = new Date(e.entry_date + "T12:00:00");
+      return d >= today && d <= today;
+    });
+    const allPaidToday = todayEntries.length > 0 && todayEntries.every(e => e.is_paid);
+    const hasOverdue = entries.some(e => !e.is_paid && new Date(e.entry_date + "T12:00:00") < today);
+    const totalRev = entries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
+    const totalExp = entries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
+
+    let msg: string;
+    if (allPaidToday) {
+      msg = MESSAGES.positive[Math.floor(Math.random() * MESSAGES.positive.length)];
+    } else if (hasOverdue) {
+      msg = MESSAGES.critical[Math.floor(Math.random() * MESSAGES.critical.length)];
+    } else if (totalExp > totalRev) {
+      msg = MESSAGES.critical[2];
+    } else {
+      msg = MESSAGES.tips[Math.floor(Math.random() * MESSAGES.tips.length)];
+    }
+
+    setTimeout(() => {
+      toast({ title: "Agile Money", description: msg });
+    }, 1500);
+    setMessageShown(true);
+  }, [entries, messageShown]);
 
   const filteredEntries = useMemo(() => {
     const s = new Date(period.start); s.setHours(0, 0, 0, 0);
     const e = new Date(period.end); e.setHours(23, 59, 59, 999);
-    return entries.filter(entry => {
+    let result = entries.filter(entry => {
       const d = new Date(entry.entry_date);
       return isWithinInterval(d, { start: s, end: e });
     });
-  }, [entries, period]);
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(entry => {
+        const cat = categories.find(c => c.id === entry.category_id)?.name || "";
+        const haystack = [entry.title, cat, entry.counterpart || "", String(entry.amount)].join(" ").toLowerCase();
+        return haystack.includes(q);
+      });
+    }
+    return result;
+  }, [entries, period, searchQuery, categories]);
 
   const monthlyData = useMemo(() => {
     const months = eachMonthOfInterval({ start: period.start, end: period.end });
@@ -198,6 +273,82 @@ export default function DashboardView() {
       .sort((a, b) => b.overdue - a.overdue || b.total - a.total);
   }, [entries, programas]);
 
+  // Programação do Dia
+  const todaySchedule = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(today); todayEnd.setHours(23, 59, 59, 999);
+    
+    const items: { id: string; title: string; type: "entry" | "task"; amount?: number; entryType?: string; isDone: boolean }[] = [];
+    
+    // Financial entries due today
+    entries.filter(e => {
+      const d = new Date(e.entry_date + "T12:00:00");
+      return d >= today && d <= todayEnd;
+    }).forEach(e => {
+      items.push({
+        id: e.id, title: e.title, type: "entry",
+        amount: Number(e.amount), entryType: e.type,
+        isDone: e.is_paid || false,
+      });
+    });
+
+    // Tasks scheduled for today
+    tasks.filter(t => {
+      if (!t.scheduled_date) return false;
+      const d = new Date(t.scheduled_date + "T12:00:00");
+      return d >= today && d <= todayEnd;
+    }).forEach(t => {
+      items.push({
+        id: t.id, title: t.title, type: "task",
+        isDone: t.is_completed || false,
+      });
+    });
+
+    // Overdue entries (up to 3)
+    entries.filter(e => {
+      const d = new Date(e.entry_date + "T12:00:00");
+      return !e.is_paid && d < today;
+    }).sort((a, b) => a.entry_date.localeCompare(b.entry_date))
+    .slice(0, 3)
+    .forEach(e => {
+      if (!items.find(i => i.id === e.id)) {
+        items.push({
+          id: e.id, title: `⚠️ ${e.title} (atrasado)`, type: "entry",
+          amount: Number(e.amount), entryType: e.type,
+          isDone: false,
+        });
+      }
+    });
+
+    return items.slice(0, 8);
+  }, [entries, tasks]);
+
+  const toggleScheduleItem = async (item: typeof todaySchedule[0]) => {
+    if (item.type === "entry") {
+      await supabase.from("financial_entries").update({
+        is_paid: !item.isDone,
+        payment_date: !item.isDone ? format(new Date(), "yyyy-MM-dd") : null,
+      }).eq("id", item.id);
+    } else {
+      await supabase.from("tasks").update({
+        is_completed: !item.isDone,
+      }).eq("id", item.id);
+    }
+    fetchData();
+    // Check if all today items are now done
+    if (!item.isDone) {
+      const tipsEnabled = localStorage.getItem("agile-money-tips") !== "false";
+      if (tipsEnabled) {
+        const remaining = todaySchedule.filter(i => i.id !== item.id && !i.isDone);
+        if (remaining.length === 0) {
+          setTimeout(() => {
+            toast({ title: "🎉 Parabéns!", description: MESSAGES.positive[Math.floor(Math.random() * MESSAGES.positive.length)] });
+          }, 500);
+        }
+      }
+    }
+  };
+
   const totalRevenue = filteredEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
   const totalExpense = filteredEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
   const totalCash = accounts.reduce((s: number, a: any) => s + Number(a.current_balance || 0), 0);
@@ -210,9 +361,6 @@ export default function DashboardView() {
     if (cur === "EUR") return `€ ${v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
-
-
-
 
   const otherCurrencies = (["BRL", "BTC", "EUR", "USD"] as const).filter(c => c !== currency).sort();
 
@@ -229,11 +377,24 @@ export default function DashboardView() {
     return `1 ${currency} = ${(1 / rate).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${cur}`;
   };
 
+  const handlePrint = () => window.print();
+
   return (
     <ScrollArea className="h-full">
       <div className="p-4 pt-3 max-w-full overflow-hidden space-y-4 module-container">
-        {/* Period filter buttons */}
-        <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex flex-row gap-2 overflow-x-auto pb-1 backdrop-blur-sm">
+        {/* Toolbar: Search + Period buttons + Print */}
+        <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex flex-row items-center gap-2 overflow-x-auto pb-1 backdrop-blur-sm">
+          {/* Search */}
+          <div className="relative shrink-0" style={{ width: 220 }}>
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Buscar..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-7 pl-8 text-xs rounded-lg"
+            />
+          </div>
+
           {periodButtons.map(({ key, label, icon: Icon }) => (
             <Popover key={key} open={key === "custom" ? intervalOpen : undefined} onOpenChange={key === "custom" ? setIntervalOpen : undefined}>
               <PopoverTrigger asChild>
@@ -248,14 +409,14 @@ export default function DashboardView() {
                     }
                   }}
                   className={cn(
-                    "flex items-center gap-2 rounded-xl border px-3 py-2 transition-all duration-200 shrink-0",
+                    "flex items-center gap-2 rounded-xl border px-3 py-1.5 transition-all duration-200 shrink-0",
                     periodKey === key
                       ? "bg-primary text-primary-foreground border-primary"
                       : "border-border hover:border-primary/80 hover:bg-primary/5"
                   )}
                 >
-                  <Icon className="size-5" />
-                  <span className="text-sm font-medium">{label}</span>
+                  <Icon className="size-4" />
+                  <span className="text-xs font-medium">{label}</span>
                 </button>
               </PopoverTrigger>
               {key === "custom" && (
@@ -271,7 +432,6 @@ export default function DashboardView() {
                     }}
                     className="pointer-events-auto"
                   />
-                  {/* Manual date inputs */}
                   <div className="space-y-2 border-t border-border/30 pt-3 pr-3">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold w-8 shrink-0">De:</span>
@@ -309,6 +469,16 @@ export default function DashboardView() {
               )}
             </Popover>
           ))}
+
+          {/* Print button */}
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors shrink-0 ml-auto">
+                <Printer className="h-5 w-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="text-xs">Imprimir</TooltipContent>
+          </Tooltip>
         </div>
 
         {/* KPI Cards Grid */}
@@ -365,6 +535,55 @@ export default function DashboardView() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Programação do Dia */}
+        {todaySchedule.length > 0 && (
+          <Card className="bg-card">
+            <CardContent className="p-3">
+              <p className="text-xl md:text-2xl font-semibold mb-3 flex items-center gap-1.5">
+                <Sun className="size-7 mr-2 text-muted-foreground" /> Programação do Dia
+              </p>
+              <div className="space-y-1.5">
+                {todaySchedule.map(item => (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg border border-border/30 px-3 py-2 transition-colors",
+                      item.isDone && "opacity-50"
+                    )}
+                  >
+                    <Checkbox
+                      checked={item.isDone}
+                      onCheckedChange={() => toggleScheduleItem(item)}
+                      className="h-4 w-4"
+                    />
+                    <span className={cn("text-sm flex-1 truncate", item.isDone && "line-through text-muted-foreground")}>
+                      {item.title}
+                    </span>
+                    {item.amount != null && (
+                      <span className={cn(
+                        "text-sm font-bold tabular-nums shrink-0",
+                        item.entryType === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive"
+                      )}>
+                        {brl(item.amount)}
+                      </span>
+                    )}
+                    {!item.isDone && item.type === "entry" && (
+                      <Button
+                        size="sm" variant="outline"
+                        className="h-6 text-[10px] px-2 gap-1 shrink-0"
+                        onClick={() => toggleScheduleItem(item)}
+                      >
+                        <Check className="h-3 w-3" />
+                        {item.entryType === "expense" ? "Pagar" : "Receber"}
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Câmbio widget – compact inline */}
         <Card className="bg-card">

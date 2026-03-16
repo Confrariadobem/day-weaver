@@ -786,6 +786,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
   const totalAvailable = accounts.reduce((s, a) => {
     if (a.type === "credit_card") return s;
+    // Respect is_immediate_cash toggle (default true for backward compat)
+    if ((a as any).is_immediate_cash === false) return s;
     return s + a.current_balance;
   }, 0);
 
@@ -843,6 +845,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   }, [entries, periodStart, periodEnd]);
 
   // DRE / DOAR data — computes both Previsto (pending) and Realizado (paid)
+  // Now respects DOAR advanced filters for real-time card/table sync
   const dreData = useMemo(() => {
     const pStart = new Date(periodStart);
     const pEnd = new Date(periodEnd);
@@ -853,9 +856,35 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     const revenueCategories = categories.filter(c => c.is_revenue || catIdsWithRevEntries.has(c.id));
     const expenseCategories = categories.filter(c => c.is_expense || catIdsWithExpEntries.has(c.id));
 
+    // Apply DOAR advanced filters to entries
+    const applyDoarFilters = (src: any[]) => {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      return src.filter(e => {
+        if (doarFilterType !== "all") {
+          if (doarFilterType === "revenue" && e.type !== "revenue") return false;
+          if (doarFilterType === "expense" && e.type !== "expense") return false;
+        }
+        if (doarFilterStatus !== "all") {
+          if (doarFilterStatus === "paid" && !(e.is_paid && e.type === "expense")) return false;
+          if (doarFilterStatus === "recebido" && !(e.is_paid && e.type === "revenue")) return false;
+          if (doarFilterStatus === "pending" && e.is_paid) return false;
+          if (doarFilterStatus === "overdue") {
+            const ed = new Date(e.entry_date + "T12:00:00");
+            if (e.is_paid || ed >= today) return false;
+          }
+        }
+        if (doarFilterCategoryId && e.category_id !== doarFilterCategoryId) return false;
+        if (doarFilterProgramId && e.cost_center_id !== doarFilterProgramId) return false;
+        if (doarFilterAccountId && e.account_id !== doarFilterAccountId) return false;
+        if (doarFilterPaymentMethod && e.payment_method !== doarFilterPaymentMethod) return false;
+        if (doarFilterIsFixed && !e.is_fixed) return false;
+        return true;
+      });
+    };
+
     const buildSection = (paidFilter: boolean | null) => {
       const getMonthEntries = (month: Date) => {
-        let src = entries;
+        let src = applyDoarFilters(entries);
         if (paidFilter !== null) src = src.filter(e => paidFilter ? e.is_paid : !e.is_paid);
         return src.filter(e => {
           const d = new Date(e.entry_date);
@@ -868,7 +897,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       const getEntriesForCatMonth = (catId: string, month: Date, type: string) =>
         getMonthEntries(month).filter(e => e.type === type && e.category_id === catId);
 
-      const prevYearEntries = entries.filter(e => {
+      const prevYearEntries = applyDoarFilters(entries).filter(e => {
         if (paidFilter !== null) { if (paidFilter ? !e.is_paid : e.is_paid) return false; }
         return new Date(e.entry_date).getFullYear() < yr;
       });
@@ -947,7 +976,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       previsto,
       realizado,
     };
-  }, [entries, categories, periodStart, periodEnd, doarHideCarryOver]);
+  }, [entries, categories, periodStart, periodEnd, doarHideCarryOver, doarFilterType, doarFilterStatus, doarFilterCategoryId, doarFilterProgramId, doarFilterAccountId, doarFilterPaymentMethod, doarFilterIsFixed]);
 
   // Indicator chart data
   const reportChartData = useMemo(() => {
@@ -1127,19 +1156,35 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   };
 
   const handleExportCSV = () => {
-    const allItems = filtered;
-    const header = "Data,Título,Tipo,Categoria,Programa,Conta,Pago,Forma Pgto,Valor\n";
-    const rows = allItems.map(e => {
-      const cat = categories.find(c => c.id === e.category_id)?.name || "";
-      const prog = programs.find((p: any) => p.id === e.cost_center_id)?.name || "";
-      const acc = accounts.find(a => a.id === e.account_id)?.name || "";
-      return `${e.entry_date},"${e.title}",${e.type === "revenue" ? "Receita" : "Despesa"},"${cat}","${prog}","${acc}",${e.is_paid ? "Sim" : "Não"},"${e.payment_method || ""}",${e.amount}`;
-    }).join("\n");
-    const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `financeiro_${format(now, "yyyy-MM-dd")}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    import("xlsx").then(XLSX => {
+      const allItems = filtered;
+      const wsData = [
+        ["Data", "Título", "Tipo", "Categoria", "Programa", "Conta", "Pago", "Forma Pgto", "Valor"],
+        ...allItems.map(e => {
+          const cat = categories.find(c => c.id === e.category_id)?.name || "";
+          const prog = programs.find((p: any) => p.id === e.cost_center_id)?.name || "";
+          const acc = accounts.find(a => a.id === e.account_id)?.name || "";
+          return [
+            e.entry_date,
+            e.title,
+            e.type === "revenue" ? "Receita" : "Despesa",
+            cat, prog, acc,
+            e.is_paid ? "Sim" : "Não",
+            e.payment_method || "",
+            Number(e.amount),
+          ];
+        }),
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      // Column widths
+      ws["!cols"] = [
+        { wch: 12 }, { wch: 30 }, { wch: 10 }, { wch: 18 }, { wch: 18 },
+        { wch: 18 }, { wch: 6 }, { wch: 15 }, { wch: 14 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Fluxo de Caixa");
+      XLSX.writeFile(wb, `financeiro_${format(now, "yyyy-MM-dd")}.xlsx`);
+    });
   };
 
   const handlePrintDOAR = () => {
@@ -2102,41 +2147,63 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
-        <Card className="bg-card">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <TrendingUp className="h-4 w-4" /> Contas a Receber
-            </p>
-            <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(kpiData.totalRevenue)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <TrendingDown className="h-4 w-4" /> Contas a Pagar
-            </p>
-            <p className="text-lg font-bold text-destructive">{brl(kpiData.totalExpense)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <Wallet className="h-4 w-4" /> Saldo
-            </p>
-            <p className={cn("text-lg font-bold", kpiData.balance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(kpiData.balance)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <Landmark className="h-4 w-4" /> Caixa Disponível
-            </p>
-            <p className={cn("text-lg font-bold", totalAvailable >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(totalAvailable)}</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* KPI Cards — Fluxo operacional (sem repetir Dashboard) */}
+      {(() => {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const in7days = new Date(today); in7days.setDate(in7days.getDate() + 7);
+        // Contas a Receber: pendentes no período filtrado
+        const contasReceber = filtered.filter(e => e.type === "revenue" && !e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
+        // Contas a Pagar: pendentes no período filtrado
+        const contasPagar = filtered.filter(e => e.type === "expense" && !e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
+        // Previsão 7 dias: todos pendentes nos próximos 7 dias
+        const prev7d = entries.filter(e => {
+          if (e.is_paid) return false;
+          const d = parseEntryDate(e.entry_date);
+          return d >= today && d <= in7days;
+        });
+        const prev7dRev = prev7d.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
+        const prev7dExp = prev7d.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
+        const previsao7d = prev7dRev - prev7dExp;
+        // Fluxo Líquido do período
+        const fluxoLiquido = kpiData.balance;
+
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+            <Card className="bg-card">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <TrendingUp className="h-4 w-4" /> Contas a Receber
+                </p>
+                <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(contasReceber)}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <TrendingDown className="h-4 w-4" /> Contas a Pagar
+                </p>
+                <p className="text-lg font-bold text-destructive">{brl(contasPagar)}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <CalendarDays className="h-4 w-4" /> Previsão 7 dias
+                </p>
+                <p className={cn("text-lg font-bold", previsao7d >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(previsao7d)}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Wallet className="h-4 w-4" /> Fluxo Líquido
+                </p>
+                <p className={cn("text-lg font-bold", fluxoLiquido >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(fluxoLiquido)}</p>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* Content */}
       <div>

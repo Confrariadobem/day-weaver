@@ -75,6 +75,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
   const [accClosing, setAccClosing] = useState("");
   const [accDue, setAccDue] = useState("");
   const [accIsActive, setAccIsActive] = useState(true);
+  const [accIsImmediateCash, setAccIsImmediateCash] = useState(true);
 
   // Payment methods for wallet
   const [allPaymentMethods, setAllPaymentMethods] = useState<any[]>([]);
@@ -142,6 +143,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
     setAccClosing(acc.closing_day ? String(acc.closing_day) : "");
     setAccDue(acc.due_day ? String(acc.due_day) : "");
     setAccIsActive(acc.is_active !== false);
+    setAccIsImmediateCash(acc.is_immediate_cash !== false);
     // Load wallet-specific payment methods
     const { data: apm } = await supabase.from("account_payment_methods" as any).select("payment_method_id").eq("account_id", acc.id);
     if (apm && apm.length > 0) {
@@ -159,6 +161,9 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
   const saveAccount = async () => {
     if (!accName.trim() || !user) return;
     const bal = parseNum(accBalance);
+    // Auto-exclude investment/crypto from immediate cash
+    const excludeTypes = ["investment", "crypto"];
+    const isImmCash = excludeTypes.includes(accType) ? false : accIsImmediateCash;
     const data: any = {
       name: accName, type: accType,
       current_balance: bal,
@@ -166,6 +171,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
       closing_day: accClosing ? parseInt(accClosing) : null,
       due_day: accDue ? parseInt(accDue) : null,
       is_active: accIsActive,
+      is_immediate_cash: isImmCash,
     };
     if (editingAccount) {
       await supabase.from("financial_accounts").update(data).eq("id", editingAccount.id);
@@ -684,6 +690,17 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
             <div className="flex items-center justify-between pt-1">
               <Label className="text-sm text-muted-foreground">Ativa</Label>
               <Switch checked={accIsActive} onCheckedChange={setAccIsActive} />
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <Label className="text-sm text-muted-foreground">Considerar como Caixa Imediato?</Label>
+                <p className="text-[10px] text-muted-foreground/60">Soma no "Caixa Disponível" do Fluxo de Caixa</p>
+              </div>
+              <Switch
+                checked={accIsImmediateCash}
+                onCheckedChange={setAccIsImmediateCash}
+                disabled={["investment", "crypto"].includes(accType)}
+              />
             </div>
 
             {/* Payment methods section */}
