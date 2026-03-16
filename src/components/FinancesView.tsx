@@ -2766,7 +2766,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 <table className="w-full text-xs border-collapse">
                   <thead className="sticky top-0 z-10 bg-background">
                     <tr className="bg-primary/10">
-                      <th colSpan={15} className="text-center p-3 border-b border-border">
+                      <th colSpan={16} className="text-center p-3 border-b border-border">
                         <h1 className="uppercase font-bold text-sm text-primary tracking-wide">
                           DOAR — {sectionLabel}
                         </h1>
