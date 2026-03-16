@@ -256,7 +256,7 @@ export default function DashboardView() {
   const programaPendencias = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const pending = entries.filter(e => !e.is_paid && e.cost_center_id);
+    const pending = filteredEntries.filter(e => !e.is_paid && e.cost_center_id);
     const map = new Map<string, { total: number; overdue: number; amount: number }>();
     pending.forEach(e => {
       const ccId = e.cost_center_id!;

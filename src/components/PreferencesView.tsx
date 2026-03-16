@@ -642,17 +642,14 @@ export default function PreferencesView() {
                     </AccordionItem>
                   </Accordion>
 
-                  {/* Mensagens e Dicas toggle — inline near date format */}
-                  <div className="flex items-center justify-between rounded-lg border border-border/40 p-3">
-                    <div>
-                      <Label className="text-xs font-medium">Ativar mensagens e dicas</Label>
-                      <p className="text-[10px] text-muted-foreground/60">Toasts motivacionais, alertas e dicas financeiras</p>
-                    </div>
+                  {/* Mostrar mensagens de dicas — inline toggle */}
+                  <div className="flex items-center justify-between max-w-xs">
+                    <Label className="text-xs">Mostrar mensagens de dicas</Label>
                     <Switch
                       checked={localStorage.getItem("agile-money-tips") !== "false"}
                       onCheckedChange={(checked) => {
                         localStorage.setItem("agile-money-tips", checked ? "true" : "false");
-                        toast({ title: checked ? "Mensagens e dicas ativadas! 💡" : "Mensagens e dicas desativadas" });
+                        toast({ title: checked ? "Mensagens de dicas ativadas 💡" : "Mensagens de dicas desativadas" });
                       }}
                     />
                   </div>

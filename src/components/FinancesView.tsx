@@ -897,11 +897,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       const getEntriesForCatMonth = (catId: string, month: Date, type: string) =>
         getMonthEntries(month).filter(e => e.type === type && e.category_id === catId);
 
-      const prevYearEntries = applyDoarFilters(entries).filter(e => {
+      const prevPeriodEntries = applyDoarFilters(entries).filter(e => {
         if (paidFilter !== null) { if (paidFilter ? !e.is_paid : e.is_paid) return false; }
-        return new Date(e.entry_date).getFullYear() < yr;
+        return parseEntryDate(e.entry_date) < parseEntryDate(periodStart);
       });
-      const carryOver = prevYearEntries.reduce((s, e) =>
+      const carryOver = prevPeriodEntries.reduce((s, e) =>
         s + (e.type === "revenue" ? Number(e.amount) : -Number(e.amount)), 0);
 
       const revRows = revenueCategories
@@ -982,26 +982,25 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       ...all,
       previsto,
       realizado,
-      doarTotalRev, doarTotalExp, doarBalance, doarLastAcc,
+      doarTotalRev, doarTotalExp, doarBalance, doarLastAcc, activeCarryOver: activeSection.carryOver,
     };
   }, [entries, categories, periodStart, periodEnd, doarHideCarryOver, doarFilterType, doarFilterStatus, doarFilterCategoryId, doarFilterProgramId, doarFilterAccountId, doarFilterPaymentMethod, doarFilterIsFixed, doarViewMode]);
 
   // Indicator chart data
   const reportChartData = useMemo(() => {
-    const yr = periodYear;
-    const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
+    const months = eachMonthOfInterval({ start: new Date(periodStart + "T12:00:00"), end: new Date(periodEnd + "T12:00:00") });
     let accumulated = 0;
     return months.map(month => {
       const mEntries = periodFilteredEntries.filter(e => {
         const d = new Date(e.entry_date);
-        return d.getMonth() === month.getMonth() && d.getFullYear() === yr;
+        return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
       });
       const rev = mEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
       const exp = mEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
       accumulated += rev - exp;
       return { month: (() => { const n = format(month, "MMM", { locale: ptBR }); return n.charAt(0).toUpperCase() + n.slice(1); })(), receita: rev, despesa: exp, saldo: rev - exp, acumulado: accumulated };
     });
-  }, [periodFilteredEntries, periodYear]);
+  }, [periodFilteredEntries, periodStart, periodEnd]);
 
   const categoryPieData = useMemo(() => {
     const map = new Map<string, { name: string; value: number; color: string }>();
@@ -1030,18 +1029,17 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   }, [periodFilteredEntries, categories]);
 
   const monthlyTrendData = useMemo(() => {
-    const yr = periodYear;
-    const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
+    const months = eachMonthOfInterval({ start: new Date(periodStart + "T12:00:00"), end: new Date(periodEnd + "T12:00:00") });
     return months.map(month => {
       const mEntries = periodFilteredEntries.filter(e => {
         const d = new Date(e.entry_date);
-        return d.getMonth() === month.getMonth() && d.getFullYear() === yr;
+        return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
       });
       const paid = mEntries.filter(e => e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
       const pending = mEntries.filter(e => !e.is_paid).reduce((s, e) => s + Number(e.amount), 0);
       return { month: (() => { const n = format(month, "MMM", { locale: ptBR }); return n.charAt(0).toUpperCase() + n.slice(1); })(), pago: paid, pendente: pending };
     });
-  }, [periodFilteredEntries, periodYear]);
+  }, [periodFilteredEntries, periodStart, periodEnd]);
 
   const accountBalanceData = useMemo(() => {
     return accounts
@@ -2139,7 +2137,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4 print-fluxo-area max-w-full overflow-hidden module-container">
       {/* Tab buttons + Toolbar on same line */}
-      <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto backdrop-blur-sm">
+      <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto backdrop-blur-sm bg-background/80 shadow-[0_1px_3px_0_hsl(var(--border)/0.3)]">
         <div className="flex items-center gap-1.5 shrink-0">
           {([
             { key: "indicadores" as ViewTab, label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
@@ -2171,7 +2169,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       )}
 
       {/* KPI Cards — Fluxo operacional (sem repetir Dashboard) */}
-      {(() => {
+      {viewTab === "previsao" && (() => {
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const in7days = new Date(today); in7days.setDate(in7days.getDate() + 7);
         // Contas a Receber: pendentes no período filtrado
@@ -2733,6 +2731,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground font-medium">
                       {brl(entryTotal)}
                     </td>
+                    <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground">
+                      {(() => { const nz = g.monthAmounts.filter(v => v > 0).length; return nz > 0 ? brl(entryTotal / nz) : "—"; })()}
+                    </td>
                   </tr>
                 );
               });
@@ -2765,7 +2766,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 <table className="w-full text-xs border-collapse">
                   <thead className="sticky top-0 z-10 bg-background">
                     <tr className="bg-primary/10">
-                      <th colSpan={15} className="text-center p-3 border-b border-border">
+                      <th colSpan={16} className="text-center p-3 border-b border-border">
                         <h1 className="uppercase font-bold text-sm text-primary tracking-wide">
                           DOAR — {sectionLabel}
                         </h1>
@@ -2781,6 +2782,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px] uppercase">{m}</th>
                       ))}
                       <th className="text-right p-2 border-b border-border font-bold min-w-[90px] bg-muted uppercase">TOTAL</th>
+                      <th className="text-right p-2 border-b border-border min-w-[80px] uppercase">MÉDIA</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2797,6 +2799,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td className={cn("text-right p-2 border-b border-border font-bold", sectionData.carryOver >= 0 ? "text-success" : "text-destructive")}>
                           {brl(sectionData.carryOver)}
                         </td>
+                        <td className="text-right p-2 border-b border-border text-muted-foreground">—</td>
                       </tr>
                     )}
 
@@ -2813,6 +2816,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td key={i} className="text-right p-2 border-b border-border font-bold text-success">{v > 0 ? brl(v) : "—"}</td>
                       ))}
                       <td className="text-right p-2 border-b border-border font-bold text-success">{brl(totalRevYear)}</td>
+                      <td className="text-right p-2 border-b border-border text-muted-foreground">{(() => { const nz = sectionData.monthTotalsRev.filter(v => v > 0).length; return nz > 0 ? brl(totalRevYear / nz) : "—"; })()}</td>
                     </tr>
                     {revGroupExpanded && filteredRevRows.map(row => {
                       const rowTotal = row.months.reduce((s, v) => s + v, 0);
@@ -2836,6 +2840,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                               </td>
                             ))}
                             <td className="text-right p-2 border-b border-border font-medium text-success">{brl(rowTotal)}</td>
+                            <td className="text-right p-2 border-b border-border text-muted-foreground">{(() => { const nz = row.months.filter(v => v > 0).length; return nz > 0 ? brl(rowTotal / nz) : "—"; })()}</td>
                           </tr>
                           {renderCategoryEntries(row, keyPrefix)}
                         </React.Fragment>
@@ -2848,6 +2853,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td key={i} className="text-right p-2 border-b-2 border-border text-success">{brl(v)}</td>
                       ))}
                       <td className="text-right p-2 border-b-2 border-border text-success">{brl(totalRevYear)}</td>
+                      <td className="text-right p-2 border-b-2 border-border text-muted-foreground">{(() => { const nz = sectionData.monthTotalsRev.filter(v => v > 0).length; return nz > 0 ? brl(totalRevYear / nz) : "—"; })()}</td>
                     </tr>
 
                     {/* ===== DESPESAS GROUP ===== */}
@@ -2863,6 +2869,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td key={i} className="text-right p-2 border-b border-border font-bold text-destructive">{v > 0 ? brl(v) : "—"}</td>
                       ))}
                       <td className="text-right p-2 border-b border-border font-bold text-destructive">{brl(totalExpYear)}</td>
+                      <td className="text-right p-2 border-b border-border text-muted-foreground">{(() => { const nz = sectionData.monthTotalsExp.filter(v => v > 0).length; return nz > 0 ? brl(totalExpYear / nz) : "—"; })()}</td>
                     </tr>
                     {expGroupExpanded && filteredExpRows.map(row => {
                       const rowTotal = row.months.reduce((s, v) => s + v, 0);
@@ -2886,6 +2893,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                               </td>
                             ))}
                             <td className="text-right p-2 border-b border-border font-medium text-destructive">{brl(rowTotal)}</td>
+                            <td className="text-right p-2 border-b border-border text-muted-foreground">{(() => { const nz = row.months.filter(v => v > 0).length; return nz > 0 ? brl(rowTotal / nz) : "—"; })()}</td>
                           </tr>
                           {renderCategoryEntries(row, keyPrefix)}
                         </React.Fragment>
@@ -2898,6 +2906,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td key={i} className="text-right p-2 border-b-2 border-border text-destructive">{brl(v)}</td>
                       ))}
                       <td className="text-right p-2 border-b-2 border-border text-destructive">{brl(totalExpYear)}</td>
+                      <td className="text-right p-2 border-b-2 border-border text-muted-foreground">{(() => { const nz = sectionData.monthTotalsExp.filter(v => v > 0).length; return nz > 0 ? brl(totalExpYear / nz) : "—"; })()}</td>
                     </tr>
 
                     {/* Balance */}
@@ -2916,6 +2925,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           <td className={cn("text-right p-2 border-b border-border font-bold",
                             totalResult >= 0 ? "text-success" : "text-destructive"
                           )}>{brl(totalResult)}</td>
+                          <td className="text-right p-2 border-b border-border text-muted-foreground">{(() => { const nz = sectionData.monthBalance.filter(v => v !== 0).length; return nz > 0 ? brl(totalResult / nz) : "—"; })()}</td>
                         </tr>
                       );
                     })()}
@@ -2936,6 +2946,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           <td className={cn("text-right p-2 border-b border-border font-bold",
                             lastAcc >= 0 ? "text-success" : "text-destructive"
                           )}>{brl(lastAcc)}</td>
+                          <td className="text-right p-2 border-b border-border text-muted-foreground">{(() => { const nz = sectionData.accumulated.filter(v => v !== 0).length; return nz > 0 ? brl(lastAcc / nz) : "—"; })()}</td>
                         </tr>
                       );
                     })()}
@@ -3063,7 +3074,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     <TrendingUp className="h-4 w-4" /> Receitas
                   </p>
-                  <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(dreData.doarTotalRev)}</p>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <p className="text-lg font-bold text-[hsl(var(--success))] cursor-help">{brl(dreData.doarTotalRev)}</p>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs">Total de receitas ({doarViewMode === "realizado" ? "realizadas" : doarViewMode === "previsto" ? "previstas" : "todas"}) no período</TooltipContent>
+                  </Tooltip>
                 </CardContent>
               </Card>
               <Card className="bg-card">
@@ -3071,7 +3087,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     <TrendingDown className="h-4 w-4" /> Despesas
                   </p>
-                  <p className="text-lg font-bold text-destructive">{brl(dreData.doarTotalExp)}</p>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <p className="text-lg font-bold text-destructive cursor-help">{brl(dreData.doarTotalExp)}</p>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs">Total de despesas ({doarViewMode === "realizado" ? "realizadas" : doarViewMode === "previsto" ? "previstas" : "todas"}) no período</TooltipContent>
+                  </Tooltip>
                 </CardContent>
               </Card>
               <Card className="bg-card">
@@ -3079,7 +3100,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     <Wallet className="h-4 w-4" /> Resultado
                   </p>
-                  <p className={cn("text-lg font-bold", dreData.doarBalance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(dreData.doarBalance)}</p>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <p className={cn("text-lg font-bold cursor-help", dreData.doarBalance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(dreData.doarBalance)}</p>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs">Receitas − Despesas no período</TooltipContent>
+                  </Tooltip>
                 </CardContent>
               </Card>
               <Card className="bg-card">
@@ -3087,7 +3113,18 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     <BarChart3 className="h-4 w-4" /> Acumulado
                   </p>
-                  <p className={cn("text-lg font-bold", dreData.doarLastAcc >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(dreData.doarLastAcc)}</p>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <p className={cn("text-lg font-bold cursor-help", dreData.doarLastAcc >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(dreData.doarLastAcc)}</p>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs max-w-[240px]">
+                      <div className="space-y-1">
+                        <p>Saldo anterior: {brl(dreData.activeCarryOver)}</p>
+                        <p>Resultado período: {brl(dreData.doarBalance)}</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                  <button onClick={() => setViewTab("previsao")} className="text-[9px] text-primary hover:underline mt-1">Ver detalhes →</button>
                 </CardContent>
               </Card>
             </div>
