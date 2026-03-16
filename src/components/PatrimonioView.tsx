@@ -691,6 +691,17 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
               <Label className="text-sm text-muted-foreground">Ativa</Label>
               <Switch checked={accIsActive} onCheckedChange={setAccIsActive} />
             </div>
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <Label className="text-sm text-muted-foreground">Considerar como Caixa Imediato?</Label>
+                <p className="text-[10px] text-muted-foreground/60">Soma no "Caixa Disponível" do Fluxo de Caixa</p>
+              </div>
+              <Switch
+                checked={accIsImmediateCash}
+                onCheckedChange={setAccIsImmediateCash}
+                disabled={["investment", "crypto"].includes(accType)}
+              />
+            </div>
 
             {/* Payment methods section */}
             {allPaymentMethods.length > 0 && (
