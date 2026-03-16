@@ -1636,11 +1636,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           {!isPaid && (
             <Button size="sm" variant="secondary" className="gap-1.5"
               onClick={() => setIsPaid(true)}>
-              <Check className="h-3.5 w-3.5" /> Marcar paga
+              <Check className="h-3.5 w-3.5" /> Baixar e salvar
             </Button>
           )}
           <Button size="sm" onClick={createOrUpdateEntry} className="gap-1.5">
-            <Save className="h-3.5 w-3.5" /> {isPaid ? "Salvar e Baixar" : "Salvar"}
+            <Save className="h-3.5 w-3.5" /> {isPaid ? "Baixar e salvar" : "Salvar"}
           </Button>
         </div>
       </div>
