@@ -982,7 +982,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       ...all,
       previsto,
       realizado,
-      doarTotalRev, doarTotalExp, doarBalance, doarLastAcc,
+      doarTotalRev, doarTotalExp, doarBalance, doarLastAcc, activeCarryOver: activeSection.carryOver,
     };
   }, [entries, categories, periodStart, periodEnd, doarHideCarryOver, doarFilterType, doarFilterStatus, doarFilterCategoryId, doarFilterProgramId, doarFilterAccountId, doarFilterPaymentMethod, doarFilterIsFixed, doarViewMode]);
 
