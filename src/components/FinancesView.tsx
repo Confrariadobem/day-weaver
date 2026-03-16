@@ -2946,6 +2946,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           <td className={cn("text-right p-2 border-b border-border font-bold",
                             lastAcc >= 0 ? "text-success" : "text-destructive"
                           )}>{brl(lastAcc)}</td>
+                          <td className="text-right p-2 border-b border-border text-muted-foreground">{(() => { const nz = sectionData.accumulated.filter(v => v !== 0).length; return nz > 0 ? brl(lastAcc / nz) : "—"; })()}</td>
                         </tr>
                       );
                     })()}
