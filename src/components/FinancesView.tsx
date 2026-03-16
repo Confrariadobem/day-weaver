@@ -2731,6 +2731,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground font-medium">
                       {brl(entryTotal)}
                     </td>
+                    <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground">
+                      {(() => { const nz = g.monthAmounts.filter(v => v > 0).length; return nz > 0 ? brl(entryTotal / nz) : "—"; })()}
+                    </td>
                   </tr>
                 );
               });
