@@ -603,27 +603,22 @@ export default function PreferencesView() {
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* ── Mensagens e Dicas (Gamificação) ── */}
-                    <AccordionItem value="tips-sub" className="border border-border/40 rounded-lg overflow-hidden mt-2">
-                      <AccordionTrigger className="px-3 py-2 text-xs font-semibold hover:no-underline bg-muted/20">
-                        <span className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-amber-500" /> Mensagens e Dicas</span>
-                      </AccordionTrigger>
-                      <AccordionContent className="px-3 pb-3 pt-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label className="text-sm">Ativar mensagens e dicas</Label>
-                            <p className="text-[10px] text-muted-foreground/60">Exibe toasts motivacionais, alertas e dicas financeiras ao usar o app</p>
-                          </div>
-                          <Switch
-                            checked={localStorage.getItem("agile-money-tips") !== "false"}
-                            onCheckedChange={(checked) => {
-                              localStorage.setItem("agile-money-tips", checked ? "true" : "false");
-                              toast({ title: checked ? "Mensagens e dicas ativadas! 💡" : "Mensagens e dicas desativadas" });
-                            }}
-                          />
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
+                    {/* ── Mensagens e Dicas toggle — inline ── */}
+                  </Accordion>
+
+                  <div className="flex items-center justify-between rounded-lg border border-border/40 p-3 mt-2">
+                    <div>
+                      <Label className="text-xs font-medium">Ativar mensagens e dicas</Label>
+                      <p className="text-[10px] text-muted-foreground/60">Toasts motivacionais, alertas e dicas financeiras</p>
+                    </div>
+                    <Switch
+                      checked={localStorage.getItem("agile-money-tips") !== "false"}
+                      onCheckedChange={(checked) => {
+                        localStorage.setItem("agile-money-tips", checked ? "true" : "false");
+                        toast({ title: checked ? "Mensagens e dicas ativadas! 💡" : "Mensagens e dicas desativadas" });
+                      }}
+                    />
+                  </div>
 
                     {/* ── Limpeza de dados ── */}
                     <AccordionItem value="advanced-sub" className="border border-border/40 rounded-lg overflow-hidden mt-2">

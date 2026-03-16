@@ -738,21 +738,30 @@ export default function DashboardView() {
                 {programaPendencias.map(p => {
                   const maxBar = Math.max(...programaPendencias.map(x => x.total), 1);
                   return (
-                    <div key={p.id} className="flex items-center gap-3">
-                      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-                      <span className="text-xs text-foreground flex-1 truncate min-w-0">{p.name}</span>
-                      <div className="w-24 h-2 rounded-full bg-secondary overflow-hidden shrink-0">
-                        <div className="h-full rounded-full" style={{ width: `${(p.total / maxBar) * 100}%`, backgroundColor: p.overdue > 0 ? "hsl(var(--destructive))" : "hsl(var(--success))" }} />
-                      </div>
-                      <span className="text-[10px] font-medium text-muted-foreground shrink-0 w-14 text-right">
-                        {p.total} pend.
-                      </span>
-                      {p.overdue > 0 && (
-                        <span className="flex items-center gap-0.5 text-[10px] text-destructive font-medium shrink-0">
-                          <AlertTriangle className="size-3" /> {p.overdue}
-                        </span>
-                      )}
-                    </div>
+                    <Tooltip key={p.id} delayDuration={200}>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-3 cursor-pointer hover:bg-muted/30 rounded-lg px-1 py-0.5 transition-colors">
+                          <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                          <span className="text-xs text-foreground flex-1 truncate min-w-0">{p.name}</span>
+                          <div className="w-24 h-2 rounded-full bg-secondary overflow-hidden shrink-0">
+                            <div className="h-full rounded-full" style={{ width: `${(p.total / maxBar) * 100}%`, backgroundColor: p.overdue > 0 ? "hsl(var(--destructive))" : "hsl(var(--success))" }} />
+                          </div>
+                          <span className="text-[10px] font-medium text-muted-foreground shrink-0 w-14 text-right">
+                            {p.total} pend.
+                          </span>
+                          {p.overdue > 0 && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-destructive font-medium shrink-0">
+                              <AlertTriangle className="size-3" /> {p.overdue}
+                            </span>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs max-w-[220px]">
+                        <p className="font-semibold">{p.name}</p>
+                        <p>{p.total} pendência(s) · {p.overdue} atrasada(s)</p>
+                        <p className="text-muted-foreground">{brl(p.amount)}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   );
                 })}
               </div>
