@@ -988,20 +988,19 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
   // Indicator chart data
   const reportChartData = useMemo(() => {
-    const yr = periodYear;
-    const months = eachMonthOfInterval({ start: startOfYear(new Date(yr, 0)), end: endOfYear(new Date(yr, 0)) });
+    const months = eachMonthOfInterval({ start: new Date(periodStart + "T12:00:00"), end: new Date(periodEnd + "T12:00:00") });
     let accumulated = 0;
     return months.map(month => {
       const mEntries = periodFilteredEntries.filter(e => {
         const d = new Date(e.entry_date);
-        return d.getMonth() === month.getMonth() && d.getFullYear() === yr;
+        return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
       });
       const rev = mEntries.filter(e => e.type === "revenue").reduce((s, e) => s + Number(e.amount), 0);
       const exp = mEntries.filter(e => e.type === "expense").reduce((s, e) => s + Number(e.amount), 0);
       accumulated += rev - exp;
       return { month: (() => { const n = format(month, "MMM", { locale: ptBR }); return n.charAt(0).toUpperCase() + n.slice(1); })(), receita: rev, despesa: exp, saldo: rev - exp, acumulado: accumulated };
     });
-  }, [periodFilteredEntries, periodYear]);
+  }, [periodFilteredEntries, periodStart, periodEnd]);
 
   const categoryPieData = useMemo(() => {
     const map = new Map<string, { name: string; value: number; color: string }>();
