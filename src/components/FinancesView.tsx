@@ -2840,6 +2840,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                               </td>
                             ))}
                             <td className="text-right p-2 border-b border-border font-medium text-success">{brl(rowTotal)}</td>
+                            <td className="text-right p-2 border-b border-border text-muted-foreground">{(() => { const nz = row.months.filter(v => v > 0).length; return nz > 0 ? brl(rowTotal / nz) : "—"; })()}</td>
                           </tr>
                           {renderCategoryEntries(row, keyPrefix)}
                         </React.Fragment>
