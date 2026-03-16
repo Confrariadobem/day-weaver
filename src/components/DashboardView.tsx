@@ -548,7 +548,7 @@ export default function DashboardView() {
                   <div
                     key={item.id}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg border border-border/30 px-3 py-2 transition-colors",
+                      "group flex items-center gap-3 rounded-lg border border-border/30 px-3 py-2 transition-colors",
                       item.isDone && "opacity-50"
                     )}
                   >
