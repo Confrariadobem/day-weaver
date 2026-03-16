@@ -1413,7 +1413,22 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">Data Pagamento Real</Label>
-              <Input type="date" value={realPaymentDate} onChange={(e) => setRealPaymentDate(e.target.value)} />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal text-sm", !realPaymentDate && "text-muted-foreground")}>
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {realPaymentDate ? format(parseEntryDate(realPaymentDate), "dd/MM/yyyy") : "Selecionar"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" locale={ptBR}
+                    selected={realPaymentDate ? parseEntryDate(realPaymentDate) : undefined}
+                    onSelect={(d) => { if (d) setRealPaymentDate(format(d, "yyyy-MM-dd")); }}
+                    className="p-3 pointer-events-auto"
+                    formatters={{ formatCaption: (date) => { const m = format(date, "LLLL", { locale: ptBR }); return m.charAt(0).toUpperCase() + m.slice(1) + " " + format(date, "yyyy"); } }}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
           {editingEntry && (editingEntry.recurrence_type || (editingEntry.installment_group && editingEntry.total_installments > 1)) && (
