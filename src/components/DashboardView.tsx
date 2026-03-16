@@ -383,7 +383,7 @@ export default function DashboardView() {
     <ScrollArea className="h-full">
       <div className="p-4 pt-3 max-w-full overflow-hidden space-y-4 module-container">
         {/* Toolbar: Search + Period buttons + Print */}
-        <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex flex-row items-center gap-2 overflow-x-auto pb-1 backdrop-blur-sm">
+        <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex flex-row items-center gap-2 overflow-x-auto pb-1 backdrop-blur-sm bg-background/80 shadow-[0_1px_3px_0_hsl(var(--border)/0.3)]">
           {/* Search */}
           <div className="relative shrink-0" style={{ width: 220 }}>
             <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
@@ -548,7 +548,7 @@ export default function DashboardView() {
                   <div
                     key={item.id}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg border border-border/30 px-3 py-2 transition-colors",
+                      "group flex items-center gap-3 rounded-lg border border-border/30 px-3 py-2 transition-colors",
                       item.isDone && "opacity-50"
                     )}
                   >
@@ -738,21 +738,30 @@ export default function DashboardView() {
                 {programaPendencias.map(p => {
                   const maxBar = Math.max(...programaPendencias.map(x => x.total), 1);
                   return (
-                    <div key={p.id} className="flex items-center gap-3">
-                      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-                      <span className="text-xs text-foreground flex-1 truncate min-w-0">{p.name}</span>
-                      <div className="w-24 h-2 rounded-full bg-secondary overflow-hidden shrink-0">
-                        <div className="h-full rounded-full" style={{ width: `${(p.total / maxBar) * 100}%`, backgroundColor: p.overdue > 0 ? "hsl(var(--destructive))" : "hsl(var(--success))" }} />
-                      </div>
-                      <span className="text-[10px] font-medium text-muted-foreground shrink-0 w-14 text-right">
-                        {p.total} pend.
-                      </span>
-                      {p.overdue > 0 && (
-                        <span className="flex items-center gap-0.5 text-[10px] text-destructive font-medium shrink-0">
-                          <AlertTriangle className="size-3" /> {p.overdue}
-                        </span>
-                      )}
-                    </div>
+                    <Tooltip key={p.id} delayDuration={200}>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-3 cursor-pointer hover:bg-muted/30 rounded-lg px-1 py-0.5 transition-colors">
+                          <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                          <span className="text-xs text-foreground flex-1 truncate min-w-0">{p.name}</span>
+                          <div className="w-24 h-2 rounded-full bg-secondary overflow-hidden shrink-0">
+                            <div className="h-full rounded-full" style={{ width: `${(p.total / maxBar) * 100}%`, backgroundColor: p.overdue > 0 ? "hsl(var(--destructive))" : "hsl(var(--success))" }} />
+                          </div>
+                          <span className="text-[10px] font-medium text-muted-foreground shrink-0 w-14 text-right">
+                            {p.total} pend.
+                          </span>
+                          {p.overdue > 0 && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-destructive font-medium shrink-0">
+                              <AlertTriangle className="size-3" /> {p.overdue}
+                            </span>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs max-w-[220px]">
+                        <p className="font-semibold">{p.name}</p>
+                        <p>{p.total} pendência(s) · {p.overdue} atrasada(s)</p>
+                        <p className="text-muted-foreground">{brl(p.amount)}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   );
                 })}
               </div>

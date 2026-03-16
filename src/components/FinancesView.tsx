@@ -967,6 +967,13 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     const previsto = buildSection(false);
     const realizado = buildSection(true);
 
+    // DOAR KPI — derived from visible section based on viewMode + filters
+    const activeSection = doarViewMode === "previsto" ? previsto : doarViewMode === "realizado" ? realizado : all;
+    const doarTotalRev = activeSection.monthTotalsRev.reduce((s, v) => s + v, 0);
+    const doarTotalExp = activeSection.monthTotalsExp.reduce((s, v) => s + v, 0);
+    const doarBalance = doarTotalRev - doarTotalExp;
+    const doarLastAcc = activeSection.accumulated[activeSection.accumulated.length - 1] || 0;
+
     return {
       months: months.map(m => {
         const name = format(m, "MMM", { locale: ptBR });
@@ -975,8 +982,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       ...all,
       previsto,
       realizado,
+      doarTotalRev, doarTotalExp, doarBalance, doarLastAcc,
     };
-  }, [entries, categories, periodStart, periodEnd, doarHideCarryOver, doarFilterType, doarFilterStatus, doarFilterCategoryId, doarFilterProgramId, doarFilterAccountId, doarFilterPaymentMethod, doarFilterIsFixed]);
+  }, [entries, categories, periodStart, periodEnd, doarHideCarryOver, doarFilterType, doarFilterStatus, doarFilterCategoryId, doarFilterProgramId, doarFilterAccountId, doarFilterPaymentMethod, doarFilterIsFixed, doarViewMode]);
 
   // Indicator chart data
   const reportChartData = useMemo(() => {
@@ -1405,7 +1413,22 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">Data Pagamento Real</Label>
-              <Input type="date" value={realPaymentDate} onChange={(e) => setRealPaymentDate(e.target.value)} />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal text-sm", !realPaymentDate && "text-muted-foreground")}>
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {realPaymentDate ? format(parseEntryDate(realPaymentDate), "dd/MM/yyyy") : "Selecionar"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" locale={ptBR}
+                    selected={realPaymentDate ? parseEntryDate(realPaymentDate) : undefined}
+                    onSelect={(d) => { if (d) setRealPaymentDate(format(d, "yyyy-MM-dd")); }}
+                    className="p-3 pointer-events-auto"
+                    formatters={{ formatCaption: (date) => { const m = format(date, "LLLL", { locale: ptBR }); return m.charAt(0).toUpperCase() + m.slice(1) + " " + format(date, "yyyy"); } }}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
           {editingEntry && (editingEntry.recurrence_type || (editingEntry.installment_group && editingEntry.total_installments > 1)) && (
@@ -1613,11 +1636,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
           {!isPaid && (
             <Button size="sm" variant="secondary" className="gap-1.5"
               onClick={() => setIsPaid(true)}>
-              <Check className="h-3.5 w-3.5" /> Marcar paga
+              <Check className="h-3.5 w-3.5" /> Baixar e salvar
             </Button>
           )}
           <Button size="sm" onClick={createOrUpdateEntry} className="gap-1.5">
-            <Save className="h-3.5 w-3.5" /> {isPaid ? "Salvar e Baixar" : "Salvar"}
+            <Save className="h-3.5 w-3.5" /> {isPaid ? "Baixar e salvar" : "Salvar"}
           </Button>
         </div>
       </div>
@@ -2188,9 +2211,14 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             <Card className="bg-card">
               <CardContent className="p-3">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <CalendarDays className="h-4 w-4" /> Previsão 7 dias
+                  <CalendarDays className="h-4 w-4" /> Previsão Caixa 7D
                 </p>
-                <p className={cn("text-lg font-bold", previsao7d >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(previsao7d)}</p>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <p className={cn("text-lg font-bold", previsao7d > 0 ? "text-[hsl(var(--success))]" : previsao7d < 0 ? "text-destructive" : "text-muted-foreground")}>{brl(previsao7d)}</p>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs max-w-[200px]">Receitas pendentes − Despesas pendentes nos próximos 7 dias</TooltipContent>
+                </Tooltip>
               </CardContent>
             </Card>
             <Card className="bg-card">
@@ -3012,13 +3040,11 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex items-end pb-1">
+                    <div className="flex items-end pb-1 gap-4">
                       <div className="flex items-center gap-1.5">
                         <Switch checked={doarFilterIsFixed} onCheckedChange={setDoarFilterIsFixed} />
                         <Label className="text-xs whitespace-nowrap">Conta fixa</Label>
                       </div>
-                    </div>
-                    <div className="flex items-end pb-1">
                       <div className="flex items-center gap-1.5">
                         <Switch checked={!doarHideCarryOver} onCheckedChange={(c) => setDoarHideCarryOver(!c)} />
                         <Label className="text-xs whitespace-nowrap">Saldo anterior</Label>
@@ -3029,6 +3055,42 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 <div className="border-t border-border/50" />
               </div>
             )}
+
+            {/* DOAR KPI Cards — update in real-time with filters */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+              <Card className="bg-card">
+                <CardContent className="p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <TrendingUp className="h-4 w-4" /> Receitas
+                  </p>
+                  <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(dreData.doarTotalRev)}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card">
+                <CardContent className="p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <TrendingDown className="h-4 w-4" /> Despesas
+                  </p>
+                  <p className="text-lg font-bold text-destructive">{brl(dreData.doarTotalExp)}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card">
+                <CardContent className="p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <Wallet className="h-4 w-4" /> Resultado
+                  </p>
+                  <p className={cn("text-lg font-bold", dreData.doarBalance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(dreData.doarBalance)}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card">
+                <CardContent className="p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <BarChart3 className="h-4 w-4" /> Acumulado
+                  </p>
+                  <p className={cn("text-lg font-bold", dreData.doarLastAcc >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(dreData.doarLastAcc)}</p>
+                </CardContent>
+              </Card>
+            </div>
 
             {/* Conditional DOAR tables based on viewMode */}
             {(doarViewMode === "previsto" || doarViewMode === "all") &&
