@@ -2137,7 +2137,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4 print-fluxo-area max-w-full overflow-hidden module-container">
       {/* Tab buttons + Toolbar on same line */}
-      <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto backdrop-blur-sm">
+      <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto backdrop-blur-sm bg-background/80 shadow-[0_1px_3px_0_hsl(var(--border)/0.3)]">
         <div className="flex items-center gap-1.5 shrink-0">
           {([
             { key: "indicadores" as ViewTab, label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
