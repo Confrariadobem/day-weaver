@@ -2782,6 +2782,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <th key={m} className="text-right p-2 border-b border-border font-bold min-w-[80px] uppercase">{m}</th>
                       ))}
                       <th className="text-right p-2 border-b border-border font-bold min-w-[90px] bg-muted uppercase">TOTAL</th>
+                      <th className="text-right p-2 border-b border-border min-w-[80px] uppercase">MÉDIA</th>
                     </tr>
                   </thead>
                   <tbody>
