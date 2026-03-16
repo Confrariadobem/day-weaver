@@ -2799,6 +2799,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td className={cn("text-right p-2 border-b border-border font-bold", sectionData.carryOver >= 0 ? "text-success" : "text-destructive")}>
                           {brl(sectionData.carryOver)}
                         </td>
+                        <td className="text-right p-2 border-b border-border text-muted-foreground">—</td>
                       </tr>
                     )}
 
