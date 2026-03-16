@@ -3074,7 +3074,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     <TrendingUp className="h-4 w-4" /> Receitas
                   </p>
-                  <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(dreData.doarTotalRev)}</p>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <p className="text-lg font-bold text-[hsl(var(--success))] cursor-help">{brl(dreData.doarTotalRev)}</p>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs">Total de receitas ({doarViewMode === "realizado" ? "realizadas" : doarViewMode === "previsto" ? "previstas" : "todas"}) no período</TooltipContent>
+                  </Tooltip>
                 </CardContent>
               </Card>
               <Card className="bg-card">
@@ -3082,7 +3087,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     <TrendingDown className="h-4 w-4" /> Despesas
                   </p>
-                  <p className="text-lg font-bold text-destructive">{brl(dreData.doarTotalExp)}</p>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <p className="text-lg font-bold text-destructive cursor-help">{brl(dreData.doarTotalExp)}</p>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs">Total de despesas ({doarViewMode === "realizado" ? "realizadas" : doarViewMode === "previsto" ? "previstas" : "todas"}) no período</TooltipContent>
+                  </Tooltip>
                 </CardContent>
               </Card>
               <Card className="bg-card">
@@ -3090,7 +3100,12 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     <Wallet className="h-4 w-4" /> Resultado
                   </p>
-                  <p className={cn("text-lg font-bold", dreData.doarBalance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(dreData.doarBalance)}</p>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <p className={cn("text-lg font-bold cursor-help", dreData.doarBalance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(dreData.doarBalance)}</p>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs">Receitas − Despesas no período</TooltipContent>
+                  </Tooltip>
                 </CardContent>
               </Card>
               <Card className="bg-card">
@@ -3098,7 +3113,18 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     <BarChart3 className="h-4 w-4" /> Acumulado
                   </p>
-                  <p className={cn("text-lg font-bold", dreData.doarLastAcc >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(dreData.doarLastAcc)}</p>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <p className={cn("text-lg font-bold cursor-help", dreData.doarLastAcc >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(dreData.doarLastAcc)}</p>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs max-w-[240px]">
+                      <div className="space-y-1">
+                        <p>Saldo anterior: {brl(dreData.activeCarryOver)}</p>
+                        <p>Resultado período: {brl(dreData.doarBalance)}</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                  <button onClick={() => setViewTab("previsao")} className="text-[9px] text-primary hover:underline mt-1">Ver detalhes →</button>
                 </CardContent>
               </Card>
             </div>
