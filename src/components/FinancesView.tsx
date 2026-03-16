@@ -3056,6 +3056,42 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               </div>
             )}
 
+            {/* DOAR KPI Cards — update in real-time with filters */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+              <Card className="bg-card">
+                <CardContent className="p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <TrendingUp className="h-4 w-4" /> Receitas
+                  </p>
+                  <p className="text-lg font-bold text-[hsl(var(--success))]">{brl(dreData.doarTotalRev)}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card">
+                <CardContent className="p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <TrendingDown className="h-4 w-4" /> Despesas
+                  </p>
+                  <p className="text-lg font-bold text-destructive">{brl(dreData.doarTotalExp)}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card">
+                <CardContent className="p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <Wallet className="h-4 w-4" /> Resultado
+                  </p>
+                  <p className={cn("text-lg font-bold", dreData.doarBalance >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(dreData.doarBalance)}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card">
+                <CardContent className="p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <BarChart3 className="h-4 w-4" /> Acumulado
+                  </p>
+                  <p className={cn("text-lg font-bold", dreData.doarLastAcc >= 0 ? "text-[hsl(var(--success))]" : "text-destructive")}>{brl(dreData.doarLastAcc)}</p>
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Conditional DOAR tables based on viewMode */}
             {(doarViewMode === "previsto" || doarViewMode === "all") &&
               renderDoarTable(dreData.previsto, "PREVISTO", "Contas a Pagar / Receber", "prev")}
