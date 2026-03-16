@@ -188,6 +188,7 @@ export type Database = {
           initial_balance: number
           is_active: boolean | null
           is_default: boolean | null
+          is_immediate_cash: boolean | null
           name: string
           type: string
           updated_at: string
@@ -205,6 +206,7 @@ export type Database = {
           initial_balance?: number
           is_active?: boolean | null
           is_default?: boolean | null
+          is_immediate_cash?: boolean | null
           name: string
           type?: string
           updated_at?: string
@@ -222,6 +224,7 @@ export type Database = {
           initial_balance?: number
           is_active?: boolean | null
           is_default?: boolean | null
+          is_immediate_cash?: boolean | null
           name?: string
           type?: string
           updated_at?: string
