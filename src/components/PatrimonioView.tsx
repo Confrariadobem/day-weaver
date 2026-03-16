@@ -161,6 +161,9 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
   const saveAccount = async () => {
     if (!accName.trim() || !user) return;
     const bal = parseNum(accBalance);
+    // Auto-exclude investment/crypto from immediate cash
+    const excludeTypes = ["investment", "crypto"];
+    const isImmCash = excludeTypes.includes(accType) ? false : accIsImmediateCash;
     const data: any = {
       name: accName, type: accType,
       current_balance: bal,
@@ -168,6 +171,7 @@ export default function PatrimonioView({ onNavigateToFluxo }: PatrimonioViewProp
       closing_day: accClosing ? parseInt(accClosing) : null,
       due_day: accDue ? parseInt(accDue) : null,
       is_active: accIsActive,
+      is_immediate_cash: isImmCash,
     };
     if (editingAccount) {
       await supabase.from("financial_accounts").update(data).eq("id", editingAccount.id);
