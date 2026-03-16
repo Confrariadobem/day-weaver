@@ -786,6 +786,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
   const totalAvailable = accounts.reduce((s, a) => {
     if (a.type === "credit_card") return s;
+    // Respect is_immediate_cash toggle (default true for backward compat)
+    if ((a as any).is_immediate_cash === false) return s;
     return s + a.current_balance;
   }, 0);
 
