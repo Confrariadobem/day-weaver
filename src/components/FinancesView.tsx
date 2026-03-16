@@ -2169,7 +2169,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       )}
 
       {/* KPI Cards — Fluxo operacional (sem repetir Dashboard) */}
-      {(() => {
+      {viewTab === "previsao" && (() => {
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const in7days = new Date(today); in7days.setDate(in7days.getDate() + 7);
         // Contas a Receber: pendentes no período filtrado
