@@ -2853,6 +2853,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td key={i} className="text-right p-2 border-b-2 border-border text-success">{brl(v)}</td>
                       ))}
                       <td className="text-right p-2 border-b-2 border-border text-success">{brl(totalRevYear)}</td>
+                      <td className="text-right p-2 border-b-2 border-border text-muted-foreground">{(() => { const nz = sectionData.monthTotalsRev.filter(v => v > 0).length; return nz > 0 ? brl(totalRevYear / nz) : "—"; })()}</td>
                     </tr>
 
                     {/* ===== DESPESAS GROUP ===== */}
