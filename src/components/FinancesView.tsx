@@ -967,6 +967,13 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     const previsto = buildSection(false);
     const realizado = buildSection(true);
 
+    // DOAR KPI — derived from visible section based on viewMode + filters
+    const activeSection = doarViewMode === "previsto" ? previsto : doarViewMode === "realizado" ? realizado : all;
+    const doarTotalRev = activeSection.monthTotalsRev.reduce((s, v) => s + v, 0);
+    const doarTotalExp = activeSection.monthTotalsExp.reduce((s, v) => s + v, 0);
+    const doarBalance = doarTotalRev - doarTotalExp;
+    const doarLastAcc = activeSection.accumulated[activeSection.accumulated.length - 1] || 0;
+
     return {
       months: months.map(m => {
         const name = format(m, "MMM", { locale: ptBR });
@@ -975,8 +982,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
       ...all,
       previsto,
       realizado,
+      doarTotalRev, doarTotalExp, doarBalance, doarLastAcc,
     };
-  }, [entries, categories, periodStart, periodEnd, doarHideCarryOver, doarFilterType, doarFilterStatus, doarFilterCategoryId, doarFilterProgramId, doarFilterAccountId, doarFilterPaymentMethod, doarFilterIsFixed]);
+  }, [entries, categories, periodStart, periodEnd, doarHideCarryOver, doarFilterType, doarFilterStatus, doarFilterCategoryId, doarFilterProgramId, doarFilterAccountId, doarFilterPaymentMethod, doarFilterIsFixed, doarViewMode]);
 
   // Indicator chart data
   const reportChartData = useMemo(() => {
