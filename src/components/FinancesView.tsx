@@ -2906,6 +2906,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td key={i} className="text-right p-2 border-b-2 border-border text-destructive">{brl(v)}</td>
                       ))}
                       <td className="text-right p-2 border-b-2 border-border text-destructive">{brl(totalExpYear)}</td>
+                      <td className="text-right p-2 border-b-2 border-border text-muted-foreground">{(() => { const nz = sectionData.monthTotalsExp.filter(v => v > 0).length; return nz > 0 ? brl(totalExpYear / nz) : "—"; })()}</td>
                     </tr>
 
                     {/* Balance */}
