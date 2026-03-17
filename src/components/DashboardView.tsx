@@ -19,8 +19,9 @@ import {
   TrendingUp, TrendingDown, Wallet, PiggyBank,
   BarChart3, Building2, FolderKanban, AlertTriangle,
   CalendarCheck, CalendarDays, CalendarRange, Scale, PieChart as PieChartIcon,
-  ArrowRightLeft, Search, Printer, Check, Sun, Lightbulb,
+  ArrowRightLeft, Search, Printer, Check, Sun, Lightbulb, Trash2, Pencil,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
