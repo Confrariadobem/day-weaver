@@ -481,7 +481,7 @@ export default function ProgramsProjectsView({ onTabChange }: { onTabChange?: (t
       <ScrollArea className="h-full">
         <div className="p-4 space-y-4">
           {/* Tab navigation */}
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-2 overflow-x-auto scrollbar-hide">
+          <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex flex-col md:flex-row items-start md:items-center gap-2 overflow-x-auto scrollbar-hide backdrop-blur-sm bg-background/80 shadow-[0_1px_3px_0_hsl(var(--border)/0.3)]">
             {([
               { key: "indicadores" as ProjectTab, label: "Indicadores", icon: <BarChart3 className="h-3 w-3" /> },
               { key: "lista" as ProjectTab, label: "Lista", icon: <ListTodo className="h-3 w-3" /> },
