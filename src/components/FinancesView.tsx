@@ -2053,8 +2053,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </Tooltip>
               </div>
             </div>
-            {renderSharedInterval()}
             {renderSharedHoje()}
+            {renderSharedInterval()}
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button onClick={cycleDoarExpand} className="text-muted-foreground hover:text-primary transition-colors">
