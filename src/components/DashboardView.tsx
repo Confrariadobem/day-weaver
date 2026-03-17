@@ -589,6 +589,12 @@ export default function DashboardView() {
                         {item.entryType === "expense" ? "Pagar" : "Receber"}
                       </Button>
                     )}
+                    <button
+                      onClick={() => deleteScheduleItem(item)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive shrink-0"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 ))}
               </div>
