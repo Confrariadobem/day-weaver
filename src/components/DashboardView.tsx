@@ -757,7 +757,10 @@ export default function DashboardView() {
                   return (
                     <Tooltip key={p.id} delayDuration={200}>
                       <TooltipTrigger asChild>
-                        <div className="flex items-center gap-3 cursor-pointer hover:bg-muted/30 rounded-lg px-1 py-0.5 transition-colors">
+                        <div
+                          className="flex items-center gap-3 cursor-pointer hover:bg-muted/30 rounded-lg px-1 py-0.5 transition-colors"
+                          onClick={() => setPendenciasModalOpen(true)}
+                        >
                           <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
                           <span className="text-xs text-foreground flex-1 truncate min-w-0">{p.name}</span>
                           <div className="w-24 h-2 rounded-full bg-secondary overflow-hidden shrink-0">
@@ -777,6 +780,7 @@ export default function DashboardView() {
                         <p className="font-semibold">{p.name}</p>
                         <p>{p.total} pendência(s) · {p.overdue} atrasada(s)</p>
                         <p className="text-muted-foreground">{brl(p.amount)}</p>
+                        <p className="text-primary mt-1">Clique para ver todas</p>
                       </TooltipContent>
                     </Tooltip>
                   );
@@ -785,6 +789,48 @@ export default function DashboardView() {
             </CardContent>
           </Card>
         )}
+
+        {/* Pendências Modal */}
+        <Dialog open={pendenciasModalOpen} onOpenChange={setPendenciasModalOpen}>
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Pendências por Programa</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {programaPendencias.map(p => {
+                const pendingEntries = filteredEntries.filter(e => !e.is_paid && e.cost_center_id === p.id);
+                return (
+                  <div key={p.id} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                      <span className="text-sm font-semibold">{p.name}</span>
+                      <span className="text-[10px] text-muted-foreground ml-auto">{p.total} pendência(s) · {brl(p.amount)}</span>
+                    </div>
+                    <div className="space-y-1 pl-4">
+                      {pendingEntries.slice(0, 10).map(e => {
+                        const today = new Date(); today.setHours(0, 0, 0, 0);
+                        const isOverdue = new Date(e.entry_date + "T12:00:00") < today;
+                        return (
+                          <div key={e.id} className="flex items-center gap-2 text-xs">
+                            <span className={cn("flex-1 truncate", isOverdue && "text-destructive")}>{e.title}</span>
+                            <span className="text-muted-foreground shrink-0">{format(new Date(e.entry_date + "T12:00:00"), "dd/MM/yyyy")}</span>
+                            <span className={cn("font-medium shrink-0", e.type === "revenue" ? "text-[hsl(var(--success))]" : "text-destructive")}>
+                              {brl(Number(e.amount))}
+                            </span>
+                            {isOverdue && <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />}
+                          </div>
+                        );
+                      })}
+                      {pendingEntries.length > 10 && (
+                        <p className="text-[10px] text-muted-foreground">...e mais {pendingEntries.length - 10} item(ns)</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </ScrollArea>
   );
