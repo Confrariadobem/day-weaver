@@ -1238,6 +1238,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   };
 
   const [doarExpandLevel, setDoarExpandLevel] = useState(2);
+  const doarMonthClickRef = useRef<number>(0);
 
   // Auto-expand RECEITAS/DESPESAS groups when entering DOAR tab
   useEffect(() => {
@@ -2155,18 +2156,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               const yearEnd = format(endOfYear(now), "yyyy-MM-dd");
               const isMonthActive = periodStart === monthStart && periodEnd === monthEnd;
               const isYearActive = periodStart === yearStart && periodEnd === yearEnd;
-              const doarMonthClickRef = React.useRef<number>(0);
               return (
                 <button
                   onClick={() => {
                     const now2 = Date.now();
                     if (now2 - doarMonthClickRef.current < 400) {
-                      // Double click → year
                       setPeriodStart(yearStart); setPeriodEnd(yearEnd);
                       setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
                       setSharedDateFrom(""); setSharedDateTo("");
                     } else {
-                      // Single click → month
                       setPeriodStart(monthStart); setPeriodEnd(monthEnd);
                       setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
                       setSharedDateFrom(""); setSharedDateTo("");
@@ -2899,7 +2897,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <tr className="bg-primary/10">
                       <th colSpan={16} className="text-center p-3 border-b border-border">
                         <h1 className="uppercase font-bold text-sm text-primary tracking-wide">
-                          DOAR — {sectionLabel}
+                          DOAR {sectionLabel}
                         </h1>
                         <p className="text-[0.9em] text-muted-foreground mt-0.5 font-normal">
                           {sectionDesc} — (Período: {format(new Date(periodStart + "T12:00:00"), "dd/MM/yyyy")} a {format(new Date(periodEnd + "T12:00:00"), "dd/MM/yyyy")})
