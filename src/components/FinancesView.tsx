@@ -2856,7 +2856,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground/60">{pctOfCat}%</td>
                     {g.monthAmounts.map((v, mi) => (
                       <td key={mi} className="text-right p-1.5 border-b border-border/50 text-muted-foreground">
-                        {v > 0 ? brl(v) : ""}
+                        {v > 0 ? brl(v) : "—"}
                       </td>
                     ))}
                     <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground font-medium">
