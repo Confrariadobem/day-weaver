@@ -325,6 +325,15 @@ export default function DashboardView() {
     return items.slice(0, 8);
   }, [entries, tasks]);
 
+  const deleteScheduleItem = async (item: typeof todaySchedule[0]) => {
+    if (item.type === "entry") {
+      await supabase.from("financial_entries").delete().eq("id", item.id);
+    } else {
+      await supabase.from("tasks").delete().eq("id", item.id);
+    }
+    fetchData();
+  };
+
   const toggleScheduleItem = async (item: typeof todaySchedule[0]) => {
     if (item.type === "entry") {
       await supabase.from("financial_entries").update({
