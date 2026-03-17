@@ -3259,9 +3259,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
             {/* Conditional DOAR tables based on viewMode */}
             {(doarViewMode === "previsto" || doarViewMode === "all") &&
-              renderDoarTable(dreData.previsto, "PREVISTO", "Contas a Pagar / Receber", "prev")}
+              renderDoarTable(dreData.previsto, "PREVISTO", "", "prev")}
             {(doarViewMode === "realizado" || doarViewMode === "all") &&
-              renderDoarTable(dreData.realizado, "REALIZADO", "Contas Pagas / Recebidas", "real")}
+              renderDoarTable(dreData.realizado, "REALIZADO", "", "real")}
           </div>
           );
         })()}
