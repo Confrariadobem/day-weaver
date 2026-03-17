@@ -1793,8 +1793,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     return (
       <div className="flex items-center gap-3">
         {isIndicadores && (<>
-          {renderSharedInterval()}
           {renderSharedHoje()}
+          {renderSharedInterval()}
         </>)}
 
         {isPrevisao && (() => {
@@ -1869,6 +1869,28 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </Tooltip>
               </div>
             </div>
+            <button
+              onClick={() => {
+                const today = new Date();
+                const todayStr = format(today, "dd/MM/yyyy");
+                if (fluxoDateFrom === todayStr && fluxoDateTo === todayStr) {
+                  setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
+                  setFluxoDateFrom(""); setFluxoDateTo("");
+                } else {
+                  setFluxoCustomFrom(today); setFluxoCustomTo(today);
+                  setFluxoDateFrom(todayStr); setFluxoDateTo(todayStr);
+                }
+              }}
+              className={cn(
+                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                fluxoDateFrom === format(new Date(), "dd/MM/yyyy") && fluxoDateTo === format(new Date(), "dd/MM/yyyy")
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border hover:border-primary/80 hover:bg-primary/5"
+              )}
+            >
+              <CalendarDays className="size-4" />
+              <span className="text-xs font-medium">Hoje</span>
+            </button>
           <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
               <PopoverTrigger asChild>
                 <button
@@ -1913,29 +1935,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </div>
               </PopoverContent>
             </Popover>
-
-            <button
-              onClick={() => {
-                const today = new Date();
-                const todayStr = format(today, "dd/MM/yyyy");
-                if (fluxoDateFrom === todayStr && fluxoDateTo === todayStr) {
-                  setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
-                  setFluxoDateFrom(""); setFluxoDateTo("");
-                } else {
-                  setFluxoCustomFrom(today); setFluxoCustomTo(today);
-                  setFluxoDateFrom(todayStr); setFluxoDateTo(todayStr);
-                }
-              }}
-              className={cn(
-                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
-                fluxoDateFrom === format(new Date(), "dd/MM/yyyy") && fluxoDateTo === format(new Date(), "dd/MM/yyyy")
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border hover:border-primary/80 hover:bg-primary/5"
-              )}
-            >
-              <CalendarDays className="size-4" />
-              <span className="text-xs font-medium">Hoje</span>
-            </button>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button onClick={() => {
@@ -2053,8 +2052,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </Tooltip>
               </div>
             </div>
-            {renderSharedInterval()}
             {renderSharedHoje()}
+            {renderSharedInterval()}
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button onClick={cycleDoarExpand} className="text-muted-foreground hover:text-primary transition-colors">
@@ -2096,8 +2095,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </button>
               )}
             </div>
-            {renderSharedInterval()}
             {renderSharedHoje()}
+            {renderSharedInterval()}
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors">
@@ -3098,7 +3097,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <Card className="bg-card">
                 <CardContent className="p-3">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                    <Wallet className="h-4 w-4" /> Resultado
+                    <Wallet className="h-4 w-4" /> Resultado Atual
                   </p>
                   <Tooltip delayDuration={200}>
                     <TooltipTrigger asChild>
@@ -3111,7 +3110,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <Card className="bg-card">
                 <CardContent className="p-3">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                    <BarChart3 className="h-4 w-4" /> Acumulado
+                    <BarChart3 className="h-4 w-4" /> Resultado Anual
                   </p>
                   <Tooltip delayDuration={200}>
                     <TooltipTrigger asChild>
@@ -3124,7 +3123,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       </div>
                     </TooltipContent>
                   </Tooltip>
-                  <button onClick={() => setViewTab("previsao")} className="text-[9px] text-primary hover:underline mt-1">Ver detalhes →</button>
                 </CardContent>
               </Card>
             </div>
