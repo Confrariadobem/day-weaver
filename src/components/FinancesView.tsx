@@ -2052,7 +2052,45 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </Tooltip>
               </div>
             </div>
-            {renderSharedHoje()}
+            {/* Mês button — single click = month, double click = year */}
+            {(() => {
+              const now = new Date();
+              const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
+              const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
+              const yearStart = format(startOfYear(now), "yyyy-MM-dd");
+              const yearEnd = format(endOfYear(now), "yyyy-MM-dd");
+              const isMonthActive = periodStart === monthStart && periodEnd === monthEnd;
+              const isYearActive = periodStart === yearStart && periodEnd === yearEnd;
+              const doarMonthClickRef = React.useRef<number>(0);
+              return (
+                <button
+                  onClick={() => {
+                    const now2 = Date.now();
+                    if (now2 - doarMonthClickRef.current < 400) {
+                      // Double click → year
+                      setPeriodStart(yearStart); setPeriodEnd(yearEnd);
+                      setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
+                      setSharedDateFrom(""); setSharedDateTo("");
+                    } else {
+                      // Single click → month
+                      setPeriodStart(monthStart); setPeriodEnd(monthEnd);
+                      setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
+                      setSharedDateFrom(""); setSharedDateTo("");
+                    }
+                    doarMonthClickRef.current = now2;
+                  }}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                    isMonthActive || isYearActive
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:border-primary/80 hover:bg-primary/5"
+                  )}
+                >
+                  <CalendarDays className="size-4" />
+                  <span className="text-xs font-medium">{isYearActive ? "Ano" : "Mês"}</span>
+                </button>
+              );
+            })()}
             {renderSharedInterval()}
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
