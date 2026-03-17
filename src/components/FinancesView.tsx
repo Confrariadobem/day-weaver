@@ -1792,10 +1792,48 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
     return (
       <div className="flex items-center gap-3">
-        {isIndicadores && (<>
-          {renderSharedHoje()}
-          {renderSharedInterval()}
-        </>)}
+        {isIndicadores && (() => {
+          const now = new Date();
+          const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
+          const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
+          const yearStart = format(startOfYear(now), "yyyy-MM-dd");
+          const yearEnd = format(endOfYear(now), "yyyy-MM-dd");
+          const isMonthActive = periodStart === monthStart && periodEnd === monthEnd;
+          const isYearActive = periodStart === yearStart && periodEnd === yearEnd;
+          return <>
+            {/* Mês */}
+            <button
+              onClick={() => {
+                setPeriodStart(monthStart); setPeriodEnd(monthEnd);
+                setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
+                setSharedDateFrom(""); setSharedDateTo("");
+              }}
+              className={cn(
+                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                isMonthActive ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/80 hover:bg-primary/5"
+              )}
+            >
+              <CalendarDays className="size-4" />
+              <span className="text-xs font-medium">Mês</span>
+            </button>
+            {/* Ano */}
+            <button
+              onClick={() => {
+                setPeriodStart(yearStart); setPeriodEnd(yearEnd);
+                setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
+                setSharedDateFrom(""); setSharedDateTo("");
+              }}
+              className={cn(
+                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                isYearActive ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/80 hover:bg-primary/5"
+              )}
+            >
+              <CalendarRange className="size-4" />
+              <span className="text-xs font-medium">Ano</span>
+            </button>
+            {renderSharedInterval()}
+          </>;
+        })()}
 
         {isPrevisao && (() => {
           const activeFilterCount = [
