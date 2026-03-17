@@ -865,6 +865,29 @@ export default function ProjectsView() {
                 </div>
               </div>
 
+              {/* Hoje toggle */}
+              <button
+                onClick={() => {
+                  const today = new Date();
+                  const todayStr = format(today, "dd/MM/yyyy");
+                  if (dateFrom === todayStr && dateTo === todayStr) {
+                    handleClearInterval();
+                  } else {
+                    setCustomFrom(today); setCustomTo(today);
+                    setDateFrom(todayStr); setDateTo(todayStr);
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                  dateFrom === format(new Date(), "dd/MM/yyyy") && dateTo === format(new Date(), "dd/MM/yyyy")
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border hover:border-primary/80 hover:bg-primary/5"
+                )}
+              >
+                <CalendarDays className="size-4" />
+                <span className="text-xs font-medium">Hoje</span>
+              </button>
+
               {/* Interval */}
               <Popover open={intervalOpen} onOpenChange={setIntervalOpen}>
                 <PopoverTrigger asChild>
@@ -903,29 +926,6 @@ export default function ProjectsView() {
                   </div>
                 </PopoverContent>
               </Popover>
-
-              {/* Hoje toggle */}
-              <button
-                onClick={() => {
-                  const today = new Date();
-                  const todayStr = format(today, "dd/MM/yyyy");
-                  if (dateFrom === todayStr && dateTo === todayStr) {
-                    handleClearInterval();
-                  } else {
-                    setCustomFrom(today); setCustomTo(today);
-                    setDateFrom(todayStr); setDateTo(todayStr);
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
-                  dateFrom === format(new Date(), "dd/MM/yyyy") && dateTo === format(new Date(), "dd/MM/yyyy")
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border hover:border-primary/80 hover:bg-primary/5"
-                )}
-              >
-                <CalendarDays className="size-4" />
-                <span className="text-xs font-medium">Hoje</span>
-              </button>
 
               {/* EAP */}
               <Tooltip delayDuration={200}>

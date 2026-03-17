@@ -2096,8 +2096,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </button>
               )}
             </div>
-            {renderSharedInterval()}
             {renderSharedHoje()}
+            {renderSharedInterval()}
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
                 <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors">
