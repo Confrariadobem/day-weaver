@@ -3101,9 +3101,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       <Select value={doarViewMode} onValueChange={setDoarViewMode}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="realizado">Realizado</SelectItem>
-                          <SelectItem value="previsto">Previsto</SelectItem>
                           <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="previsto">Previsto</SelectItem>
+                          <SelectItem value="realizado">Realizado</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
