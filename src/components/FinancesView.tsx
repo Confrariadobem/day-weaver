@@ -2156,18 +2156,15 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               const yearEnd = format(endOfYear(now), "yyyy-MM-dd");
               const isMonthActive = periodStart === monthStart && periodEnd === monthEnd;
               const isYearActive = periodStart === yearStart && periodEnd === yearEnd;
-              const doarMonthClickRef = React.useRef<number>(0);
               return (
                 <button
                   onClick={() => {
                     const now2 = Date.now();
                     if (now2 - doarMonthClickRef.current < 400) {
-                      // Double click → year
                       setPeriodStart(yearStart); setPeriodEnd(yearEnd);
                       setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
                       setSharedDateFrom(""); setSharedDateTo("");
                     } else {
-                      // Single click → month
                       setPeriodStart(monthStart); setPeriodEnd(monthEnd);
                       setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
                       setSharedDateFrom(""); setSharedDateTo("");
