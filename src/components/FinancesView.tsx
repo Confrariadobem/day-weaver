@@ -2897,7 +2897,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <tr className="bg-primary/10">
                       <th colSpan={16} className="text-center p-3 border-b border-border">
                         <h1 className="uppercase font-bold text-sm text-primary tracking-wide">
-                          DOAR — {sectionLabel}
+                          DOAR {sectionLabel}
                         </h1>
                         <p className="text-[0.9em] text-muted-foreground mt-0.5 font-normal">
                           {sectionDesc} — (Período: {format(new Date(periodStart + "T12:00:00"), "dd/MM/yyyy")} a {format(new Date(periodEnd + "T12:00:00"), "dd/MM/yyyy")})
