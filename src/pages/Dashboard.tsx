@@ -223,7 +223,7 @@ export default function Dashboard() {
 
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Sticky header — line 1 */}
-        <header className="sticky top-0 z-30 flex-shrink-0 border-b border-border bg-card">
+        <header className="sticky top-0 z-30 flex-shrink-0 border-b border-border bg-background shadow-[0_1px_3px_0_hsl(var(--border)/0.3)]">
           <div className="flex h-14 items-center gap-3 px-4">
             {/* Mobile hamburger */}
             {isMobile && (
