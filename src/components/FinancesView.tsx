@@ -3098,7 +3098,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <Card className="bg-card">
                 <CardContent className="p-3">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                    <Wallet className="h-4 w-4" /> Resultado
+                    <Wallet className="h-4 w-4" /> Resultado Atual
                   </p>
                   <Tooltip delayDuration={200}>
                     <TooltipTrigger asChild>
@@ -3111,7 +3111,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <Card className="bg-card">
                 <CardContent className="p-3">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                    <BarChart3 className="h-4 w-4" /> Acumulado
+                    <BarChart3 className="h-4 w-4" /> Resultado Anual
                   </p>
                   <Tooltip delayDuration={200}>
                     <TooltipTrigger asChild>
@@ -3124,7 +3124,6 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       </div>
                     </TooltipContent>
                   </Tooltip>
-                  <button onClick={() => setViewTab("previsao")} className="text-[9px] text-primary hover:underline mt-1">Ver detalhes →</button>
                 </CardContent>
               </Card>
             </div>
