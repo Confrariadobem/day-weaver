@@ -271,7 +271,7 @@ export default function DashboardView() {
       .filter(p => map.has(p.id))
       .map(p => ({ id: p.id, name: p.name, color: p.color || "#3b82f6", ...map.get(p.id)! }))
       .sort((a, b) => b.overdue - a.overdue || b.total - a.total);
-  }, [entries, programas]);
+  }, [filteredEntries, programas]);
 
   // Programação do Dia
   const todaySchedule = useMemo(() => {
