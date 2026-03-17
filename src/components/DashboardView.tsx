@@ -88,6 +88,7 @@ export default function DashboardView() {
   const [fromText, setFromText] = useState("");
   const [toText, setToText] = useState("");
   const [messageShown, setMessageShown] = useState(false);
+  const [pendenciasModalOpen, setPendenciasModalOpen] = useState(false);
 
   const period = useMemo(() => {
     if (periodKey === "custom") return customRange;
