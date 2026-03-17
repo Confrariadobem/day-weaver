@@ -394,7 +394,8 @@ export default function DashboardView() {
     <ScrollArea className="h-full">
       <div className="p-4 pt-3 max-w-full overflow-hidden space-y-4 module-container">
         {/* Toolbar: Search + Period buttons + Print */}
-        <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex flex-row items-center justify-end gap-2 overflow-x-auto pb-1 backdrop-blur-sm bg-background/80 shadow-[0_1px_3px_0_hsl(var(--border)/0.3)]">
+        <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex flex-row items-center gap-2 overflow-x-auto pb-1 backdrop-blur-sm bg-background/80 shadow-[0_1px_3px_0_hsl(var(--border)/0.3)]">
+          <div className="ml-auto flex items-center gap-2">
           {/* Search */}
           <div className="relative shrink-0" style={{ width: 220 }}>
             <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
@@ -484,12 +485,13 @@ export default function DashboardView() {
           {/* Print button */}
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
-              <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors shrink-0 ml-auto">
+              <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors shrink-0">
                 <Printer className="h-5 w-5" />
               </button>
             </TooltipTrigger>
             <TooltipContent className="text-xs">Imprimir</TooltipContent>
           </Tooltip>
+          </div>
         </div>
 
         {/* KPI Cards Grid */}
