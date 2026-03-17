@@ -1238,6 +1238,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
   };
 
   const [doarExpandLevel, setDoarExpandLevel] = useState(2);
+  const doarMonthClickRef = useRef<number>(0);
 
   // Auto-expand RECEITAS/DESPESAS groups when entering DOAR tab
   useEffect(() => {
