@@ -1793,8 +1793,8 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
     return (
       <div className="flex items-center gap-3">
         {isIndicadores && (<>
-          {renderSharedInterval()}
           {renderSharedHoje()}
+          {renderSharedInterval()}
         </>)}
 
         {isPrevisao && (() => {
