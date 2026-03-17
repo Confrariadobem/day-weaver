@@ -244,7 +244,7 @@ export default function Dashboard() {
         </header>
 
         <div className="flex flex-1 overflow-hidden">
-          <div className={cn("flex-1 overflow-x-hidden overflow-y-auto max-w-full", isMobile && "pb-14")}>
+          <div className={cn("flex-1 overflow-x-hidden overflow-y-auto max-w-full pt-4", isMobile && "pb-14")}>
             {activeModule === "dashboard" && <DashboardView />}
             {activeModule === "calendar" && <CalendarView onTabChange={setCalendarTab} />}
             {activeModule === "finances" && <FinancesView onTabChange={setFinanceTab} walletFilter={walletFilter} onClearWalletFilter={() => setWalletFilter(null)} onNavigateToPatrimonio={() => { setWalletFilter(null); setActiveModule("patrimonio"); }} />}
