@@ -382,7 +382,7 @@ export default function InvestmentsView({ onTabChange }: { onTabChange?: (tab: s
                 (dateFrom || dateTo) ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/80 hover:bg-primary/5"
               )}>
                 <CalendarRange className="size-4" />
-                <span className="text-xs font-medium">Intervalo</span>
+                <span className="text-xs font-medium">Período</span>
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-3" align="start">

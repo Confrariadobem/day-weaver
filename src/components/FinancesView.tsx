@@ -1903,7 +1903,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   )}
                 >
                   <CalendarRange className="size-4" />
-                  <span className="text-xs font-medium">Intervalo</span>
+                  <span className="text-xs font-medium">Período</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-3" align="start">

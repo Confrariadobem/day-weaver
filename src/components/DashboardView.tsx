@@ -380,7 +380,7 @@ export default function DashboardView() {
     { key: "3days", label: "3 Dias", icon: CalendarDays },
     { key: "month", label: "Mês", icon: CalendarCheck },
     { key: "year", label: "Ano", icon: CalendarRange },
-    { key: "custom", label: "Intervalo", icon: CalendarRange },
+    { key: "custom", label: "Período", icon: CalendarRange },
   ];
 
   const fmtRate = (cur: string, rate: number) => {
