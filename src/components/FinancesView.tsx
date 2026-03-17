@@ -2924,7 +2924,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td className="text-right p-2 border-b border-border text-muted-foreground">—</td>
                         {dreData.months.map((m, i) => (
                           <td key={m} className="text-right p-2 border-b border-border">
-                            {i === 0 ? <span className={sectionData.carryOver >= 0 ? "text-success" : "text-destructive"}>{brl(sectionData.carryOver)}</span> : ""}
+                            {i === 0 ? <span className={sectionData.carryOver >= 0 ? "text-success" : "text-destructive"}>{brl(sectionData.carryOver)}</span> : "—"}
                           </td>
                         ))}
                         <td className={cn("text-right p-2 border-b border-border font-bold", sectionData.carryOver >= 0 ? "text-success" : "text-destructive")}>
