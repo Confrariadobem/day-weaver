@@ -2161,20 +2161,31 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   onClick={() => {
                     const now2 = Date.now();
                     if (now2 - doarMonthClickRef.current < 400) {
-                      setPeriodStart(yearStart); setPeriodEnd(yearEnd);
+                      // Double click: if already annual, reset to month (toggle back)
+                      if (isYearActive) {
+                        setPeriodStart(monthStart); setPeriodEnd(monthEnd);
+                      } else {
+                        setPeriodStart(yearStart); setPeriodEnd(yearEnd);
+                      }
                       setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
                       setSharedDateFrom(""); setSharedDateTo("");
                     } else {
-                      setPeriodStart(monthStart); setPeriodEnd(monthEnd);
+                      // Single click: toggle month on/off
+                      if (isMonthActive) {
+                        // Deselect → reset to annual (default)
+                        setPeriodStart(yearStart); setPeriodEnd(yearEnd);
+                      } else {
+                        setPeriodStart(monthStart); setPeriodEnd(monthEnd);
+                      }
                       setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
                       setSharedDateFrom(""); setSharedDateTo("");
                     }
                     doarMonthClickRef.current = now2;
                   }}
                   className={cn(
-                    "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                    "flex items-center gap-2 rounded-xl border px-3 py-1 shrink-0 transition-all duration-200",
                     isMonthActive || isYearActive
-                      ? "bg-primary text-primary-foreground border-primary"
+                      ? "bg-primary text-primary-foreground border-primary animate-[pulse_0.3s_ease-in-out]"
                       : "border-border hover:border-primary/80 hover:bg-primary/5"
                   )}
                 >
@@ -3101,9 +3112,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                       <Select value={doarViewMode} onValueChange={setDoarViewMode}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="realizado">Realizado</SelectItem>
-                          <SelectItem value="previsto">Previsto</SelectItem>
                           <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="previsto">Previsto</SelectItem>
+                          <SelectItem value="realizado">Realizado</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -3259,9 +3270,9 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
             {/* Conditional DOAR tables based on viewMode */}
             {(doarViewMode === "previsto" || doarViewMode === "all") &&
-              renderDoarTable(dreData.previsto, "PREVISTO", "Contas a Pagar / Receber", "prev")}
+              renderDoarTable(dreData.previsto, "PREVISTO", "", "prev")}
             {(doarViewMode === "realizado" || doarViewMode === "all") &&
-              renderDoarTable(dreData.realizado, "REALIZADO", "Contas Pagas / Recebidas", "real")}
+              renderDoarTable(dreData.realizado, "REALIZADO", "", "real")}
           </div>
           );
         })()}
