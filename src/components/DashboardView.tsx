@@ -485,12 +485,13 @@ export default function DashboardView() {
           {/* Print button */}
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
-              <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors shrink-0 ml-auto">
+              <button onClick={handlePrint} className="text-muted-foreground hover:text-primary transition-colors shrink-0">
                 <Printer className="h-5 w-5" />
               </button>
             </TooltipTrigger>
             <TooltipContent className="text-xs">Imprimir</TooltipContent>
           </Tooltip>
+          </div>
         </div>
 
         {/* KPI Cards Grid */}
