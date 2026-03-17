@@ -831,7 +831,7 @@ export default function ProjectsView() {
     <ScrollArea className="h-full">
       <div className={cn("p-4 space-y-4 max-w-full overflow-hidden module-container", isMobile && "px-3")}>
         {/* Tab buttons + Toolbar on same line */}
-        <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto backdrop-blur-sm">
+        <div className="sticky top-0 z-10 py-2 -mx-4 px-4 flex items-center gap-2 overflow-x-auto backdrop-blur-sm bg-background/80 shadow-[0_1px_3px_0_hsl(var(--border)/0.3)]">
           <div className="flex items-center gap-1.5 shrink-0">
             {tabConfig.map(tab => (
               <Button key={tab.key} size="sm"
@@ -896,7 +896,7 @@ export default function ProjectsView() {
                     (dateFrom || dateTo) ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/80 hover:bg-primary/5"
                   )}>
                     <CalendarRange className="size-4" />
-                    <span className="text-xs font-medium">Intervalo</span>
+                    <span className="text-xs font-medium">Período</span>
                   </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-3" align="start">

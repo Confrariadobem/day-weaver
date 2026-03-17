@@ -223,7 +223,7 @@ export default function Dashboard() {
 
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Sticky header — line 1 */}
-        <header className="sticky top-0 z-30 flex-shrink-0 border-b border-border bg-card">
+        <header className="sticky top-0 z-30 flex-shrink-0 border-b border-border bg-background shadow-[0_1px_3px_0_hsl(var(--border)/0.3)]">
           <div className="flex h-14 items-center gap-3 px-4">
             {/* Mobile hamburger */}
             {isMobile && (
@@ -244,7 +244,7 @@ export default function Dashboard() {
         </header>
 
         <div className="flex flex-1 overflow-hidden">
-          <div className={cn("flex-1 overflow-x-hidden overflow-y-auto max-w-full", isMobile && "pb-14")}>
+          <div className={cn("flex-1 overflow-x-hidden overflow-y-auto max-w-full pt-4", isMobile && "pb-14")}>
             {activeModule === "dashboard" && <DashboardView />}
             {activeModule === "calendar" && <CalendarView onTabChange={setCalendarTab} />}
             {activeModule === "finances" && <FinancesView onTabChange={setFinanceTab} walletFilter={walletFilter} onClearWalletFilter={() => setWalletFilter(null)} onNavigateToPatrimonio={() => { setWalletFilter(null); setActiveModule("patrimonio"); }} />}

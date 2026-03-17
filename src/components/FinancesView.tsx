@@ -1726,7 +1726,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
             )}
           >
             <CalendarRange className="size-4" />
-            <span className="text-xs font-medium">Intervalo</span>
+            <span className="text-xs font-medium">Período</span>
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-3" align="start">
@@ -1792,10 +1792,48 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
 
     return (
       <div className="flex items-center gap-3">
-        {isIndicadores && (<>
-          {renderSharedHoje()}
-          {renderSharedInterval()}
-        </>)}
+        {isIndicadores && (() => {
+          const now = new Date();
+          const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
+          const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
+          const yearStart = format(startOfYear(now), "yyyy-MM-dd");
+          const yearEnd = format(endOfYear(now), "yyyy-MM-dd");
+          const isMonthActive = periodStart === monthStart && periodEnd === monthEnd;
+          const isYearActive = periodStart === yearStart && periodEnd === yearEnd;
+          return <>
+            {/* Mês */}
+            <button
+              onClick={() => {
+                setPeriodStart(monthStart); setPeriodEnd(monthEnd);
+                setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
+                setSharedDateFrom(""); setSharedDateTo("");
+              }}
+              className={cn(
+                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                isMonthActive ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/80 hover:bg-primary/5"
+              )}
+            >
+              <CalendarDays className="size-4" />
+              <span className="text-xs font-medium">Mês</span>
+            </button>
+            {/* Ano */}
+            <button
+              onClick={() => {
+                setPeriodStart(yearStart); setPeriodEnd(yearEnd);
+                setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
+                setSharedDateFrom(""); setSharedDateTo("");
+              }}
+              className={cn(
+                "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                isYearActive ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/80 hover:bg-primary/5"
+              )}
+            >
+              <CalendarRange className="size-4" />
+              <span className="text-xs font-medium">Ano</span>
+            </button>
+            {renderSharedInterval()}
+          </>;
+        })()}
 
         {isPrevisao && (() => {
           const activeFilterCount = [
@@ -1869,6 +1907,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </Tooltip>
               </div>
             </div>
+            {/* Hoje */}
             <button
               onClick={() => {
                 const today = new Date();
@@ -1891,6 +1930,61 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
               <CalendarDays className="size-4" />
               <span className="text-xs font-medium">Hoje</span>
             </button>
+            {/* 3 dias */}
+            {(() => {
+              const today = new Date();
+              const in3 = addDays(today, 2);
+              const fromStr = format(today, "dd/MM/yyyy");
+              const toStr = format(in3, "dd/MM/yyyy");
+              const isActive = fluxoDateFrom === fromStr && fluxoDateTo === toStr;
+              return (
+                <button
+                  onClick={() => {
+                    if (isActive) {
+                      setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
+                      setFluxoDateFrom(""); setFluxoDateTo("");
+                    } else {
+                      setFluxoCustomFrom(today); setFluxoCustomTo(in3);
+                      setFluxoDateFrom(fromStr); setFluxoDateTo(toStr);
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                    isActive ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/80 hover:bg-primary/5"
+                  )}
+                >
+                  <CalendarDays className="size-4" />
+                  <span className="text-xs font-medium">3 Dias</span>
+                </button>
+              );
+            })()}
+            {/* Mês */}
+            {(() => {
+              const now = new Date();
+              const fromStr = format(startOfMonth(now), "dd/MM/yyyy");
+              const toStr = format(endOfMonth(now), "dd/MM/yyyy");
+              const isActive = fluxoDateFrom === fromStr && fluxoDateTo === toStr;
+              return (
+                <button
+                  onClick={() => {
+                    if (isActive) {
+                      setFluxoCustomFrom(undefined); setFluxoCustomTo(undefined);
+                      setFluxoDateFrom(""); setFluxoDateTo("");
+                    } else {
+                      setFluxoCustomFrom(startOfMonth(now)); setFluxoCustomTo(endOfMonth(now));
+                      setFluxoDateFrom(fromStr); setFluxoDateTo(toStr);
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                    isActive ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/80 hover:bg-primary/5"
+                  )}
+                >
+                  <CalendarDays className="size-4" />
+                  <span className="text-xs font-medium">Mês</span>
+                </button>
+              );
+            })()}
           <Popover open={fluxoIntervalOpen} onOpenChange={setFluxoIntervalOpen}>
               <PopoverTrigger asChild>
                 <button
@@ -1903,7 +1997,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                   )}
                 >
                   <CalendarRange className="size-4" />
-                  <span className="text-xs font-medium">Intervalo</span>
+                  <span className="text-xs font-medium">Período</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-72 bg-background border rounded-lg shadow-lg p-3 space-y-3" align="start">
@@ -2052,7 +2146,45 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                 </Tooltip>
               </div>
             </div>
-            {renderSharedHoje()}
+            {/* Mês button — single click = month, double click = year */}
+            {(() => {
+              const now = new Date();
+              const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
+              const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
+              const yearStart = format(startOfYear(now), "yyyy-MM-dd");
+              const yearEnd = format(endOfYear(now), "yyyy-MM-dd");
+              const isMonthActive = periodStart === monthStart && periodEnd === monthEnd;
+              const isYearActive = periodStart === yearStart && periodEnd === yearEnd;
+              const doarMonthClickRef = React.useRef<number>(0);
+              return (
+                <button
+                  onClick={() => {
+                    const now2 = Date.now();
+                    if (now2 - doarMonthClickRef.current < 400) {
+                      // Double click → year
+                      setPeriodStart(yearStart); setPeriodEnd(yearEnd);
+                      setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
+                      setSharedDateFrom(""); setSharedDateTo("");
+                    } else {
+                      // Single click → month
+                      setPeriodStart(monthStart); setPeriodEnd(monthEnd);
+                      setSharedCustomFrom(undefined); setSharedCustomTo(undefined);
+                      setSharedDateFrom(""); setSharedDateTo("");
+                    }
+                    doarMonthClickRef.current = now2;
+                  }}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl border px-3 py-1 transition-all duration-200 shrink-0",
+                    isMonthActive || isYearActive
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:border-primary/80 hover:bg-primary/5"
+                  )}
+                >
+                  <CalendarDays className="size-4" />
+                  <span className="text-xs font-medium">{isYearActive ? "Ano" : "Mês"}</span>
+                </button>
+              );
+            })()}
             {renderSharedInterval()}
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
@@ -2724,7 +2856,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                     <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground/60">{pctOfCat}%</td>
                     {g.monthAmounts.map((v, mi) => (
                       <td key={mi} className="text-right p-1.5 border-b border-border/50 text-muted-foreground">
-                        {v > 0 ? brl(v) : ""}
+                        {v > 0 ? brl(v) : "—"}
                       </td>
                     ))}
                     <td className="text-right p-1.5 border-b border-border/50 text-muted-foreground font-medium">
@@ -2770,7 +2902,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                           DOAR — {sectionLabel}
                         </h1>
                         <p className="text-[0.9em] text-muted-foreground mt-0.5 font-normal">
-                          {sectionDesc} — (Período: {format(new Date(periodStart), "dd/MM/yyyy")} a {format(new Date(periodEnd), "dd/MM/yyyy")})
+                          {sectionDesc} — (Período: {format(new Date(periodStart + "T12:00:00"), "dd/MM/yyyy")} a {format(new Date(periodEnd + "T12:00:00"), "dd/MM/yyyy")})
                         </p>
                       </th>
                     </tr>
@@ -2792,7 +2924,7 @@ export default function FinancesView({ onTabChange, walletFilter, onClearWalletF
                         <td className="text-right p-2 border-b border-border text-muted-foreground">—</td>
                         {dreData.months.map((m, i) => (
                           <td key={m} className="text-right p-2 border-b border-border">
-                            {i === 0 ? <span className={sectionData.carryOver >= 0 ? "text-success" : "text-destructive"}>{brl(sectionData.carryOver)}</span> : ""}
+                            {i === 0 ? <span className={sectionData.carryOver >= 0 ? "text-success" : "text-destructive"}>{brl(sectionData.carryOver)}</span> : "—"}
                           </td>
                         ))}
                         <td className={cn("text-right p-2 border-b border-border font-bold", sectionData.carryOver >= 0 ? "text-success" : "text-destructive")}>
