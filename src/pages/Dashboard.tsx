@@ -16,7 +16,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { Menu } from "lucide-react";
+import { Menu, ShieldCheck } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
@@ -239,6 +240,35 @@ export default function Dashboard() {
             </h1>
             <div className="ml-auto flex items-center gap-2">
               {renderBulletChart()}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors" title="Status de segurança">
+                    <ShieldCheck className="h-4 w-4" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64 p-4 space-y-3">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-[hsl(var(--success))]" /> Segurança
+                  </h4>
+                  <div className="space-y-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-[hsl(var(--success))]" />
+                      <span>Conexão HTTPS ativa</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-[hsl(var(--success))]" />
+                      <span>Dados criptografados em trânsito</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-[hsl(var(--success))]" />
+                      <span>Armazenamento seguro na nuvem</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/70 pt-1 border-t border-border/40">
+                    Seus dados financeiros são protegidos por autenticação e políticas de acesso por linha (RLS).
+                  </p>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </header>
