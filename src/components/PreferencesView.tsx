@@ -634,13 +634,14 @@ export default function PreferencesView() {
               </AccordionItem>
             )}
 
-            {/* ═══════════ SEGURANÇA ═══════════ */}
+            {/* ═══════════ SEGURANÇA (inclui Privacidade + Limpeza) ═══════════ */}
             <AccordionItem value="security" className="border-none">
               <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
                 <span className="flex items-center gap-2"><Shield className="h-4 w-4 text-emerald-500" /> Segurança</span>
               </AccordionTrigger>
               <AccordionContent className="px-4 pt-6 pb-16 space-y-6">
-                {/* Change password */}
+
+                {/* ── Alterar senha ── */}
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold flex items-center gap-2"><Lock className="h-3.5 w-3.5" /> Alterar senha</Label>
                   <Input type="password" placeholder="Senha atual" className="max-w-sm text-sm" />
@@ -649,7 +650,7 @@ export default function PreferencesView() {
                   <Button size="sm" className="gap-1.5 text-xs"><Lock className="h-3.5 w-3.5" /> Atualizar senha</Button>
                 </div>
 
-                {/* 2FA — UI only */}
+                {/* ── 2FA — UI only ── */}
                 <div className="space-y-3 rounded-lg border border-border/40 p-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -664,92 +665,91 @@ export default function PreferencesView() {
                   </div>
                 </div>
 
-                {/* Backup */}
+                {/* ── Backup ── */}
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold flex items-center gap-2"><Download className="h-3.5 w-3.5" /> Backup de dados</Label>
                   <p className="text-[11px] text-muted-foreground">Exporte todos os seus dados para manter um backup pessoal.</p>
                   <Button variant="outline" size="sm" className="gap-1.5 text-xs"><FileArchive className="h-3.5 w-3.5" /> Exportar backup (ZIP)</Button>
                 </div>
-              </AccordionContent>
-            </AccordionItem>
 
-            {/* ═══════════ PRIVACIDADE ═══════════ */}
-            <AccordionItem value="privacy" className="border-none">
-              <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
-                <span className="flex items-center gap-2"><EyeOff className="h-4 w-4 text-violet-500" /> Privacidade</span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pt-6 pb-16 space-y-6">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-xs font-semibold">Esconder gastos pessoais</Label>
-                      <p className="text-[11px] text-muted-foreground">Oculte lançamentos marcados como pessoais de outros usuários com acesso.</p>
-                    </div>
-                    <Switch />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-xs font-semibold">Esconder saldo total</Label>
-                      <p className="text-[11px] text-muted-foreground">Membros da família e time não verão o saldo consolidado.</p>
-                    </div>
-                    <Switch />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-xs font-semibold">Modo discreto no dashboard</Label>
-                      <p className="text-[11px] text-muted-foreground">Valores são substituídos por ••• até clicar.</p>
-                    </div>
-                    <Switch />
-                  </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
+                {/* ── Privacidade (sub-seção) ── */}
+                <Accordion type="multiple" className="w-full">
+                  <AccordionItem value="privacy-sub" className="border border-border/40 rounded-lg overflow-hidden">
+                    <AccordionTrigger className="px-3 py-2 text-xs font-semibold hover:no-underline bg-muted/20">
+                      <span className="flex items-center gap-2"><EyeOff className="h-3.5 w-3.5 text-violet-500" /> Privacidade</span>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-3 pb-3 pt-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-xs font-semibold">Esconder gastos pessoais</Label>
+                          <p className="text-[11px] text-muted-foreground">Oculte lançamentos marcados como pessoais de outros usuários com acesso.</p>
+                        </div>
+                        <Switch />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-xs font-semibold">Esconder saldo total</Label>
+                          <p className="text-[11px] text-muted-foreground">Membros da família e time não verão o saldo consolidado.</p>
+                        </div>
+                        <Switch />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-xs font-semibold">Modo discreto no dashboard</Label>
+                          <p className="text-[11px] text-muted-foreground">Valores são substituídos por ••• até clicar.</p>
+                        </div>
+                        <Switch />
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
 
-            {/* ═══════════ LIMPEZA DE DADOS ═══════════ */}
-            <AccordionItem value="data-cleanup" className="border-none">
-              <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
-                <span className="flex items-center gap-2"><Database className="h-4 w-4 text-destructive" /> Limpeza de Dados</span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pt-6 pb-16 space-y-4">
-                <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-3 mb-2">
-                  <p className="text-xs text-destructive font-medium flex items-center gap-2"><AlertTriangle className="h-3.5 w-3.5" /> Ações irreversíveis — confirme antes de prosseguir.</p>
-                </div>
-                <p className="text-[11px] text-muted-foreground">Selecione módulos para limpar dados.</p>
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between rounded-lg border border-border/40 p-2 bg-muted/20">
-                    <div className="flex items-center gap-2">
-                      <Database className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-xs font-semibold">Selecionar Todos</span>
-                    </div>
-                    <Switch checked={allDataToggled} onCheckedChange={toggleAllData} />
-                  </div>
-                  {DATA_MODULES.map(mod => (
-                    <ToggleRow
-                      key={mod.key}
-                      icon={DATA_MODULE_ICONS[mod.key]}
-                      iconColor={CALENDAR_PALETTE.events}
-                      label={mod.label}
-                      desc={mod.desc}
-                      enabled={!!dataToggles[mod.key]}
-                      onToggle={() => setDataToggles(prev => ({ ...prev, [mod.key]: !prev[mod.key] }))}
-                      onDoubleClick={() => setDataEditDialog({ open: true, key: mod.key, label: mod.label })}
-                    />
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 pt-3">
-                  <Button variant="destructive" size="sm" className="gap-1.5 text-xs" onClick={handleClearData}
-                    disabled={!DATA_MODULES.some(m => dataToggles[m.key])}>
-                    <Trash2 className="h-3.5 w-3.5" /> Limpar selecionados
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-xs ml-auto" onClick={() => setDataToggles({})}>Cancelar</Button>
-                </div>
+                  {/* ── Limpeza de Dados (sub-seção com alerta vermelho) ── */}
+                  <AccordionItem value="data-cleanup-sub" className="border border-destructive/30 rounded-lg overflow-hidden mt-2">
+                    <AccordionTrigger className="px-3 py-2 text-xs font-semibold hover:no-underline bg-destructive/5">
+                      <span className="flex items-center gap-2"><Lock className="h-3.5 w-3.5 text-destructive" /> Limpeza de Dados</span>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-3 pb-3 pt-3 space-y-4">
+                      <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-3">
+                        <p className="text-xs text-destructive font-medium flex items-center gap-2"><AlertTriangle className="h-3.5 w-3.5" /> Ações irreversíveis — confirme antes de prosseguir.</p>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">Selecione módulos para limpar dados.</p>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between rounded-lg border border-border/40 p-2 bg-muted/20">
+                          <div className="flex items-center gap-2">
+                            <Database className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-xs font-semibold">Selecionar Todos</span>
+                          </div>
+                          <Switch checked={allDataToggled} onCheckedChange={toggleAllData} />
+                        </div>
+                        {DATA_MODULES.map(mod => (
+                          <ToggleRow
+                            key={mod.key}
+                            icon={DATA_MODULE_ICONS[mod.key]}
+                            iconColor={CALENDAR_PALETTE.events}
+                            label={mod.label}
+                            desc={mod.desc}
+                            enabled={!!dataToggles[mod.key]}
+                            onToggle={() => setDataToggles(prev => ({ ...prev, [mod.key]: !prev[mod.key] }))}
+                            onDoubleClick={() => setDataEditDialog({ open: true, key: mod.key, label: mod.label })}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2 pt-3">
+                        <Button variant="destructive" size="sm" className="gap-1.5 text-xs" onClick={handleClearData}
+                          disabled={!DATA_MODULES.some(m => dataToggles[m.key])}>
+                          <Trash2 className="h-3.5 w-3.5" /> Limpar selecionados
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-xs ml-auto" onClick={() => setDataToggles({})}>Cancelar</Button>
+                      </div>
+                      <div className="pt-4 border-t border-border/40 space-y-2">
+                        <Label className="text-xs font-semibold">Exportar todos os dados</Label>
+                        <p className="text-[11px] text-muted-foreground">Gere um arquivo ZIP com todos os seus dados em formato CSV.</p>
+                        <Button variant="outline" size="sm" className="gap-1.5 text-xs"><FileArchive className="h-3.5 w-3.5" /> Exportar ZIP</Button>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
 
-                {/* Export ZIP */}
-                <div className="pt-4 border-t border-border/40 space-y-2">
-                  <Label className="text-xs font-semibold">Exportar todos os dados</Label>
-                  <p className="text-[11px] text-muted-foreground">Gere um arquivo ZIP com todos os seus dados em formato CSV.</p>
-                  <Button variant="outline" size="sm" className="gap-1.5 text-xs"><FileArchive className="h-3.5 w-3.5" /> Exportar ZIP</Button>
-                </div>
               </AccordionContent>
             </AccordionItem>
 
@@ -808,7 +808,6 @@ export default function PreferencesView() {
                 </div>
               </AccordionContent>
             </AccordionItem>
-
 
             {(
               <AccordionItem value="calendar" className="border-none">
