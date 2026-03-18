@@ -604,43 +604,7 @@ export default function PreferencesView() {
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* ── Limpeza de dados ── */}
-                    <AccordionItem value="advanced-sub" className="border border-border/40 rounded-lg overflow-hidden mt-2">
-                      <AccordionTrigger className="px-3 py-2 text-xs font-semibold hover:no-underline bg-muted/20">
-                        <span className="flex items-center gap-2"><Database className="h-3.5 w-3.5 text-destructive" /> Limpeza de dados</span>
-                      </AccordionTrigger>
-                      <AccordionContent className="px-3 pb-3 pt-3">
-                        <p className="text-[11px] text-muted-foreground mb-2">Selecione módulos para limpar dados. Ação irreversível.</p>
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between rounded-lg border border-border/40 p-2 bg-muted/20">
-                            <div className="flex items-center gap-2">
-                              <Database className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-xs font-semibold">Selecionar Todos</span>
-                            </div>
-                            <Switch checked={allDataToggled} onCheckedChange={toggleAllData} />
-                          </div>
-                          {DATA_MODULES.map(mod => (
-                            <ToggleRow
-                              key={mod.key}
-                              icon={DATA_MODULE_ICONS[mod.key]}
-                              iconColor={CALENDAR_PALETTE.events}
-                              label={mod.label}
-                              desc={mod.desc}
-                              enabled={!!dataToggles[mod.key]}
-                              onToggle={() => setDataToggles(prev => ({ ...prev, [mod.key]: !prev[mod.key] }))}
-                              onDoubleClick={() => setDataEditDialog({ open: true, key: mod.key, label: mod.label })}
-                            />
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-2 pt-3">
-                          <Button variant="destructive" size="sm" className="gap-1.5 text-xs" onClick={handleClearData}
-                            disabled={!DATA_MODULES.some(m => dataToggles[m.key])}>
-                            <Trash2 className="h-3.5 w-3.5" /> Limpar selecionados
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-xs ml-auto" onClick={() => setDataToggles({})}>Cancelar</Button>
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
+                    {/* Limpeza de dados moved to top-level section */}
                   </Accordion>
 
                   {/* Mostrar mensagens de dicas — inline toggle */}
