@@ -634,7 +634,182 @@ export default function PreferencesView() {
               </AccordionItem>
             )}
 
-            {/* ═══════════ CALENDÁRIO ═══════════ */}
+            {/* ═══════════ SEGURANÇA ═══════════ */}
+            <AccordionItem value="security" className="border-none">
+              <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
+                <span className="flex items-center gap-2"><Shield className="h-4 w-4 text-emerald-500" /> Segurança</span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pt-6 pb-16 space-y-6">
+                {/* Change password */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold flex items-center gap-2"><Lock className="h-3.5 w-3.5" /> Alterar senha</Label>
+                  <Input type="password" placeholder="Senha atual" className="max-w-sm text-sm" />
+                  <Input type="password" placeholder="Nova senha" className="max-w-sm text-sm" />
+                  <Input type="password" placeholder="Confirmar nova senha" className="max-w-sm text-sm" />
+                  <Button size="sm" className="gap-1.5 text-xs"><Lock className="h-3.5 w-3.5" /> Atualizar senha</Button>
+                </div>
+
+                {/* 2FA — UI only */}
+                <div className="space-y-3 rounded-lg border border-border/40 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-semibold flex items-center gap-2"><KeyRound className="h-3.5 w-3.5" /> Autenticação em dois fatores (2FA)</Label>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Use um app autenticador (Google Authenticator, Authy) para maior segurança.</p>
+                    </div>
+                    <Switch disabled />
+                  </div>
+                  <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
+                    <p className="text-xs text-primary font-medium">💡 Ative 2FA em 1 minuto — proteja sua conta com um app autenticador.</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Em breve disponível.</p>
+                  </div>
+                </div>
+
+                {/* Backup */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold flex items-center gap-2"><Download className="h-3.5 w-3.5" /> Backup de dados</Label>
+                  <p className="text-[11px] text-muted-foreground">Exporte todos os seus dados para manter um backup pessoal.</p>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs"><FileArchive className="h-3.5 w-3.5" /> Exportar backup (ZIP)</Button>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* ═══════════ PRIVACIDADE ═══════════ */}
+            <AccordionItem value="privacy" className="border-none">
+              <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
+                <span className="flex items-center gap-2"><EyeOff className="h-4 w-4 text-violet-500" /> Privacidade</span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pt-6 pb-16 space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-semibold">Esconder gastos pessoais</Label>
+                      <p className="text-[11px] text-muted-foreground">Oculte lançamentos marcados como pessoais de outros usuários com acesso.</p>
+                    </div>
+                    <Switch />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-semibold">Esconder saldo total</Label>
+                      <p className="text-[11px] text-muted-foreground">Membros da família e time não verão o saldo consolidado.</p>
+                    </div>
+                    <Switch />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-semibold">Modo discreto no dashboard</Label>
+                      <p className="text-[11px] text-muted-foreground">Valores são substituídos por ••• até clicar.</p>
+                    </div>
+                    <Switch />
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* ═══════════ LIMPEZA DE DADOS ═══════════ */}
+            <AccordionItem value="data-cleanup" className="border-none">
+              <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
+                <span className="flex items-center gap-2"><Database className="h-4 w-4 text-destructive" /> Limpeza de Dados</span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pt-6 pb-16 space-y-4">
+                <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-3 mb-2">
+                  <p className="text-xs text-destructive font-medium flex items-center gap-2"><AlertTriangle className="h-3.5 w-3.5" /> Ações irreversíveis — confirme antes de prosseguir.</p>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Selecione módulos para limpar dados.</p>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between rounded-lg border border-border/40 p-2 bg-muted/20">
+                    <div className="flex items-center gap-2">
+                      <Database className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs font-semibold">Selecionar Todos</span>
+                    </div>
+                    <Switch checked={allDataToggled} onCheckedChange={toggleAllData} />
+                  </div>
+                  {DATA_MODULES.map(mod => (
+                    <ToggleRow
+                      key={mod.key}
+                      icon={DATA_MODULE_ICONS[mod.key]}
+                      iconColor={CALENDAR_PALETTE.events}
+                      label={mod.label}
+                      desc={mod.desc}
+                      enabled={!!dataToggles[mod.key]}
+                      onToggle={() => setDataToggles(prev => ({ ...prev, [mod.key]: !prev[mod.key] }))}
+                      onDoubleClick={() => setDataEditDialog({ open: true, key: mod.key, label: mod.label })}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 pt-3">
+                  <Button variant="destructive" size="sm" className="gap-1.5 text-xs" onClick={handleClearData}
+                    disabled={!DATA_MODULES.some(m => dataToggles[m.key])}>
+                    <Trash2 className="h-3.5 w-3.5" /> Limpar selecionados
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-xs ml-auto" onClick={() => setDataToggles({})}>Cancelar</Button>
+                </div>
+
+                {/* Export ZIP */}
+                <div className="pt-4 border-t border-border/40 space-y-2">
+                  <Label className="text-xs font-semibold">Exportar todos os dados</Label>
+                  <p className="text-[11px] text-muted-foreground">Gere um arquivo ZIP com todos os seus dados em formato CSV.</p>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs"><FileArchive className="h-3.5 w-3.5" /> Exportar ZIP</Button>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* ═══════════ AVANÇADO ═══════════ */}
+            <AccordionItem value="advanced" className="border-none">
+              <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
+                <span className="flex items-center gap-2"><Settings2 className="h-4 w-4 text-indigo-500" /> Avançado</span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pt-6 pb-16 space-y-6">
+                {/* 2FA extras */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold flex items-center gap-2"><KeyRound className="h-3.5 w-3.5" /> Configurações avançadas de 2FA</Label>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-normal">Exigir 2FA para ações críticas</Label>
+                      <p className="text-[10px] text-muted-foreground">Excluir dados, alterar roles, remover co-admins.</p>
+                    </div>
+                    <Switch disabled />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-normal">Códigos de recuperação</Label>
+                      <p className="text-[10px] text-muted-foreground">Gere códigos para usar caso perca o autenticador.</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="text-xs" disabled>Gerar códigos</Button>
+                  </div>
+                </div>
+
+                {/* Backup extras */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold flex items-center gap-2"><Download className="h-3.5 w-3.5" /> Backup avançado</Label>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-normal">Backup automático semanal</Label>
+                      <p className="text-[10px] text-muted-foreground">Salva snapshot semanal dos metadados no vault.</p>
+                    </div>
+                    <Switch disabled />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-normal">Trava anti-delete</Label>
+                      <p className="text-[10px] text-muted-foreground">Bloqueia exclusões permanentes por 30 dias. O Proprietário deve aprovar.</p>
+                    </div>
+                    <Switch disabled />
+                  </div>
+                </div>
+
+                {/* Export extras */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold flex items-center gap-2"><FileArchive className="h-3.5 w-3.5" /> Exportações</Label>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="text-xs gap-1.5" disabled><FileArchive className="h-3.5 w-3.5" /> Exportar PDF</Button>
+                    <Button variant="outline" size="sm" className="text-xs gap-1.5" disabled><FileArchive className="h-3.5 w-3.5" /> Exportar CSV</Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Exportações avançadas em breve.</p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+
             {(
               <AccordionItem value="calendar" className="border-none">
                 <AccordionTrigger className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2.5 px-4 border-b border-border font-semibold text-sm hover:no-underline">
